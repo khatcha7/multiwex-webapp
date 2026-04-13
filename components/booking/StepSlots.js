@@ -52,14 +52,14 @@ export default function StepSlots() {
               onClick={() => open && setDate(d)}
               disabled={!open}
               className={`shrink-0 rounded-xl border px-4 py-3 text-center transition ${
-                active ? 'border-mw-cyan bg-mw-cyan text-black shadow-neon-cyan' : 'border-white/15 bg-white/[0.03] hover:border-white/40'
+                active ? 'border-mw-pink bg-mw-pink text-black shadow-neon-pink' : 'border-white/15 bg-white/[0.03] hover:border-white/40'
               } ${!open ? 'cursor-not-allowed opacity-30' : ''}`}
             >
               <div className="text-[10px] font-bold uppercase">{dayLabelsFr[date.getDay()]}</div>
               <div className="text-xl font-black">{date.getDate()}</div>
               <div className="text-[10px]">{date.toLocaleDateString('fr-FR', { month: 'short' })}</div>
               {isWed && open && (
-                <div className={`mt-1 text-[9px] font-bold ${active ? 'text-mw-red' : 'text-mw-cyan'}`}>-50%</div>
+                <div className={`mt-1 text-[9px] font-bold ${active ? 'text-mw-red' : 'text-mw-pink'}`}>-50%</div>
               )}
             </button>
           );
@@ -78,7 +78,7 @@ export default function StepSlots() {
                   key={a.id}
                   onClick={() => setActiveActivity(a.id)}
                   className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    active ? 'border-mw-cyan bg-mw-cyan/10 text-mw-cyan' : 'border-white/15 text-white/70 hover:border-white/40'
+                    active ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 text-white/70 hover:border-white/40'
                   }`}
                 >
                   {chosen ? '✓ ' : ''}{a.name}
@@ -113,10 +113,10 @@ export default function StepSlots() {
                   disabled={conflict}
                   className={`rounded-lg border py-2.5 text-sm font-bold transition ${
                     selected
-                      ? 'border-mw-cyan bg-mw-cyan text-black shadow-neon-cyan'
+                      ? 'border-mw-pink bg-mw-pink text-black shadow-neon-pink'
                       : conflict
                       ? 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20 line-through'
-                      : 'border-white/15 bg-white/[0.03] text-white hover:border-mw-cyan'
+                      : 'border-white/15 bg-white/[0.03] text-white hover:border-mw-pink'
                   }`}
                 >
                   {slot.start}

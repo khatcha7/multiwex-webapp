@@ -4,7 +4,6 @@
 
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Inter', system-ui, sans-serif;
 }
 
 html, body {
@@ -16,18 +15,19 @@ html, body {
 
 body {
   background-image:
-    radial-gradient(circle at 15% 10%, rgba(0, 217, 255, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(228, 13, 13, 0.06) 0%, transparent 40%);
+    radial-gradient(circle at 15% 10%, rgba(255, 0, 125, 0.10) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(255, 0, 84, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(0, 217, 255, 0.05) 0%, transparent 50%);
   background-attachment: fixed;
   min-height: 100vh;
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-mw-cyan px-6 py-3 font-bold text-black transition hover:shadow-neon-cyan hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/40 disabled:shadow-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-mw-pink px-6 py-3 font-bold text-white transition hover:shadow-neon-pink hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/30 disabled:shadow-none;
   }
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3 font-medium text-white transition hover:border-mw-cyan hover:text-mw-cyan;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3 font-medium text-white transition hover:border-mw-pink hover:text-mw-pink;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-mw-red px-6 py-3 font-bold text-white transition hover:shadow-neon-red hover:brightness-110;
@@ -36,13 +36,13 @@ body {
     @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm transition;
   }
   .card-selected {
-    @apply border-mw-cyan shadow-neon-cyan;
+    @apply border-mw-pink shadow-neon-pink;
   }
   .chip {
     @apply inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80;
   }
-  .chip-cyan {
-    @apply border-mw-cyan/60 bg-mw-cyan/10 text-mw-cyan;
+  .chip-pink {
+    @apply border-mw-pink/60 bg-mw-pink/10 text-mw-pink;
   }
   .chip-red {
     @apply border-mw-red/60 bg-mw-red/10 text-mw-red;
@@ -51,9 +51,9 @@ body {
     @apply text-3xl md:text-5xl font-black tracking-tight;
   }
   .input {
-    @apply w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder-white/40 outline-none transition focus:border-mw-cyan focus:shadow-neon-cyan;
+    @apply w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder-white/40 outline-none transition focus:border-mw-pink focus:shadow-neon-pink;
   }
 }
 
 .scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0, 217, 255, 0.4); border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255, 0, 125, 0.5); border-radius: 999px; }

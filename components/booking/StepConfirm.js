@@ -13,19 +13,19 @@ export default function StepConfirm({ onRestart }) {
 
   return (
     <div className="text-center">
-      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-mw-cyan/20 text-5xl shadow-neon-cyan">
+      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-mw-pink/20 text-5xl shadow-neon-pink">
         ✓
       </div>
       <h1 className="section-title mb-2">Réservation confirmée&nbsp;!</h1>
       <p className="mb-6 text-white/60">
-        Un email de confirmation a été envoyé à <span className="text-mw-cyan">{booking.customer.email}</span>
+        Un email de confirmation a été envoyé à <span className="text-mw-pink">{booking.customer.email}</span>
         <span className="text-xs text-white/40"> (simulation démo)</span>
       </p>
-      <div className="mx-auto max-w-md rounded-2xl border border-mw-cyan/40 bg-gradient-to-br from-mw-cyan/10 to-transparent p-6 text-left">
+      <div className="mx-auto max-w-md rounded-2xl border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-white/50">Numéro</div>
-            <div className="font-mono text-lg font-black text-mw-cyan">{booking.id}</div>
+            <div className="font-mono text-lg font-black text-mw-pink">{booking.id}</div>
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider text-white/50">Total</div>
@@ -39,7 +39,7 @@ export default function StepConfirm({ onRestart }) {
           {booking.items.map((i, idx) => (
             <div key={idx} className="flex items-center justify-between rounded-lg bg-white/[0.05] p-2 text-sm">
               <span className="font-medium">{i.activityName}</span>
-              <span className="font-mono text-mw-cyan">{i.start}</span>
+              <span className="font-mono text-mw-pink">{i.start}</span>
             </div>
           ))}
         </div>

@@ -16,9 +16,10 @@ export default function Header() {
           <span className="hidden font-black tracking-tight text-white sm:block">MULTIWEX</span>
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/" className="text-sm font-medium text-white/80 hover:text-mw-cyan">Accueil</Link>
-          <Link href="/booking" className="text-sm font-medium text-white/80 hover:text-mw-cyan">Réserver</Link>
-          <Link href="/account" className="text-sm font-medium text-white/80 hover:text-mw-cyan">Compte</Link>
+          <Link href="/" className="text-sm font-medium text-white/80 hover:text-mw-pink">Accueil</Link>
+          <Link href="/booking" className="text-sm font-medium text-white/80 hover:text-mw-pink">Réserver</Link>
+          <Link href="/giftcard" className="text-sm font-medium text-white/80 hover:text-mw-pink">🎁 Carte cadeau</Link>
+          <Link href="/account" className="text-sm font-medium text-white/80 hover:text-mw-pink">Compte</Link>
           <Link href="/booking" className="btn-primary !py-2 !px-5 text-sm">
             Panier {count > 0 && <span className="ml-1 rounded-full bg-black/20 px-2 text-xs">{count}</span>}
           </Link>
@@ -35,7 +36,8 @@ export default function Header() {
         <div className="border-t border-white/10 bg-mw-darker md:hidden">
           <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-3">
             <Link href="/" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/90 hover:bg-white/5">Accueil</Link>
-            <Link href="/booking" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/90 hover:bg-white/5">Réserver {count > 0 && <span className="ml-2 rounded-full bg-mw-cyan px-2 text-xs font-bold text-black">{count}</span>}</Link>
+            <Link href="/booking" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/90 hover:bg-white/5">Réserver {count > 0 && <span className="ml-2 rounded-full bg-mw-pink px-2 text-xs font-bold text-white">{count}</span>}</Link>
+            <Link href="/giftcard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/90 hover:bg-white/5">🎁 Carte cadeau</Link>
             <Link href="/account" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/90 hover:bg-white/5">Compte</Link>
             <Link href="/admin" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-white/60 hover:bg-white/5 text-sm">Admin</Link>
           </nav>

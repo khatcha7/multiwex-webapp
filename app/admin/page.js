@@ -42,7 +42,7 @@ export default function AdminPage() {
     return (
       <div className="mx-auto max-w-sm px-4 py-20">
         <h1 className="section-title mb-2 text-center">Admin</h1>
-        <p className="mb-6 text-center text-white/60">Code d'accès démo&nbsp;: <code className="text-mw-cyan">admin</code></p>
+        <p className="mb-6 text-center text-white/60">Code d'accès démo&nbsp;: <code className="text-mw-pink">admin</code></p>
         <div className="space-y-3">
           <input
             type="password"
@@ -89,10 +89,10 @@ export default function AdminPage() {
                 <div key={name}>
                   <div className="mb-1 flex justify-between text-sm">
                     <span className="font-medium">{name}</span>
-                    <span className="font-mono text-mw-cyan">{total.toFixed(0)}€</span>
+                    <span className="font-mono text-mw-pink">{total.toFixed(0)}€</span>
                   </div>
                   <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-mw-cyan to-mw-cyan/60" style={{ width: `${pct}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-mw-pink to-mw-pink/60" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -119,7 +119,7 @@ export default function AdminPage() {
             <tbody>
               {bookings.slice(0, 20).map((b) => (
                 <tr key={b.id} className="border-t border-white/5">
-                  <td className="py-2 font-mono text-xs text-mw-cyan">{b.id}</td>
+                  <td className="py-2 font-mono text-xs text-mw-pink">{b.id}</td>
                   <td className="py-2">{b.customer.name}</td>
                   <td className="py-2 text-white/70">{new Date(b.date).toLocaleDateString('fr-FR')}</td>
                   <td className="py-2 text-xs text-white/60">{b.items.map((i) => i.activityName).join(', ')}</td>
@@ -136,9 +136,9 @@ export default function AdminPage() {
 
 function KPI({ label, value, sub, accent }) {
   return (
-    <div className={`rounded-2xl border p-5 ${accent ? 'border-mw-cyan/40 bg-mw-cyan/10' : 'border-white/10 bg-white/[0.03]'}`}>
+    <div className={`rounded-2xl border p-5 ${accent ? 'border-mw-pink/40 bg-mw-pink/10' : 'border-white/10 bg-white/[0.03]'}`}>
       <div className="text-xs uppercase tracking-wider text-white/50">{label}</div>
-      <div className={`mt-1 text-3xl font-black ${accent ? 'text-mw-cyan' : 'text-white'}`}>{value}</div>
+      <div className={`mt-1 text-3xl font-black ${accent ? 'text-mw-pink' : 'text-white'}`}>{value}</div>
       {sub && <div className="mt-1 text-xs text-white/50">{sub}</div>}
     </div>
   );

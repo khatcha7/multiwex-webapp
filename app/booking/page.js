@@ -68,9 +68,9 @@ function Stepper({ step }) {
           <div
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition ${
               i === step
-                ? 'border-mw-cyan bg-mw-cyan text-black shadow-neon-cyan'
+                ? 'border-mw-pink bg-mw-pink text-black shadow-neon-pink'
                 : i < step
-                ? 'border-mw-cyan/60 bg-mw-cyan/20 text-mw-cyan'
+                ? 'border-mw-pink/60 bg-mw-pink/20 text-mw-pink'
                 : 'border-white/20 text-white/40'
             }`}
           >

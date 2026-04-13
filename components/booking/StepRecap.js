@@ -70,7 +70,7 @@ export default function StepRecap({ onConfirm }) {
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider text-white/50">Joueurs</div>
-            <div className="font-bold text-mw-cyan">{cart.players}</div>
+            <div className="font-bold text-mw-pink">{cart.players}</div>
           </div>
         </div>
 
@@ -105,14 +105,14 @@ export default function StepRecap({ onConfirm }) {
               {promoApplied ? '✓' : 'Appliquer'}
             </button>
           </div>
-          {wed && <p className="mt-2 text-xs text-mw-cyan">✓ Tarif mercredi -50% déjà appliqué</p>}
-          {promoApplied && <p className="mt-2 text-xs text-mw-cyan">✓ Code DEMO100 — paiement offert</p>}
+          {wed && <p className="mt-2 text-xs text-mw-pink">✓ Tarif mercredi -50% déjà appliqué</p>}
+          {promoApplied && <p className="mt-2 text-xs text-mw-pink">✓ Code DEMO100 — paiement offert</p>}
         </div>
 
         <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-sm">
           <div className="flex justify-between text-white/70"><span>Sous-total</span><span>{subtotal.toFixed(2)}€</span></div>
-          {discount > 0 && <div className="flex justify-between text-mw-cyan"><span>Code promo</span><span>−{discount.toFixed(2)}€</span></div>}
-          <div className="flex justify-between pt-2 text-lg font-black"><span>Total</span><span className="text-mw-cyan">{total.toFixed(2)}€</span></div>
+          {discount > 0 && <div className="flex justify-between text-mw-pink"><span>Code promo</span><span>−{discount.toFixed(2)}€</span></div>}
+          <div className="flex justify-between pt-2 text-lg font-black"><span>Total</span><span className="text-mw-pink">{total.toFixed(2)}€</span></div>
         </div>
       </div>
 

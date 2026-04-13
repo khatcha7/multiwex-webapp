@@ -66,14 +66,14 @@ export default function AccountPage() {
             <div key={b.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <div>
-                  <div className="font-mono text-sm text-mw-cyan">{b.id}</div>
+                  <div className="font-mono text-sm text-mw-pink">{b.id}</div>
                   <div className="text-xs text-white/60">
                     {new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.players} joueur(s)
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="font-black">{b.total.toFixed(2)}€</div>
-                  <div className={`text-xs ${b.paid ? 'text-mw-cyan' : 'text-mw-red'}`}>{b.paid ? 'Payé' : 'Impayé'}</div>
+                  <div className={`text-xs ${b.paid ? 'text-mw-pink' : 'text-mw-red'}`}>{b.paid ? 'Payé' : 'Impayé'}</div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -93,7 +93,7 @@ function Stat({ label, value }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
       <div className="text-xs uppercase tracking-wider text-white/50">{label}</div>
-      <div className="mt-1 text-2xl font-black text-mw-cyan">{value}</div>
+      <div className="mt-1 text-2xl font-black text-mw-pink">{value}</div>
     </div>
   );
 }

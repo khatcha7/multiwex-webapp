@@ -15,7 +15,7 @@ export default function Footer() {
           </div>
           <div>
             <div className="mb-2 font-bold text-white">Démo</div>
-            <div className="text-xs">Maquette de réservation — paiement bypassé par code promo <span className="font-mono text-mw-cyan">DEMO100</span></div>
+            <div className="text-xs">Maquette de réservation — paiement bypassé par code promo <span className="font-mono text-mw-pink">DEMO100</span></div>
           </div>
         </div>
         <div className="mt-6 border-t border-white/10 pt-4 text-center text-xs text-white/40">
