@@ -14,7 +14,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'Impact', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'neon-pink': '0 0 20px rgba(255, 0, 125, 0.55), 0 0 40px rgba(255, 0, 125, 0.25)',

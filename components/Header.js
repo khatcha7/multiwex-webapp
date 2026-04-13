@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 export default function Header() {
   const { cart, user } = useBooking();
-  const count = cart.activityIds.length;
+  const count = Object.keys(cart.items || {}).length;
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-mw-darker/80 backdrop-blur-md">
@@ -15,11 +15,12 @@ export default function Header() {
           <Image src="/images/brand/logo.png" alt="Multiwex" width={48} height={48} priority className="h-10 w-auto md:h-12" />
           <span className="hidden font-black tracking-tight text-white sm:block">MULTIWEX</span>
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/" className="text-sm font-medium text-white/80 hover:text-mw-pink">Accueil</Link>
-          <Link href="/booking" className="text-sm font-medium text-white/80 hover:text-mw-pink">Réserver</Link>
-          <Link href="/giftcard" className="text-sm font-medium text-white/80 hover:text-mw-pink">🎁 Carte cadeau</Link>
-          <Link href="/account" className="text-sm font-medium text-white/80 hover:text-mw-pink">Compte</Link>
+        <nav className="hidden items-center gap-5 md:flex">
+          <Link href="/" className="display text-sm text-white/80 hover:text-mw-pink">Accueil</Link>
+          <Link href="/booking" className="display text-sm text-white/80 hover:text-mw-pink">Réserver</Link>
+          <Link href="/giftcard" className="display text-sm text-white/80 hover:text-mw-pink">🎁 Carte cadeau</Link>
+          <Link href="/account" className="display text-sm text-white/80 hover:text-mw-pink">Compte</Link>
+          <Link href="/admin" className="display text-sm text-white/40 hover:text-mw-pink">Admin</Link>
           <Link href="/booking" className="btn-primary !py-2 !px-5 text-sm">
             Panier {count > 0 && <span className="ml-1 rounded-full bg-black/20 px-2 text-xs">{count}</span>}
           </Link>

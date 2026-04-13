@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useBooking } from '@/lib/store';
+import { useBooking, computeSessionsNeeded } from '@/lib/store';
+import { getActivity } from '@/lib/activities';
 import StepActivities from '@/components/booking/StepActivities';
 import StepPlayers from '@/components/booking/StepPlayers';
 import StepSlots from '@/components/booking/StepSlots';
@@ -12,7 +13,7 @@ const STEPS = [
   { id: 'players', label: 'Joueurs' },
   { id: 'slots', label: 'Créneaux' },
   { id: 'recap', label: 'Récap' },
-  { id: 'confirm', label: 'Confirmation' },
+  { id: 'confirm', label: 'OK' },
 ];
 
 export default function BookingPage() {
@@ -23,13 +24,21 @@ export default function BookingPage() {
     return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-white/60">Chargement…</div>;
   }
 
-  const bookableSelected = cart.activityIds.filter((id) => id !== 'battlekart' && id !== 'starcadium');
+  const activityIds = Object.keys(cart.items);
+  const bookable = activityIds.map(getActivity).filter((a) => a && a.bookable);
+
   const canNext = () => {
-    if (step === 0) return bookableSelected.length > 0;
+    if (step === 0) return bookable.length > 0;
     if (step === 1) return cart.players > 0;
-    if (step === 2) return cart.date && bookableSelected.every((id) => cart.slots[id]);
-    if (step === 3) return true;
-    return false;
+    if (step === 2) {
+      if (!cart.date) return false;
+      return bookable.every((a) => {
+        const item = cart.items[a.id];
+        const needed = computeSessionsNeeded(a, cart.players, item.quantity);
+        return (cart.slots[a.id] || []).length === needed;
+      });
+    }
+    return true;
   };
 
   return (
@@ -42,18 +51,20 @@ export default function BookingPage() {
         {step === 3 && <StepRecap onConfirm={() => setStep(4)} />}
         {step === 4 && <StepConfirm onRestart={() => setStep(0)} />}
       </div>
-      {step < 3 && (
-        <div className="mt-8 flex items-center justify-between">
+      {step < 4 && (
+        <div className="sticky bottom-4 mt-8 flex items-center justify-between gap-3 rounded-full border border-white/10 bg-black/60 p-2 backdrop-blur-md md:static md:bg-transparent md:p-0 md:backdrop-blur-0">
           <button
             onClick={() => setStep(Math.max(0, step - 1))}
             disabled={step === 0}
-            className="btn-outline disabled:opacity-30"
+            className="btn-outline !px-5 disabled:opacity-30"
           >
             ← Retour
           </button>
-          <button onClick={() => setStep(step + 1)} disabled={!canNext()} className="btn-primary">
-            Continuer →
-          </button>
+          {step < 3 ? (
+            <button onClick={() => setStep(step + 1)} disabled={!canNext()} className="btn-primary !px-5">
+              Continuer →
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -68,7 +79,7 @@ function Stepper({ step }) {
           <div
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition ${
               i === step
-                ? 'border-mw-pink bg-mw-pink text-black shadow-neon-pink'
+                ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
                 : i < step
                 ? 'border-mw-pink/60 bg-mw-pink/20 text-mw-pink'
                 : 'border-white/20 text-white/40'
@@ -76,7 +87,7 @@ function Stepper({ step }) {
           >
             {i < step ? '✓' : i + 1}
           </div>
-          <span className={`text-xs font-medium md:text-sm ${i === step ? 'text-white' : 'text-white/40'}`}>
+          <span className={`display text-xs md:text-sm ${i === step ? 'text-white' : 'text-white/40'}`}>
             {s.label}
           </span>
           {i < STEPS.length - 1 && <div className="h-px w-4 bg-white/20 md:w-8" />}

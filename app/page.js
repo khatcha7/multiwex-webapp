@@ -33,9 +33,17 @@ export default function HomePage() {
           <Link href="/booking" className="hidden text-sm font-medium text-mw-pink hover:underline md:block">Réserver →</Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
-          {activities.map((a) => (
-            <ActivityLogoCard key={a.id} activity={a} as="div" />
-          ))}
+          {activities.map((a) => {
+            const external = !a.bookable && !a.walkIn;
+            if (external) {
+              return (
+                <a key={a.id} href={a.external} target="_blank" rel="noopener noreferrer" className="block">
+                  <ActivityLogoCard activity={a} as="div" badge="Externe ↗" />
+                </a>
+              );
+            }
+            return <ActivityLogoCard key={a.id} activity={a} as="div" />;
+          })}
         </div>
       </section>
 
