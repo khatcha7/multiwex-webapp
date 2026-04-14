@@ -13,7 +13,7 @@ export default function StaffLayout({ children }) {
   useEffect(() => {
     setStaff(getActiveStaff());
     setHydrated(true);
-  }, []);
+  }, [pathname]);
 
   const logout = () => {
     if (staff) logAudit({ action: 'logout', entityType: 'staff_session', entityId: staff.id });
@@ -44,8 +44,8 @@ export default function StaffLayout({ children }) {
   return (
     <div className="min-h-screen">
       <div className="sticky top-[104px] z-30 border-b border-mw-pink/30 bg-mw-darker/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 overflow-x-auto px-4 py-2 scrollbar-thin">
-          <nav className="flex items-center gap-1">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2">
+          <nav className="flex flex-wrap items-center gap-1">
             {tabs.filter((t) => can(t.perm)).map((t) => {
               const active = pathname.startsWith(t.href);
               return (

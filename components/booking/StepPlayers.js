@@ -7,18 +7,23 @@ export default function StepPlayers() {
   const { cart, setPlayers } = useBooking();
   const activityIds = Object.keys(cart.items);
   const bookable = activityIds.map(getActivity).filter((a) => a && a.bookable);
-  const absoluteMax = 30;
+  const absoluteMax = cart.packageMaxPlayers || 30;
+  const minPlayers = cart.packageMinPlayers || 1;
 
   return (
     <div>
       <h1 className="section-title mb-2">Combien de joueurs ?</h1>
       <p className="mb-6 text-white/60">
         Ce nombre s'applique à toutes vos activités. Si votre groupe dépasse une capacité max, plusieurs créneaux seront automatiquement requis.
+        {cart.packageMinPlayers && (
+          <span className="ml-2 text-mw-pink">Package : min {cart.packageMinPlayers} personnes.</span>
+        )}
       </p>
       <div className="mb-8 flex items-center justify-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-8">
         <button
-          onClick={() => setPlayers(Math.max(1, cart.players - 1))}
-          className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-3xl font-bold transition hover:border-mw-pink hover:text-mw-pink"
+          onClick={() => setPlayers(Math.max(minPlayers, cart.players - 1))}
+          disabled={cart.players <= minPlayers}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-3xl font-bold transition hover:border-mw-pink hover:text-mw-pink disabled:opacity-30"
           aria-label="Moins"
         >
           −

@@ -4,15 +4,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'mw-pink': '#ff007d',
+        'mw-pink': '#e8005a',
         'mw-red': '#ff004b',
         'mw-yellow': '#f3d10b',
         'mw-cyan': '#00d9ff',
         'mw-cyan-light': '#07effe',
-        'mw-purple': '#b200d9',
+        'mw-purple': '#7b00e0',
         'mw-black': '#000000',
-        'mw-dark': '#0a0a0f',
-        'mw-darker': '#050508',
+        'mw-bg': '#080808',
+        'mw-surface': '#111111',
+        'mw-surface-alt': '#1a1a1a',
+        'mw-dark': '#111111',
+        'mw-darker': '#080808',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
@@ -24,9 +27,9 @@ module.exports = {
         'neon-red': '0 0 20px rgba(228, 13, 13, 0.5), 0 0 40px rgba(228, 13, 13, 0.2)',
       },
       backgroundImage: {
-        'mw-btn': 'linear-gradient(90deg, #ff004b 0%, #ff007d 100%)',
-        'mw-marquee': 'linear-gradient(90deg, #F3D10B 0%, #FF8A00 20%, #FF007D 45%, #B200D9 62%, #00D9FF 82%, #07EFFE 100%)',
-        'mw-hero': 'linear-gradient(135deg, rgba(255,0,125,0.15) 0%, rgba(0,217,255,0.08) 100%)',
+        'mw-btn': 'linear-gradient(135deg, #e8005a 0%, #7b00e0 100%)',
+        'mw-marquee': 'linear-gradient(90deg, #F3D10B 0%, #FF8A00 20%, #e8005a 45%, #7b00e0 62%, #00D9FF 82%, #07EFFE 100%)',
+        'mw-hero': 'linear-gradient(135deg, rgba(232,0,90,0.15) 0%, rgba(123,0,224,0.10) 100%)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

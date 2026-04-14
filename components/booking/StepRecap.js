@@ -21,6 +21,8 @@ export default function StepRecap({ onConfirm }) {
   const [cgvAccepted, setCgvAccepted] = useState(false);
   const [disclaimersAccepted, setDisclaimersAccepted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [paymentStep, setPaymentStep] = useState(null); // null | 'choose' | 'processing' | 'success'
+  const [paymentMethod, setPaymentMethod] = useState(null);
 
   const items = Object.entries(cart.slots)
     .filter(([, arr]) => arr && arr.length)
@@ -51,10 +53,27 @@ export default function StepRecap({ onConfirm }) {
     else alert('Code promo invalide. Essayez DEMO100 pour la démo.');
   };
 
-  const confirm = async () => {
+  const startPayment = () => {
     if (!email || !name) return alert('Nom et email requis');
     if (!cgvAccepted) return alert('Veuillez accepter les CGV');
     if (!disclaimersAccepted) return alert('Veuillez confirmer avoir pris connaissance des restrictions');
+    if (total === 0) {
+      confirmBooking('free');
+    } else {
+      setPaymentStep('choose');
+    }
+  };
+
+  const processPayment = async (method) => {
+    setPaymentMethod(method);
+    setPaymentStep('processing');
+    await new Promise((r) => setTimeout(r, method === 'card' ? 2500 : 1500));
+    setPaymentStep('success');
+    await new Promise((r) => setTimeout(r, 900));
+    confirmBooking(method);
+  };
+
+  const confirmBooking = async (method) => {
     const booking = {
       id: 'MW-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       date: cart.date,
@@ -70,7 +89,8 @@ export default function StepRecap({ onConfirm }) {
       subtotal,
       discount,
       total,
-      paid: total === 0,
+      paid: true,
+      paymentMethod: method,
       promoCode: promoApplied ? 'DEMO100' : null,
       source: 'online',
       packageId: cart.packageId || null,
@@ -236,12 +256,86 @@ export default function StepRecap({ onConfirm }) {
       </div>
 
       <button
-        onClick={confirm}
-        disabled={!promoApplied || !name || !email || !cgvAccepted || !disclaimersAccepted || sending}
+        onClick={startPayment}
+        disabled={!name || !email || !cgvAccepted || !disclaimersAccepted || sending}
         className="btn-primary mt-6 w-full md:w-auto"
       >
-        {sending ? 'Envoi…' : 'Confirmer la réservation →'}
+        {sending ? 'Envoi…' : total === 0 ? 'Confirmer la réservation →' : `Payer ${total.toFixed(2)}€ →`}
       </button>
+      {total > 0 && !promoApplied && (
+        <p className="mt-2 text-xs text-white/40">
+          Simulation de paiement — aucune transaction réelle. En prod, redirection Stripe/Mollie.
+        </p>
+      )}
+
+      {paymentStep && (
+        <PaymentModal
+          step={paymentStep}
+          method={paymentMethod}
+          total={total}
+          onChoose={processPayment}
+          onCancel={() => setPaymentStep(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PaymentModal({ step, method, total, onChoose, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-mw-pink/40 bg-mw-darker p-6 text-center shadow-neon-pink">
+        {step === 'choose' && (
+          <>
+            <div className="mb-3 display text-2xl">Mode de paiement</div>
+            <div className="display mb-5 text-3xl text-mw-pink">{total.toFixed(2)}€</div>
+            <div className="grid gap-3">
+              <button onClick={() => onChoose('card')} className="btn-primary !py-4 text-base">
+                💳 Carte bancaire
+              </button>
+              <button onClick={() => onChoose('bancontact')} className="btn-outline !py-4 text-base">
+                🇧🇪 Bancontact
+              </button>
+              <button onClick={() => onChoose('giftcard')} className="btn-outline !py-4 text-base">
+                🎁 Carte cadeau
+              </button>
+            </div>
+            <button onClick={onCancel} className="mt-4 text-xs text-white/50 hover:text-mw-red">
+              Annuler
+            </button>
+            <p className="mt-4 text-[10px] text-white/40">
+              Simulation de paiement — en prod, redirection vers Stripe/Mollie/Worldline.
+            </p>
+          </>
+        )}
+
+        {step === 'processing' && (
+          <>
+            <div className="mb-4 text-6xl">
+              {method === 'card' ? '💳' : method === 'bancontact' ? '🇧🇪' : '🎁'}
+            </div>
+            <div className="display mb-4 text-xl">
+              {method === 'card' && 'Traitement en cours…'}
+              {method === 'bancontact' && 'Redirection Bancontact…'}
+              {method === 'giftcard' && 'Vérification du code…'}
+            </div>
+            <div className="mb-4 flex items-center justify-center gap-1">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-mw-pink [animation-delay:0ms]"></span>
+              <span className="h-2 w-2 animate-pulse rounded-full bg-mw-pink [animation-delay:200ms]"></span>
+              <span className="h-2 w-2 animate-pulse rounded-full bg-mw-pink [animation-delay:400ms]"></span>
+            </div>
+            <div className="display text-3xl text-mw-pink">{total.toFixed(2)}€</div>
+          </>
+        )}
+
+        {step === 'success' && (
+          <>
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/30 text-5xl">✓</div>
+            <div className="display mb-2 text-2xl text-green-400">Paiement accepté</div>
+            <div className="display text-3xl text-mw-pink">{total.toFixed(2)}€</div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

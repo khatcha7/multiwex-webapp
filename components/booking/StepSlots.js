@@ -219,8 +219,10 @@ export default function StepSlots() {
                 if (slotM - nowM < JOIN_CUTOFF_MIN) pastCutoff = true;
               }
 
-              const full = playersInSlot >= totalCap;
-              const shared = playersInSlot > 0 && !full;
+              // Activités privatives : dès qu'il y a 1 groupe, le créneau est complet
+              const privative = currentActivity.privative;
+              const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
+              const shared = !privative && playersInSlot > 0 && !full;
               const blocked = Boolean(blockedHere) || pastCutoff || (shared && !wouldFit);
               const disabled = conflict || full || blocked;
 

@@ -8,43 +8,47 @@
 }
 
 html, body {
-  background: #050508;
+  background: #080808;
   color: #ffffff;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  letter-spacing: -0.005em;
 }
 
 body {
   background-image:
-    radial-gradient(circle at 15% 10%, rgba(255, 0, 125, 0.12) 0%, transparent 45%),
-    radial-gradient(circle at 85% 60%, rgba(0, 217, 255, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(178, 0, 217, 0.06) 0%, transparent 55%);
+    radial-gradient(circle at 15% 10%, rgba(232, 0, 90, 0.10) 0%, transparent 45%),
+    radial-gradient(circle at 85% 60%, rgba(123, 0, 224, 0.08) 0%, transparent 45%);
   background-attachment: fixed;
   min-height: 100vh;
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 font-display uppercase tracking-wide text-white transition hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100;
-    background-image: linear-gradient(90deg, #ff004b 0%, #ff007d 100%);
-    box-shadow: 0 4px 20px -4px rgba(255, 0, 125, 0.5);
+    @apply inline-flex items-center justify-center gap-2 rounded px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:brightness-100;
+    background-image: linear-gradient(135deg, #e8005a 0%, #7b00e0 100%);
+    box-shadow: 0 4px 20px -4px rgba(232, 0, 90, 0.45);
+    border-radius: 4px;
   }
   .btn-primary:hover {
-    box-shadow: 0 6px 30px -4px rgba(255, 0, 125, 0.7);
+    box-shadow: 0 6px 30px -4px rgba(232, 0, 90, 0.7);
   }
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-white/25 bg-white/5 px-6 py-3 font-display uppercase tracking-wide text-white transition hover:border-mw-pink hover:text-mw-pink;
+    @apply inline-flex items-center justify-center gap-2 rounded border border-white/30 bg-white/[0.03] px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-white transition hover:border-mw-pink hover:text-mw-pink;
+    border-radius: 4px;
   }
   .btn-light {
-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-white px-6 py-3 font-display uppercase tracking-wide text-black transition hover:bg-mw-pink hover:text-white;
+    @apply inline-flex items-center justify-center gap-2 rounded bg-white px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-black transition hover:bg-mw-pink hover:text-white;
+    border-radius: 4px;
   }
   .card {
-    @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm transition;
+    @apply relative overflow-hidden border border-white/[0.08] bg-mw-surface transition;
+    border-radius: 8px;
   }
   .card-selected {
     @apply border-mw-pink;
-    box-shadow: 0 0 20px rgba(255, 0, 125, 0.5), 0 0 40px rgba(255, 0, 125, 0.2);
+    box-shadow: 0 0 20px rgba(232, 0, 90, 0.5), 0 0 40px rgba(232, 0, 90, 0.25);
   }
   .chip {
     @apply inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80;
@@ -59,19 +63,23 @@ body {
     @apply border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow;
   }
   .section-title {
-    @apply font-display text-3xl md:text-5xl uppercase tracking-wide leading-[0.95];
+    @apply font-display uppercase leading-[0.95] text-white;
+    font-size: clamp(36px, 5vw, 68px);
+    letter-spacing: -0.02em;
   }
   .display {
-    @apply font-display uppercase tracking-wide leading-none;
+    @apply font-display uppercase leading-none text-white;
+    letter-spacing: -0.015em;
   }
   .input {
-    @apply w-full rounded-md border border-white/15 bg-white/5 px-4 py-3 text-white placeholder-white/40 outline-none transition focus:border-mw-pink;
+    @apply w-full border border-white/15 bg-mw-surface px-4 py-3 text-white placeholder-white/40 outline-none transition focus:border-mw-pink;
+    border-radius: 4px;
   }
   .input:focus {
-    box-shadow: 0 0 0 3px rgba(255, 0, 125, 0.2);
+    box-shadow: 0 0 0 3px rgba(232, 0, 90, 0.2);
   }
   .shadow-neon-pink {
-    box-shadow: 0 0 20px rgba(255, 0, 125, 0.55), 0 0 40px rgba(255, 0, 125, 0.25);
+    box-shadow: 0 0 20px rgba(232, 0, 90, 0.55), 0 0 40px rgba(232, 0, 90, 0.25);
   }
   .shadow-neon-cyan {
     box-shadow: 0 0 20px rgba(0, 217, 255, 0.5), 0 0 40px rgba(0, 217, 255, 0.2);

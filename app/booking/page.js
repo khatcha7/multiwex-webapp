@@ -1,7 +1,9 @@
 'use client';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useBooking, computeSessionsNeeded } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
+import { getPackage } from '@/lib/packages';
 import StepActivities from '@/components/booking/StepActivities';
 import StepPlayers from '@/components/booking/StepPlayers';
 import StepSlots from '@/components/booking/StepSlots';
@@ -16,10 +18,23 @@ const STEPS = [
   { id: 'confirm', label: 'OK', short: '✓' },
 ];
 
-export default function BookingPage() {
+function BookingInner() {
   const [step, setStep] = useState(0);
   const topRef = useRef(null);
-  const { cart, hydrated } = useBooking();
+  const { cart, hydrated, applyPackage } = useBooking();
+  const params = useSearchParams();
+  const packageId = params.get('package');
+
+  useEffect(() => {
+    if (hydrated && packageId) {
+      const pkg = getPackage(packageId);
+      if (pkg && pkg.activities && applyPackage) {
+        applyPackage(pkg);
+        setStep(1);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, packageId]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -73,6 +88,14 @@ export default function BookingPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BookingPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-4xl px-4 py-20 text-center text-white/60">Chargement…</div>}>
+      <BookingInner />
+    </Suspense>
   );
 }
 

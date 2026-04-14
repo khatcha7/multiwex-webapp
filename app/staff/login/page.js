@@ -15,11 +15,12 @@ export default function StaffLoginPage() {
 
   const login = () => {
     const user = users.find((u) => u.id === selectedId);
-    if (!user) return alert('Choisissez un utilisateur');
-    if (password !== 'staff' && password !== 'admin') return alert('Code: staff ou admin pour la démo');
+    if (!user) return alert('Choisissez un utilisateur dans la liste');
+    if (password !== 'staff' && password !== 'admin') return alert('Code: staff ou admin (pour la démo)');
     setActiveStaff(user);
     logAudit({ action: 'login', entityType: 'staff_session', entityId: user.id });
-    router.push('/staff/calendar');
+    // Force full navigation so the staff layout re-reads the active staff
+    window.location.href = '/staff/calendar';
   };
 
   return (

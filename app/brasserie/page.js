@@ -38,7 +38,7 @@ export default function BrasseriePage() {
             Conseillé pour vos sessions de jeu en groupe.
           </p>
           <button onClick={() => setOpen(true)} className="btn-primary w-full !py-3">
-            Ouvrir Zenchef →
+            Je réserve →
           </button>
         </div>
       </div>

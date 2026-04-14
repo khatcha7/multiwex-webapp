@@ -32,6 +32,16 @@ export default function Header() {
 
         <div className="flex items-center gap-2 shrink-0">
           <Link
+            href="/account"
+            className="hidden items-center justify-center rounded-md border border-white/20 bg-white/5 p-2.5 transition hover:border-mw-pink hover:text-mw-pink sm:flex"
+            aria-label="Mon compte"
+            title="Mon compte"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+          </Link>
+          <Link
             href="/giftcard"
             className="hidden items-center justify-center rounded-md border border-white/20 bg-white/5 p-2.5 transition hover:border-mw-pink hover:text-mw-pink sm:flex"
             aria-label="Carte cadeau"
@@ -39,6 +49,16 @@ export default function Header() {
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z" />
+            </svg>
+          </Link>
+          <Link
+            href="/staff/login"
+            className="hidden items-center justify-center rounded-md border border-white/20 bg-white/5 p-2.5 transition hover:border-mw-pink hover:text-mw-pink lg:flex"
+            aria-label="Back-office"
+            title="Back-office staff"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
             </svg>
           </Link>
 
