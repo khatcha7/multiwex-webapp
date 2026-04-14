@@ -7,6 +7,19 @@
 **URL prod** : https://multiwex-webapp.vercel.app
 **Auteur** : Alexandre K.
 
+Contenu du doc (10 sections)                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                   
+  1. Objectif — contexte démo + cibles                                                                                                                                                                                                                                       
+  2. Stack technique — tableau de toutes les technos et pourquoi                                                                                                                                                                                                           
+  3. Arborescence — structure complète du projet fichier par fichier                                                                                                                                                                                                         
+  4. Design system — palette couleurs exacte (#ff007d etc), gradients, typo Bebas Neue, composants Tailwind custom, responsive                                                                                                                                               
+  5. Fonctionnalités détaillées — chaque page/flow expliqué (accueil, booking 5 étapes, compte, admin, giftcard, email)                                                                                                                                                      
+  6. Comment ça se branche à Odoo — archi recommandée + table des endpoints API à créer + méthodes XML-RPC vs REST + variables d'env + alternative iframe WordPress                                                                                                          
+  7. Modifications faciles vs theme editor — tableau de ce qui se modifie via code, et proposition concrète pour une page /admin/settings Phase 2                                                                                                                            
+  8. Potentiels problèmes en prod — 15 points classés 🔴 bloquants / 🟡 importants / 🟢 à surveiller (race condition créneaux, RGPD, paiement, auth admin, multilingue FR/NL/EN, monitoring, tests, a11y, etc.)                                                              
+  9. Recommandations — planning Sprint 1-4 (3-4 semaines pour prod-ready) + pièges à éviter                                                                                                                                                                                  
+  10. Coordonnées & annexe données activités
+
 ---
 
 ## 1. Objectif

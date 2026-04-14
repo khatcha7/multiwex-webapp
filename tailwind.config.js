@@ -5,9 +5,11 @@ module.exports = {
     extend: {
       colors: {
         'mw-pink': '#ff007d',
-        'mw-pink-2': '#ff0054',
-        'mw-red': '#E40D0D',
-        'mw-cyan': '#00D9FF',
+        'mw-red': '#ff004b',
+        'mw-yellow': '#f3d10b',
+        'mw-cyan': '#00d9ff',
+        'mw-cyan-light': '#07effe',
+        'mw-purple': '#b200d9',
         'mw-black': '#000000',
         'mw-dark': '#0a0a0f',
         'mw-darker': '#050508',
@@ -22,8 +24,9 @@ module.exports = {
         'neon-red': '0 0 20px rgba(228, 13, 13, 0.5), 0 0 40px rgba(228, 13, 13, 0.2)',
       },
       backgroundImage: {
-        'mw-gradient': 'linear-gradient(135deg, #ff007d 0%, #ff0054 100%)',
-        'mw-gradient-2': 'linear-gradient(135deg, #ff007d 0%, #00D9FF 100%)',
+        'mw-btn': 'linear-gradient(90deg, #ff004b 0%, #ff007d 100%)',
+        'mw-marquee': 'linear-gradient(90deg, #F3D10B 0%, #FF8A00 20%, #FF007D 45%, #B200D9 62%, #00D9FF 82%, #07EFFE 100%)',
+        'mw-hero': 'linear-gradient(135deg, rgba(255,0,125,0.15) 0%, rgba(0,217,255,0.08) 100%)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
