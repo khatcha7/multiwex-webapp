@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useBooking, computeSessionsNeeded } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
 import StepActivities from '@/components/booking/StepActivities';
@@ -50,7 +50,7 @@ export default function BookingPage() {
     <div ref={topRef} className="mx-auto max-w-4xl px-4 py-6 md:py-10">
       <Stepper step={step} />
       <div className="mt-6 md:mt-10">
-        {step === 0 && <StepActivities />}
+        {step === 0 && <Suspense fallback={null}><StepActivities /></Suspense>}
         {step === 1 && <StepPlayers />}
         {step === 2 && <StepSlots />}
         {step === 3 && <StepRecap onConfirm={() => setStep(4)} />}

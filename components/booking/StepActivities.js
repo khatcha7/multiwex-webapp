@@ -1,11 +1,25 @@
 'use client';
 import Image from 'next/image';
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { activities } from '@/lib/activities';
+import { getRestrictions } from '@/lib/restrictions';
+import { getPackage } from '@/lib/packages';
 import { useBooking } from '@/lib/store';
 import ActivityLogoCard from '@/components/ActivityLogoCard';
 
 export default function StepActivities() {
-  const { cart, toggleActivity, setItemQuantity } = useBooking();
+  const { cart, toggleActivity, setItemQuantity, applyPackage } = useBooking();
+  const params = useSearchParams();
+  const packageId = params.get('package');
+
+  useEffect(() => {
+    if (packageId && applyPackage) {
+      const pkg = getPackage(packageId);
+      if (pkg && pkg.activities) applyPackage(pkg);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packageId]);
   return (
     <div>
       <h1 className="section-title mb-2">Vos activités</h1>
@@ -53,6 +67,9 @@ export default function StepActivities() {
                   <div className="min-w-0 flex-1">
                     <div className="display text-lg leading-none">{a.name}</div>
                     <div className="text-xs text-white/50">{a.duration} min · max {a.maxPlayers}</div>
+                    {getRestrictions(id)?.disclaimerShort && (
+                      <div className="mt-1 text-[10px] text-mw-yellow">⚠ {getRestrictions(id).disclaimerShort}</div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button

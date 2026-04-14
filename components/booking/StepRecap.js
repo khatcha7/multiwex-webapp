@@ -1,16 +1,25 @@
 'use client';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useBooking } from '@/lib/store';
 import { getActivity, getActivityPrice, isWednesdayDiscount } from '@/lib/activities';
+import { getRestrictions } from '@/lib/restrictions';
+import { createBooking, logAudit } from '@/lib/data';
 
 export default function StepRecap({ onConfirm }) {
-  const { cart, user, saveBooking, clearCart } = useBooking();
+  const { cart, user, clearCart } = useBooking();
   const [promo, setPromo] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [email, setEmail] = useState(user?.email || '');
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState('');
+  const [isCompany, setIsCompany] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [cgvAccepted, setCgvAccepted] = useState(false);
+  const [disclaimersAccepted, setDisclaimersAccepted] = useState(false);
   const [sending, setSending] = useState(false);
 
   const items = Object.entries(cart.slots)
@@ -27,10 +36,15 @@ export default function StepRecap({ onConfirm }) {
     })
     .sort((a, b) => a.slot.start.localeCompare(b.slot.start));
 
+  const uniqueActivities = [...new Set(items.map((i) => i.activity.id))].map((id) => getActivity(id));
+
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const discount = promoApplied ? subtotal : 0;
   const total = subtotal - discount;
   const wed = cart.date && isWednesdayDiscount(cart.date);
+
+  // Redirection formulaire B2B si 12+ joueurs
+  const largeGroup = cart.players >= 12;
 
   const applyPromo = () => {
     if (promo.trim().toUpperCase() === 'DEMO100') setPromoApplied(true);
@@ -39,6 +53,8 @@ export default function StepRecap({ onConfirm }) {
 
   const confirm = async () => {
     if (!email || !name) return alert('Nom et email requis');
+    if (!cgvAccepted) return alert('Veuillez accepter les CGV');
+    if (!disclaimersAccepted) return alert('Veuillez confirmer avoir pris connaissance des restrictions');
     const booking = {
       id: 'MW-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       date: cart.date,
@@ -55,19 +71,35 @@ export default function StepRecap({ onConfirm }) {
       discount,
       total,
       paid: total === 0,
-      customer: { name, email, phone },
+      promoCode: promoApplied ? 'DEMO100' : null,
+      source: 'online',
+      packageId: cart.packageId || null,
+      customer: {
+        name, email, phone,
+        companyName: isCompany ? companyName : null,
+        vatNumber: isCompany ? vatNumber : null,
+        address: isCompany ? address : null,
+      },
       createdAt: new Date().toISOString(),
     };
     setSending(true);
     try {
+      await createBooking(booking);
+      await logAudit({
+        action: 'create_booking',
+        entityType: 'booking',
+        entityId: booking.id,
+        after: { total: booking.total, players: booking.players, source: 'online' },
+      });
       await fetch('/api/send-confirmation', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(booking),
       });
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
     setSending(false);
-    saveBooking(booking);
     sessionStorage.setItem('mw_last_booking', JSON.stringify(booking));
     clearCart();
     onConfirm();
@@ -76,7 +108,19 @@ export default function StepRecap({ onConfirm }) {
   return (
     <div>
       <h1 className="section-title mb-2">Récap</h1>
-      <p className="mb-6 text-white/60">Vérifiez votre sélection et appliquez le code promo de démonstration.</p>
+      <p className="mb-6 text-white/60">Vérifiez votre sélection puis acceptez les conditions.</p>
+
+      {largeGroup && (
+        <div className="mb-4 rounded-2xl border border-mw-yellow/40 bg-mw-yellow/10 p-4">
+          <div className="mb-1 display text-sm text-mw-yellow">Groupe de 12 personnes ou plus ?</div>
+          <p className="mb-3 text-xs text-white/70">
+            Pour les événements entreprises, team buildings et grands groupes, nous vous recommandons de passer par notre formulaire dédié pour un devis personnalisé.
+          </p>
+          <a href="https://www.multiwex.be/fr/entreprises/" target="_blank" rel="noopener noreferrer" className="btn-outline !py-2 text-xs">
+            Formulaire entreprises ↗
+          </a>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-6">
         <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
@@ -122,7 +166,7 @@ export default function StepRecap({ onConfirm }) {
               disabled={promoApplied}
               className="input flex-1"
             />
-            <button onClick={applyPromo} disabled={promoApplied} className="btn-outline shrink-0">
+            <button onClick={applyPromo} disabled={promoApplied} className="btn-outline !py-2.5 shrink-0 text-sm">
               {promoApplied ? '✓' : 'Appliquer'}
             </button>
           </div>
@@ -144,9 +188,58 @@ export default function StepRecap({ onConfirm }) {
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="input" />
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone (facultatif)" className="input sm:col-span-2" />
         </div>
+
+        <label className="mt-4 flex items-center gap-2 text-sm text-white/80">
+          <input type="checkbox" checked={isCompany} onChange={(e) => setIsCompany(e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+          Je réserve au nom d'une entreprise (facture TVA)
+        </label>
+
+        {isCompany && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Raison sociale" className="input" />
+            <input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} placeholder="N° TVA (ex: BE0123456789)" className="input" />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Adresse de facturation" className="input sm:col-span-2" />
+          </div>
+        )}
       </div>
 
-      <button onClick={confirm} disabled={!promoApplied || !name || !email || sending} className="btn-primary mt-6 w-full md:w-auto">
+      {uniqueActivities.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-mw-yellow/30 bg-mw-yellow/5 p-4 md:p-6">
+          <div className="mb-3 display text-sm text-mw-yellow">Restrictions par activité</div>
+          <div className="space-y-2 text-xs text-white/70">
+            {uniqueActivities.map((a) => {
+              const r = getRestrictions(a.id);
+              if (!r) return null;
+              return (
+                <div key={a.id} className="flex gap-2">
+                  <span className="shrink-0 display text-white">{a.name}</span>
+                  <span className="text-white/60">· {r.disclaimerLong}</span>
+                </div>
+              );
+            })}
+          </div>
+          <label className="mt-3 flex items-start gap-2 text-xs text-white">
+            <input type="checkbox" checked={disclaimersAccepted} onChange={(e) => setDisclaimersAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 accent-mw-pink" />
+            Je confirme avoir pris connaissance des restrictions ci-dessus et que tous les participants y répondent.
+            <span className="text-mw-pink">*</span>
+          </label>
+        </div>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-6">
+        <label className="flex items-start gap-2 text-xs text-white">
+          <input type="checkbox" checked={cgvAccepted} onChange={(e) => setCgvAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 accent-mw-pink" />
+          J'accepte les{' '}
+          <Link href="/cgv" target="_blank" className="text-mw-pink underline">conditions générales de vente</Link>. Je comprends qu'aucun remboursement n'est possible une fois la réservation confirmée.
+          <span className="text-mw-pink">*</span>
+        </label>
+      </div>
+
+      <button
+        onClick={confirm}
+        disabled={!promoApplied || !name || !email || !cgvAccepted || !disclaimersAccepted || sending}
+        className="btn-primary mt-6 w-full md:w-auto"
+      >
         {sending ? 'Envoi…' : 'Confirmer la réservation →'}
       </button>
     </div>

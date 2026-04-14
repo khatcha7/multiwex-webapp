@@ -3,18 +3,21 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useBooking, computeSessionsNeeded } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
+import { getSlotOccupancy, getSlotBlocks, subscribeBookings } from '@/lib/data';
 import {
   generateSlotsForActivity,
-  getFakeOccupiedSlots,
   slotConflicts,
   dayLabelsFr,
   monthsFr,
   isOpenOn,
   toDateStr,
   parseDate,
+  toMinutes,
 } from '@/lib/hours';
 
-function buildUpcomingDays(count = 60) {
+const JOIN_CUTOFF_MIN = 10;
+
+function buildUpcomingDays(count = 90) {
   const out = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -28,8 +31,11 @@ function buildUpcomingDays(count = 60) {
 
 export default function StepSlots() {
   const { cart, setDate, setActivitySlots } = useBooking();
-  const days = useMemo(() => buildUpcomingDays(60), []);
+  const days = useMemo(() => buildUpcomingDays(90), []);
   const [activeActivity, setActiveActivity] = useState(null);
+  const [occupancy, setOccupancy] = useState({});
+  const [blocks, setBlocks] = useState([]);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     if (!cart.date) {
@@ -45,6 +51,19 @@ export default function StepSlots() {
   const currentItem = cart.items[currentActivityId];
   const currentSessions = currentActivity ? computeSessionsNeeded(currentActivity, cart.players, currentItem.quantity) : 0;
 
+  useEffect(() => {
+    if (!currentActivity || !cart.date) return;
+    let cancelled = false;
+    getSlotOccupancy(currentActivity.id, cart.date).then((o) => !cancelled && setOccupancy(o));
+    getSlotBlocks(cart.date).then((b) => !cancelled && setBlocks(b || []));
+    return () => { cancelled = true; };
+  }, [currentActivity, cart.date, refreshTick]);
+
+  useEffect(() => {
+    const unsub = subscribeBookings(() => setRefreshTick((t) => t + 1));
+    return unsub;
+  }, []);
+
   const existingBookings = Object.entries(cart.slots).flatMap(([id, arr]) => {
     if (id === currentActivityId) return [];
     const act = getActivity(id);
@@ -53,7 +72,6 @@ export default function StepSlots() {
 
   const ownSelected = cart.slots[currentActivityId] || [];
   const allSlots = cart.date && currentActivity ? generateSlotsForActivity(currentActivity, cart.date) : [];
-  const occupied = cart.date && currentActivity ? new Set(getFakeOccupiedSlots(currentActivity, cart.date)) : new Set();
 
   const toggleSlot = (slot) => {
     const has = ownSelected.find((s) => s.start === slot.start);
@@ -70,7 +88,6 @@ export default function StepSlots() {
     }
   };
 
-  // Group days by month for display
   const byMonth = {};
   days.forEach((d) => {
     const dt = parseDate(d);
@@ -84,7 +101,8 @@ export default function StepSlots() {
       <h1 className="section-title mb-2">Date & créneaux</h1>
       <p className="mb-6 text-white/60">
         Sélectionnez {currentSessions > 1 ? <>{currentSessions} créneaux pour </> : 'le créneau pour '}
-        chaque activité. Les conflits ({'+'}10 min de buffer) sont bloqués automatiquement.
+        chaque activité.{' '}
+        <span className="text-mw-yellow">Créneaux jaunes = groupe déjà présent, vous jouerez ensemble (tant qu'il reste de la place).</span>
       </p>
 
       <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Date</div>
@@ -138,14 +156,14 @@ export default function StepSlots() {
                 <button
                   key={a.id}
                   onClick={() => setActiveActivity(a.id)}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
                     active ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 text-white/70 hover:border-white/40'
                   }`}
                 >
                   <div className="relative h-5 w-5">
                     <Image src={a.logo} alt="" fill className="object-contain" sizes="20px" />
                   </div>
-                  <span className="display uppercase tracking-wider">{a.name}</span>
+                  <span className="display tracking-wider">{a.name}</span>
                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${complete ? 'bg-mw-pink text-white' : 'bg-white/10 text-white/60'}`}>
                     {chosen}/{needed}
                   </span>
@@ -160,8 +178,8 @@ export default function StepSlots() {
         <>
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs uppercase tracking-wider text-white/50">
-              Créneaux {currentActivity.name} ({currentActivity.duration} min)
-              {currentSessions > 1 && <> — {ownSelected.length}/{currentSessions} sélectionnés</>}
+              {currentActivity.name} ({currentActivity.duration} min)
+              {currentSessions > 1 && <> — {ownSelected.length}/{currentSessions}</>}
             </div>
             {ownSelected.length > 0 && (
               <button onClick={() => setActivitySlots(currentActivityId, [])} className="text-xs text-mw-red hover:underline">
@@ -169,29 +187,73 @@ export default function StepSlots() {
               </button>
             )}
           </div>
+
+          <div className="mb-3 flex flex-wrap gap-3 text-[10px] text-white/50">
+            <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-white/10 border border-white/30"></span>Libre</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-yellow/30 border border-mw-yellow"></span>Groupe présent</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-red/20 border border-mw-red line-through"></span>Complet</span>
+            <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-pink border border-mw-pink"></span>Sélectionné</span>
+          </div>
+
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
             {allSlots.map((slot) => {
               const conflict = slotConflicts(existingBookings, slot, currentActivity);
               const selected = ownSelected.some((s) => s.start === slot.start);
-              const isOccupied = occupied.has(slot.start);
-              const disabled = conflict || isOccupied;
+              const occ = occupancy[slot.start];
+              const blockedHere = blocks.find(
+                (b) => (b.activity_id || b.activityId) === currentActivity.id && (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start)
+              );
+
+              const totalCap = currentActivity.maxPlayers;
+              const playersInSlot = occ?.players || 0;
+              const groupsInSlot = occ?.groups || 0;
+              const wouldFit = playersInSlot + cart.players <= totalCap;
+
+              // cutoff — can't join less than JOIN_CUTOFF_MIN before start (only for today)
+              const isToday = toDateStr(new Date()) === cart.date;
+              let pastCutoff = false;
+              if (isToday) {
+                const now = new Date();
+                const nowM = now.getHours() * 60 + now.getMinutes();
+                const slotM = toMinutes(slot.start);
+                if (slotM - nowM < JOIN_CUTOFF_MIN) pastCutoff = true;
+              }
+
+              const full = playersInSlot >= totalCap;
+              const shared = playersInSlot > 0 && !full;
+              const blocked = Boolean(blockedHere) || pastCutoff || (shared && !wouldFit);
+              const disabled = conflict || full || blocked;
+
+              let classes = '';
+              if (selected) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
+              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/20 text-white/40 line-through';
+              else if (full) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
+              else if (shared && wouldFit) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
+              else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30';
+              else if (conflict) classes = 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20 line-through';
+              else if (pastCutoff) classes = 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20';
+              else classes = 'border-white/15 bg-white/[0.03] text-white hover:border-mw-pink';
+
               return (
                 <button
                   key={slot.start}
                   onClick={() => !disabled && toggleSlot(slot)}
                   disabled={disabled}
-                  className={`relative rounded-lg border py-2.5 text-sm font-bold transition ${
-                    selected
-                      ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
-                      : isOccupied
-                      ? 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through'
-                      : conflict
-                      ? 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20 line-through'
-                      : 'border-white/15 bg-white/[0.03] text-white hover:border-mw-pink'
-                  }`}
+                  className={`relative rounded-lg border py-2.5 text-sm font-bold transition ${classes}`}
+                  title={
+                    blockedHere ? `Bloqué: ${blockedHere.block_reason || blockedHere.reason || 'staff'}`
+                      : shared ? `${playersInSlot}/${totalCap} joueurs (${groupsInSlot} groupe${groupsInSlot > 1 ? 's' : ''}) — vous les rejoindrez`
+                      : full ? 'Complet'
+                      : pastCutoff ? 'Trop tard pour rejoindre ce créneau (briefing 10 min)'
+                      : undefined
+                  }
                 >
                   {slot.start}
-                  {isOccupied && <div className="text-[8px] font-normal opacity-80">complet</div>}
+                  {shared && !full && wouldFit && (
+                    <div className="mt-0.5 text-[8px] font-normal">{playersInSlot}/{totalCap}</div>
+                  )}
+                  {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">{blockedHere ? 'bloqué' : 'complet'}</div>}
+                  {pastCutoff && !full && !blockedHere && <div className="text-[8px] font-normal opacity-60">trop tard</div>}
                 </button>
               );
             })}
@@ -201,6 +263,12 @@ export default function StepSlots() {
               </div>
             )}
           </div>
+
+          {currentActivity && ownSelected.length > 0 && (
+            <div className="mt-4 rounded-xl border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-xs text-mw-yellow">
+              ℹ Le briefing sécurité démarre 10 minutes avant le créneau. Merci d'arriver au moins 15 min à l'avance.
+            </div>
+          )}
         </>
       )}
     </div>
