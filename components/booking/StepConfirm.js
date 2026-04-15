@@ -1,22 +1,48 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { getPopups } from '@/lib/data';
 
 export default function StepConfirm({ onRestart }) {
   const [booking, setBooking] = useState(null);
-  const [brasserieOpen, setBrasserieOpen] = useState(false);
+  const [popupQueue, setPopupQueue] = useState([]);
+  const [popupIndex, setPopupIndex] = useState(-1);
   const [zenchefOpen, setZenchefOpen] = useState(false);
 
   useEffect(() => {
     const b = sessionStorage.getItem('mw_last_booking');
     if (b) {
       setBooking(JSON.parse(b));
-      // Offer brasserie prompt ~1.5s after confirm
-      const id = setTimeout(() => setBrasserieOpen(true), 1500);
-      return () => clearTimeout(id);
+      const popups = getPopups().filter((p) => p.enabled && p.trigger === 'after_confirmation').sort((a, b) => (a.order || 0) - (b.order || 0));
+      setPopupQueue(popups);
+      if (popups.length > 0) {
+        const t = setTimeout(() => setPopupIndex(0), 1500);
+        return () => clearTimeout(t);
+      }
     }
   }, []);
+
+  const current = popupIndex >= 0 ? popupQueue[popupIndex] : null;
+
+  const dismissPopup = () => {
+    const next = popupIndex + 1;
+    if (next < popupQueue.length) setPopupIndex(next);
+    else setPopupIndex(-1);
+  };
+
+  const handlePopupCta = () => {
+    if (!current) return;
+    if (current.cta_action === 'zenchef') {
+      setZenchefOpen(true);
+    } else if (current.cta_action === 'upsell_addactivities') {
+      const code = current.promo_code || 'UPSELL20';
+      sessionStorage.setItem('mw_upsell_code', code);
+      window.location.href = '/booking';
+    } else if (current.cta_url) {
+      window.open(current.cta_url, '_blank');
+    }
+    dismissPopup();
+  };
 
   if (!booking) return null;
 
@@ -30,7 +56,7 @@ export default function StepConfirm({ onRestart }) {
         Un email de confirmation a été envoyé à <span className="text-mw-pink">{booking.customer.email}</span>
         <span className="text-xs text-white/40"> (simulation démo)</span>
       </p>
-      <div className="mx-auto max-w-md rounded-2xl border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
+      <div className="mx-auto max-w-md rounded border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-white/50">Numéro</div>
@@ -42,12 +68,12 @@ export default function StepConfirm({ onRestart }) {
           </div>
         </div>
         <div className="mb-3 text-sm text-white/70">
-          {new Date(booking.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} — {booking.players} joueur(s)
+          {new Date(booking.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} — max {booking.players} joueur(s)
         </div>
         <div className="space-y-2">
           {booking.items.map((i, idx) => (
-            <div key={idx} className="flex items-center justify-between rounded-lg bg-white/[0.05] p-2 text-sm">
-              <span className="font-medium">{i.activityName}</span>
+            <div key={idx} className="flex items-center justify-between rounded bg-white/[0.05] p-2 text-sm">
+              <span className="font-medium">{i.activityName} <span className="text-white/50">· {i.players}j</span></span>
               <span className="font-mono text-mw-pink">{i.start}</span>
             </div>
           ))}
@@ -58,27 +84,23 @@ export default function StepConfirm({ onRestart }) {
         <button onClick={onRestart} className="btn-primary">Nouvelle réservation</button>
       </div>
 
-      {/* Pop-up brasserie proposée après confirmation */}
-      {brasserieOpen && !zenchefOpen && (
+      {current && !zenchefOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm md:items-center">
-          <div className="relative w-full max-w-md rounded-2xl border border-mw-pink/50 bg-mw-darker p-6 shadow-neon-pink">
+          <div className="relative w-full max-w-md rounded border border-mw-pink/50 bg-mw-surface p-6 shadow-neon-pink">
             <button
-              onClick={() => setBrasserieOpen(false)}
+              onClick={dismissPopup}
               className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-mw-pink"
             >
               ✕
             </button>
-            <div className="mb-3 text-center text-5xl">🍽️</div>
-            <div className="display mb-2 text-center text-2xl">Et pour manger&nbsp;?</div>
-            <p className="mb-5 text-center text-sm text-white/70">
-              Prolongez l'expérience à la <span className="text-mw-pink">Red Planet Brasserie</span>.
-              Réservez une table pour après vos parties.
-            </p>
+            {current.emoji && <div className="mb-3 text-center text-5xl">{current.emoji}</div>}
+            <div className="display mb-2 text-center text-2xl">{current.title}</div>
+            <p className="mb-5 text-center text-sm text-white/70" style={{ whiteSpace: 'pre-line' }}>{current.body}</p>
             <div className="flex flex-col gap-2">
-              <button onClick={() => setZenchefOpen(true)} className="btn-primary w-full">
-                Réserver une table →
+              <button onClick={handlePopupCta} className="btn-primary w-full">
+                {current.cta_label}
               </button>
-              <button onClick={() => setBrasserieOpen(false)} className="btn-outline w-full text-sm">
+              <button onClick={dismissPopup} className="btn-outline w-full text-sm">
                 Non merci
               </button>
             </div>
@@ -86,20 +108,18 @@ export default function StepConfirm({ onRestart }) {
         </div>
       )}
 
-      {/* Iframe Zenchef */}
       {zenchefOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => { setZenchefOpen(false); setBrasserieOpen(false); }}
+          onClick={() => { setZenchefOpen(false); dismissPopup(); }}
         >
           <div
-            className="relative w-full max-w-xl rounded-2xl border border-mw-pink/40 bg-mw-darker p-4 shadow-neon-pink"
+            className="relative w-full max-w-xl rounded border border-mw-pink/40 bg-mw-surface p-4 shadow-neon-pink"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => { setZenchefOpen(false); setBrasserieOpen(false); }}
+              onClick={() => { setZenchefOpen(false); dismissPopup(); }}
               className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-mw-pink"
-              aria-label="Fermer"
             >
               ✕
             </button>
@@ -107,7 +127,7 @@ export default function StepConfirm({ onRestart }) {
               <div className="display text-lg">Red Planet Brasserie</div>
               <div className="text-xs text-white/60">Powered by Zenchef</div>
             </div>
-            <div className="overflow-hidden rounded-xl bg-white" style={{ height: '520px' }}>
+            <div className="overflow-hidden rounded bg-white" style={{ height: '520px' }}>
               <iframe
                 src="https://bookings.zenchef.com/results?rid=378158&pid=menu"
                 width="100%"
@@ -116,17 +136,6 @@ export default function StepConfirm({ onRestart }) {
                 title="Réservation Red Planet Brasserie"
               />
             </div>
-            <p className="mt-3 text-center text-[11px] text-white/50">
-              Si le widget ne charge pas,{' '}
-              <a
-                href="https://www.google.com/maps/reserve/v/dine/c/VQ5EgyH_iZg"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-mw-pink hover:underline"
-              >
-                ouvrez Google Reserve →
-              </a>
-            </p>
           </div>
         </div>
       )}

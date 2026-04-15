@@ -1,49 +1,111 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { activities } from '@/lib/activities';
-import { getRestrictions } from '@/lib/restrictions';
+import { activities, getActivityPrice } from '@/lib/activities';
 import { generateSlotsForActivity, toDateStr } from '@/lib/hours';
 import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
-import { computeSessionsNeeded } from '@/lib/store';
-import { getActivityPrice } from '@/lib/activities';
 
 export default function OnSiteBookingPage() {
   const today = toDateStr(new Date());
-  const [step, setStep] = useState('customer');
+  const [date, setDate] = useState(today);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [players, setPlayers] = useState(2);
+  // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
-  const [date, setDate] = useState(today);
-  const [slots, setSlots] = useState({});
+  const [occupancy, setOccupancy] = useState({});
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const staff = typeof window !== 'undefined' ? getActiveStaff() : null;
 
+  useEffect(() => {
+    // Charge occupation pour toutes les activités sélectionnées
+    const load = async () => {
+      const o = {};
+      for (const id of Object.keys(items)) {
+        const act = activities.find((a) => a.id === id);
+        if (act) {
+          const oc = await getSlotOccupancy(id, date);
+          o[id] = oc;
+        }
+      }
+      setOccupancy(o);
+    };
+    load();
+  }, [items, date]);
+
   const toggleActivity = (id) => {
-    const next = { ...items };
-    if (next[id]) delete next[id];
-    else next[id] = { quantity: 1 };
-    setItems(next);
+    const a = activities.find((x) => x.id === id);
+    if (!a) return;
+    setItems((prev) => {
+      const next = { ...prev };
+      if (next[id]) delete next[id];
+      else next[id] = [{ players: a.minPlayers || 2, slot: null }];
+      return next;
+    });
   };
 
-  const bookable = Object.keys(items).map((id) => activities.find((a) => a.id === id)).filter(Boolean);
-  const itemsArr = Object.entries(slots).flatMap(([id, arr]) => {
+  const addSession = (id) => {
+    const a = activities.find((x) => x.id === id);
+    setItems((prev) => ({
+      ...prev,
+      [id]: [...(prev[id] || []), { players: a.minPlayers || 2, slot: null }],
+    }));
+  };
+
+  const removeSession = (id, idx) => {
+    setItems((prev) => {
+      const arr = (prev[id] || []).slice();
+      arr.splice(idx, 1);
+      if (arr.length === 0) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: arr };
+    });
+  };
+
+  const setSessionPlayers = (id, idx, players) => {
+    const a = activities.find((x) => x.id === id);
+    const clamped = Math.min(Math.max(a.minPlayers || 1, players), a.maxPlayers);
+    setItems((prev) => {
+      const arr = (prev[id] || []).slice();
+      arr[idx] = { ...arr[idx], players: clamped };
+      return { ...prev, [id]: arr };
+    });
+  };
+
+  const setSessionSlot = (id, idx, slot) => {
+    setItems((prev) => {
+      const arr = (prev[id] || []).slice();
+      arr[idx] = { ...arr[idx], slot };
+      return { ...prev, [id]: arr };
+    });
+  };
+
+  const flat = Object.entries(items).flatMap(([id, arr]) => {
     const a = activities.find((x) => x.id === id);
     const unit = getActivityPrice(a, date);
-    return (arr || []).map((s) => ({
-      activityId: id,
-      activityName: a.name,
-      activity: a,
-      start: s.start,
-      end: s.end,
-      unit,
-      total: unit * players,
-    }));
-  }).sort((a, b) => a.start.localeCompare(b.start));
+    return arr
+      .filter((s) => s.slot)
+      .map((s) => ({
+        activityId: id,
+        activity: a,
+        activityName: a.name,
+        start: s.slot.start,
+        end: s.slot.end,
+        players: s.players,
+        billedPlayers: Math.max(s.players, a.minPlayers || 1),
+        unit,
+        total: unit * Math.max(s.players, a.minPlayers || 1),
+      }))
+      .sort((x, y) => x.start.localeCompare(y.start));
+  });
 
-  const subtotal = itemsArr.reduce((s, i) => s + i.total, 0);
+  const subtotal = flat.reduce((s, i) => s + i.total, 0);
+  const allAssigned =
+    Object.keys(items).length > 0 &&
+    Object.values(items).every((arr) => arr.every((s) => s.slot));
 
   const submitPayment = async (method) => {
     setPayment({ method, status: 'processing' });
@@ -53,15 +115,13 @@ export default function OnSiteBookingPage() {
     const booking = {
       id: 'MW-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
       date,
-      players,
-      items: itemsArr.map((i) => ({ ...i, activityName: i.activityName })),
+      players: Math.max(...flat.map((i) => i.players), 0),
+      items: flat,
       subtotal,
       discount: 0,
       total: subtotal,
       paid: true,
       source: 'on_site',
-      promoCode: null,
-      packageId: null,
       customer: { name, email: '', phone },
       createdAt: new Date().toISOString(),
       staffId: staff?.id,
@@ -77,16 +137,15 @@ export default function OnSiteBookingPage() {
       after: { total: booking.total, method: booking.paymentMethod },
     });
     setConfirmed(booking);
-    setStep('done');
   };
 
-  if (confirmed && step === 'done') {
+  if (confirmed) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10 text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-4xl shadow-neon-cyan">✓</div>
-        <h1 className="section-title mb-2">Réservation enregistrée</h1>
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-4xl">✓</div>
+        <h1 className="section-title mb-2">Enregistrée</h1>
         <div className="mb-6 text-white/60">Facture Odoo créée automatiquement (simulation)</div>
-        <div className="mx-auto max-w-md rounded-2xl border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
+        <div className="mx-auto max-w-md rounded border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
           <div className="mb-3 flex justify-between">
             <div>
               <div className="text-xs text-white/50">N°</div>
@@ -97,40 +156,33 @@ export default function OnSiteBookingPage() {
               <div className="display text-2xl">{confirmed.total}€</div>
             </div>
           </div>
-          <div className="mb-3 text-sm">{confirmed.customer.name} · {confirmed.players} joueurs</div>
+          <div className="mb-3 text-sm">{confirmed.customer.name} · {confirmed.players} joueurs max</div>
           <div className="space-y-1 text-xs text-white/60">
-            {confirmed.items.map((i, idx) => <div key={idx}>· {i.activityName} @ {i.start}</div>)}
+            {confirmed.items.map((i, idx) => <div key={idx}>· {i.activityName} @ {i.start} ({i.players}j)</div>)}
           </div>
           <div className="mt-3 border-t border-white/10 pt-3 text-xs text-white/50">
-            Paiement : {confirmed.paymentMethod === 'on_site_card' ? '💳 Carte' : '💵 Espèces'} · Staff : {confirmed.staffName}
+            {confirmed.paymentMethod === 'on_site_card' ? '💳 Carte' : '💵 Espèces'} · Staff : {confirmed.staffName}
           </div>
         </div>
         <button
-          onClick={() => {
-            setConfirmed(null); setPayment(null); setStep('customer');
-            setName(''); setPhone(''); setPlayers(2); setItems({}); setSlots({});
-          }}
+          onClick={() => { setConfirmed(null); setPayment(null); setName(''); setPhone(''); setItems({}); }}
           className="btn-primary mt-6"
         >
-          Nouvelle réservation sur place
+          Nouvelle réservation
         </button>
       </div>
     );
   }
 
-  if (payment) {
-    return <PaymentSimulation payment={payment} total={subtotal} onCancel={() => setPayment(null)} />;
-  }
+  if (payment) return <PaymentSimulation payment={payment} total={subtotal} onCancel={() => setPayment(null)} />;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="section-title mb-1">Réservation sur place</h1>
-      <p className="mb-6 text-sm text-white/60">
-        Mode accueil — créez une réservation pour un client présent, encaissement direct.
-      </p>
+      <p className="mb-6 text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
 
       {/* Customer */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
         <div className="mb-2 display text-sm">1. Client</div>
         <div className="grid gap-2 sm:grid-cols-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom" className="input" />
@@ -138,18 +190,14 @@ export default function OnSiteBookingPage() {
         </div>
       </div>
 
-      {/* Players */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="mb-2 display text-sm">2. Joueurs</div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setPlayers(Math.max(1, players - 1))} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-xl">−</button>
-          <div className="w-12 text-center display text-3xl text-mw-pink">{players}</div>
-          <button onClick={() => setPlayers(players + 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-xl">+</button>
-        </div>
+      {/* Date */}
+      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
+        <div className="mb-2 display text-sm">2. Date</div>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input max-w-xs" />
       </div>
 
       {/* Activities */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
         <div className="mb-2 display text-sm">3. Activités</div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
           {activities.filter((a) => a.bookable).map((a) => {
@@ -158,7 +206,7 @@ export default function OnSiteBookingPage() {
               <button
                 key={a.id}
                 onClick={() => toggleActivity(a.id)}
-                className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition ${
+                className={`flex flex-col items-center gap-1 rounded border p-2 transition ${
                   sel ? 'border-mw-pink bg-mw-pink/10' : 'border-white/15 hover:border-white/40'
                 }`}
               >
@@ -173,46 +221,69 @@ export default function OnSiteBookingPage() {
         </div>
       </div>
 
-      {/* Slots */}
-      {bookable.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="mb-2 display text-sm">4. Créneaux</div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => { setDate(e.target.value); setSlots({}); }}
-            className="input mb-3 max-w-xs"
-          />
-          {bookable.map((a) => {
-            const needed = computeSessionsNeeded(a, players, items[a.id].quantity);
+      {/* Sessions */}
+      {Object.keys(items).length > 0 && (
+        <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
+          <div className="mb-2 display text-sm">4. Créneaux & joueurs</div>
+          {Object.entries(items).map(([id, arr]) => {
+            const a = activities.find((x) => x.id === id);
             const allSlots = generateSlotsForActivity(a, date);
-            const selected = slots[a.id] || [];
+            const occ = occupancy[id] || {};
             return (
-              <div key={a.id} className="mb-3">
-                <div className="mb-1 text-xs text-white/60">
-                  {a.name} — {selected.length}/{needed} créneaux
+              <div key={id} className="mb-4 rounded bg-white/[0.02] p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="display flex items-center gap-2">
+                    <div className="relative h-6 w-6">
+                      <Image src={a.logo} alt="" fill sizes="24px" className="object-contain" />
+                    </div>
+                    {a.name}
+                  </div>
+                  <button onClick={() => addSession(id)} className="text-xs text-mw-pink hover:underline">
+                    + Créneau
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {allSlots.slice(0, 30).map((slot) => {
-                    const chosen = selected.some((s) => s.start === slot.start);
-                    return (
-                      <button
-                        key={slot.start}
-                        onClick={() => {
-                          const cur = selected.slice();
-                          const idx = cur.findIndex((s) => s.start === slot.start);
-                          if (idx >= 0) cur.splice(idx, 1);
-                          else if (cur.length < needed) cur.push(slot);
-                          else { cur.shift(); cur.push(slot); }
-                          setSlots({ ...slots, [a.id]: cur.sort((x, y) => x.start.localeCompare(y.start)) });
-                        }}
-                        className={`rounded border px-2 py-1 text-xs ${chosen ? 'border-mw-pink bg-mw-pink text-white' : 'border-white/15 text-white/70 hover:border-white/40'}`}
-                      >
-                        {slot.start}
-                      </button>
-                    );
-                  })}
-                </div>
+                {arr.map((sess, idx) => (
+                  <div key={idx} className="mb-2 rounded border border-white/10 p-2">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white">{idx + 1}</div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players - 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">−</button>
+                          <span className="display w-7 text-center text-mw-pink">{sess.players}</span>
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players + 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">+</button>
+                          <span className="ml-1 text-[10px] text-white/50">joueurs</span>
+                        </div>
+                      </div>
+                      <button onClick={() => removeSession(id, idx)} className="text-xs text-mw-red">✕</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {allSlots.slice(0, 40).map((slot) => {
+                        const chosen = sess.slot?.start === slot.start;
+                        const occInfo = occ[slot.start];
+                        const playersInSlot = occInfo?.players || 0;
+                        const privative = a.privative;
+                        const full = privative ? playersInSlot > 0 : playersInSlot >= a.maxPlayers;
+                        const shared = !privative && playersInSlot > 0 && !full;
+                        let cls = 'border-white/15 text-white/70 hover:border-white/40';
+                        if (chosen) cls = 'border-mw-pink bg-mw-pink text-white';
+                        else if (full) cls = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
+                        else if (shared) cls = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow';
+                        return (
+                          <button
+                            key={slot.start}
+                            onClick={() => !full && setSessionSlot(id, idx, slot)}
+                            disabled={full}
+                            className={`relative rounded border px-2 py-1 text-xs ${cls}`}
+                            title={shared ? `Libre: ${playersInSlot}/${a.maxPlayers}` : full ? 'Complet' : 'Libre'}
+                          >
+                            {slot.start}
+                            {shared && <div className="text-[8px]">{playersInSlot}/{a.maxPlayers}</div>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })}
@@ -220,31 +291,21 @@ export default function OnSiteBookingPage() {
       )}
 
       {/* Payment */}
-      {itemsArr.length > 0 && (
-        <div className="rounded-2xl border border-mw-pink/30 bg-gradient-to-br from-mw-pink/10 to-transparent p-4">
+      {allAssigned && subtotal > 0 && (
+        <div className="rounded border border-mw-pink/30 bg-gradient-to-br from-mw-pink/10 to-transparent p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="display text-sm">5. Paiement</div>
             <div className="display text-3xl text-mw-pink">{subtotal.toFixed(2)}€</div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              onClick={() => submitPayment('card')}
-              disabled={!name || itemsArr.length === 0}
-              className="btn-primary !py-4 disabled:opacity-30"
-            >
+            <button onClick={() => submitPayment('card')} disabled={!name} className="btn-primary !py-4 disabled:opacity-30">
               💳 Carte bancaire
             </button>
-            <button
-              onClick={() => submitPayment('cash')}
-              disabled={!name || itemsArr.length === 0}
-              className="btn-outline !py-4 disabled:opacity-30"
-            >
+            <button onClick={() => submitPayment('cash')} disabled={!name} className="btn-outline !py-4 disabled:opacity-30">
               💵 Espèces
             </button>
           </div>
-          <p className="mt-3 text-center text-[10px] text-white/40">
-            Simulation : aucune transaction réelle n'est effectuée. En prod, branchement Worldline/SumUp + caisse Odoo.
-          </p>
+          <p className="mt-3 text-center text-[10px] text-white/40">Simulation — en prod, Worldline/SumUp + caisse Odoo POS.</p>
         </div>
       )}
     </div>
@@ -254,7 +315,7 @@ export default function OnSiteBookingPage() {
 function PaymentSimulation({ payment, total, onCancel }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-2xl border border-mw-pink/40 bg-mw-darker p-8 text-center shadow-neon-pink">
+      <div className="mx-4 w-full max-w-md rounded border border-mw-pink/40 bg-mw-surface p-8 text-center shadow-neon-pink">
         {payment.method === 'card' ? (
           <>
             <div className="mb-4 text-6xl">💳</div>
@@ -280,7 +341,7 @@ function PaymentSimulation({ payment, total, onCancel }) {
             <div className="mb-4 text-6xl">💵</div>
             <div className="display mb-2 text-xl">Paiement espèces</div>
             {payment.status === 'processing' ? (
-              <div className="text-sm text-white/60">Ouverture de la caisse enregistreuse Odoo…</div>
+              <div className="text-sm text-white/60">Ouverture caisse Odoo…</div>
             ) : (
               <div className="display text-green-400">✓ Caisse ouverte</div>
             )}
@@ -288,9 +349,7 @@ function PaymentSimulation({ payment, total, onCancel }) {
         )}
         <div className="mt-6 display text-3xl text-mw-pink">{total.toFixed(2)}€</div>
         {payment.status === 'processing' && (
-          <button onClick={onCancel} className="mt-4 text-xs text-white/50 hover:text-mw-red">
-            Annuler
-          </button>
+          <button onClick={onCancel} className="mt-4 text-xs text-white/50 hover:text-mw-red">Annuler</button>
         )}
       </div>
     </div>

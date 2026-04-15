@@ -1,55 +1,37 @@
 'use client';
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
-import { useBooking, computeSessionsNeeded } from '@/lib/store';
+import { useBooking } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
 import { getSlotOccupancy, getSlotBlocks, subscribeBookings } from '@/lib/data';
 import {
   generateSlotsForActivity,
-  slotConflicts,
   dayLabelsFr,
+  dayLabelsFrFull,
   monthsFr,
   isOpenOn,
   toDateStr,
   parseDate,
   toMinutes,
+  JOIN_CUTOFF_MIN_ONLINE,
 } from '@/lib/hours';
 
-const JOIN_CUTOFF_MIN = 10;
-
-function buildUpcomingDays(count = 90) {
-  const out = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = 0; i < count; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    out.push(toDateStr(d));
-  }
-  return out;
-}
-
 export default function StepSlots() {
-  const { cart, setDate, setActivitySlots } = useBooking();
-  const days = useMemo(() => buildUpcomingDays(90), []);
-  const [activeActivity, setActiveActivity] = useState(null);
+  const { cart, setDate, assignSlot, clearSlot } = useBooking();
+  const [activeActivityId, setActiveActivityId] = useState(null);
   const [occupancy, setOccupancy] = useState({});
   const [blocks, setBlocks] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = cart.date ? parseDate(cart.date) : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
 
-  useEffect(() => {
-    if (!cart.date) {
-      const firstOpen = days.find((d) => isOpenOn(d));
-      if (firstOpen) setDate(firstOpen);
-    }
-  }, [cart.date, days, setDate]);
-
-  const activityIds = Object.keys(cart.items);
-  const bookable = activityIds.map(getActivity).filter((a) => a && a.bookable);
-  const currentActivityId = activeActivity || bookable[0]?.id;
+  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && a.bookable);
+  const currentActivityId = activeActivityId || bookable[0]?.id;
   const currentActivity = getActivity(currentActivityId);
-  const currentItem = cart.items[currentActivityId];
-  const currentSessions = currentActivity ? computeSessionsNeeded(currentActivity, cart.players, currentItem.quantity) : 0;
+  const currentSessions = cart.items[currentActivityId]?.sessions || [];
+  const currentSlots = cart.slots[currentActivityId] || [];
 
   useEffect(() => {
     if (!currentActivity || !cart.date) return;
@@ -64,99 +46,141 @@ export default function StepSlots() {
     return unsub;
   }, []);
 
-  const existingBookings = Object.entries(cart.slots).flatMap(([id, arr]) => {
-    if (id === currentActivityId) return [];
-    const act = getActivity(id);
-    return (arr || []).map((s) => ({ ...s, duration: act.duration }));
-  });
-
-  const ownSelected = cart.slots[currentActivityId] || [];
   const allSlots = cart.date && currentActivity ? generateSlotsForActivity(currentActivity, cart.date) : [];
 
-  const toggleSlot = (slot) => {
-    const has = ownSelected.find((s) => s.start === slot.start);
-    if (has) {
-      setActivitySlots(currentActivityId, ownSelected.filter((s) => s.start !== slot.start));
-    } else {
-      if (ownSelected.length >= currentSessions) {
-        const next = [...ownSelected.slice(1), slot].sort((a, b) => a.start.localeCompare(b.start));
-        setActivitySlots(currentActivityId, next);
-      } else {
-        const next = [...ownSelected, slot].sort((a, b) => a.start.localeCompare(b.start));
-        setActivitySlots(currentActivityId, next);
-      }
+  // Trouve le prochain index de session non assigné
+  const nextUnassignedIndex = () => {
+    for (let i = 0; i < currentSessions.length; i++) {
+      if (!currentSlots[i]) return i;
+    }
+    return currentSessions.length - 1;
+  };
+
+  const handleSlotClick = (slot) => {
+    // Si ce slot est déjà dans currentSlots, on le désassigne
+    const existingIdx = currentSlots.findIndex((s) => s && s.start === slot.start);
+    if (existingIdx >= 0) {
+      clearSlot(currentActivityId, existingIdx);
+      return;
+    }
+
+    // Sinon, on l'assigne au prochain slot non assigné
+    const idx = nextUnassignedIndex();
+    assignSlot(currentActivityId, idx, slot);
+
+    // Auto-advance : si cette activité est maintenant complète, passer à la suivante
+    const willBeComplete = currentSessions.every((_, i) => i === idx || currentSlots[i]);
+    if (willBeComplete) {
+      setTimeout(() => {
+        const currentIdx = bookable.findIndex((a) => a.id === currentActivityId);
+        const nextActivity = bookable.find((a, i) => {
+          if (i <= currentIdx) return false;
+          const slots = cart.slots[a.id] || [];
+          const sessions = cart.items[a.id]?.sessions || [];
+          return slots.filter(Boolean).length < sessions.length;
+        });
+        if (nextActivity) setActiveActivityId(nextActivity.id);
+      }, 300);
     }
   };
 
-  const byMonth = {};
-  days.forEach((d) => {
-    const dt = parseDate(d);
-    const key = `${dt.getFullYear()}-${dt.getMonth()}`;
-    if (!byMonth[key]) byMonth[key] = { label: `${monthsFr[dt.getMonth()]} ${dt.getFullYear()}`, days: [] };
-    byMonth[key].days.push(d);
-  });
+  const navPrev = () => {
+    const pm = new Date(viewMonth.year, viewMonth.month - 1, 1);
+    const today = new Date();
+    if (pm < new Date(today.getFullYear(), today.getMonth(), 1)) return;
+    setViewMonth({ year: pm.getFullYear(), month: pm.getMonth() });
+  };
+  const navNext = () => {
+    const nm = new Date(viewMonth.year, viewMonth.month + 1, 1);
+    setViewMonth({ year: nm.getFullYear(), month: nm.getMonth() });
+  };
+
+  // Liste des jours du mois view
+  const today = new Date();
+  const firstDay = new Date(viewMonth.year, viewMonth.month, 1);
+  const lastDay = new Date(viewMonth.year, viewMonth.month + 1, 0);
+  const monthDays = [];
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    monthDays.push(toDateStr(new Date(viewMonth.year, viewMonth.month, d)));
+  }
 
   return (
     <div>
-      <h1 className="section-title mb-2">Date & créneaux</h1>
+      <h1 className="section-title mb-2">Créneaux</h1>
       <p className="mb-6 text-white/60">
-        Sélectionnez {currentSessions > 1 ? <>{currentSessions} créneaux pour </> : 'le créneau pour '}
-        chaque activité.{' '}
-        <span className="text-mw-yellow">Créneaux jaunes = groupe déjà présent, vous jouerez ensemble (tant qu'il reste de la place).</span>
+        Sélectionnez un créneau pour chaque session. Numéro de la bulle = numéro du créneau.
+        Les activités peuvent se chevaucher (votre groupe peut se splitter).
       </p>
 
-      <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Date</div>
-      <div className="mb-8 space-y-3">
-        {Object.entries(byMonth).map(([key, { label, days: monthDays }]) => (
-          <div key={key}>
-            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-white/40">{label}</div>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {monthDays.map((d) => {
-                const date = parseDate(d);
-                const open = isOpenOn(d);
-                const isWed = date.getDay() === 3;
-                const active = cart.date === d;
-                const today = toDateStr(new Date()) === d;
-                return (
-                  <button
-                    key={d}
-                    onClick={() => open && setDate(d)}
-                    disabled={!open}
-                    className={`relative shrink-0 rounded-xl border px-3.5 py-2.5 text-center transition ${
-                      active
-                        ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
-                        : 'border-white/15 bg-white/[0.03] hover:border-white/40'
-                    } ${!open ? 'cursor-not-allowed opacity-25' : ''}`}
-                  >
-                    {today && !active && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mw-pink" />}
-                    <div className="text-[10px] font-bold uppercase opacity-80">{dayLabelsFr[date.getDay()]}</div>
-                    <div className="display text-xl leading-none">{date.getDate()}</div>
-                    {isWed && open && (
-                      <div className={`mt-0.5 text-[9px] font-bold ${active ? 'text-white' : 'text-mw-pink'}`}>-50%</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-white/50">
+          Date {cart.date === toDateStr(today) && <span className="text-mw-pink">(aujourd'hui)</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={navPrev}
+            disabled={viewMonth.year === today.getFullYear() && viewMonth.month === today.getMonth()}
+            className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm disabled:opacity-20"
+          >
+            ←
+          </button>
+          <div className="display w-32 text-center text-sm">
+            {monthsFr[viewMonth.month]} {viewMonth.year}
           </div>
-        ))}
+          <button onClick={navNext} className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm hover:border-mw-pink hover:text-mw-pink">
+            →
+          </button>
+        </div>
       </div>
 
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+        {monthDays.map((d) => {
+          const dt = parseDate(d);
+          const open = isOpenOn(d);
+          const isWed = dt.getDay() === 3;
+          const active = cart.date === d;
+          const isToday = toDateStr(today) === d;
+          const isPast = dt < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const disabled = !open || isPast;
+          return (
+            <button
+              key={d}
+              onClick={() => !disabled && setDate(d)}
+              disabled={disabled}
+              className={`relative shrink-0 rounded border px-3.5 py-2.5 text-center transition ${
+                active
+                  ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
+                  : 'border-white/15 bg-white/[0.03] hover:border-white/40'
+              } ${disabled ? 'cursor-not-allowed opacity-25' : ''}`}
+            >
+              {isToday && !active && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mw-pink" />}
+              <div className="text-[10px] font-bold uppercase opacity-80">{dayLabelsFr[dt.getDay()]}</div>
+              <div className="display text-xl leading-none">{dt.getDate()}</div>
+              {isWed && open && (
+                <div className={`mt-0.5 text-[9px] font-bold ${active ? 'text-white' : 'text-mw-pink'}`}>-50%</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Activité tabs */}
       {cart.date && bookable.length > 1 && (
         <>
           <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Activité à planifier</div>
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className="mb-5 flex flex-wrap gap-2">
             {bookable.map((a) => {
-              const item = cart.items[a.id];
-              const needed = computeSessionsNeeded(a, cart.players, item.quantity);
-              const chosen = (cart.slots[a.id] || []).length;
+              const slots = cart.slots[a.id] || [];
+              const sessions = cart.items[a.id]?.sessions || [];
+              const chosen = slots.filter(Boolean).length;
+              const needed = sessions.length;
               const active = currentActivityId === a.id;
               const complete = chosen === needed;
               return (
                 <button
                   key={a.id}
-                  onClick={() => setActiveActivity(a.id)}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
+                  onClick={() => setActiveActivityId(a.id)}
+                  className={`flex items-center gap-2 rounded border px-3 py-1.5 text-sm transition ${
                     active ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 text-white/70 hover:border-white/40'
                   }`}
                 >
@@ -164,7 +188,7 @@ export default function StepSlots() {
                     <Image src={a.logo} alt="" fill className="object-contain" sizes="20px" />
                   </div>
                   <span className="display tracking-wider">{a.name}</span>
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${complete ? 'bg-mw-pink text-white' : 'bg-white/10 text-white/60'}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${complete ? 'bg-mw-pink text-white' : 'bg-white/10 text-white/60'}`}>
                     {chosen}/{needed}
                   </span>
                 </button>
@@ -174,31 +198,50 @@ export default function StepSlots() {
         </>
       )}
 
-      {cart.date && currentActivity && (
+      {/* Sessions à assigner */}
+      {currentActivity && (
         <>
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wider text-white/50">
-              {currentActivity.name} ({currentActivity.duration} min)
-              {currentSessions > 1 && <> — {ownSelected.length}/{currentSessions}</>}
-            </div>
-            {ownSelected.length > 0 && (
-              <button onClick={() => setActivitySlots(currentActivityId, [])} className="text-xs text-mw-red hover:underline">
-                Effacer
-              </button>
-            )}
+          <div className="mb-2 text-xs uppercase tracking-wider text-white/50">
+            {currentActivity.name} · Créneaux à placer
+          </div>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {currentSessions.map((sess, idx) => {
+              const assigned = currentSlots[idx];
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
+                    assigned ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/20 text-white/60 border-dashed'
+                  }`}
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white">
+                    {idx + 1}
+                  </div>
+                  <span className="display">{sess.players} joueur{sess.players > 1 ? 's' : ''}</span>
+                  {assigned ? (
+                    <>
+                      <span className="font-mono">{assigned.start}</span>
+                      <button onClick={() => clearSlot(currentActivityId, idx)} className="text-mw-red hover:underline">✕</button>
+                    </>
+                  ) : (
+                    <span className="opacity-50">à placer</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div className="mb-3 flex flex-wrap gap-3 text-[10px] text-white/50">
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] text-white/50">
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-white/10 border border-white/30"></span>Libre</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-yellow/30 border border-mw-yellow"></span>Groupe présent</span>
+            {!currentActivity.privative && (
+              <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-yellow/30 border border-mw-yellow"></span>Groupe(s) présent(s)</span>
+            )}
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-red/20 border border-mw-red line-through"></span>Complet</span>
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-pink border border-mw-pink"></span>Sélectionné</span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
             {allSlots.map((slot) => {
-              const conflict = slotConflicts(existingBookings, slot, currentActivity);
-              const selected = ownSelected.some((s) => s.start === slot.start);
               const occ = occupancy[slot.start];
               const blockedHere = blocks.find(
                 (b) => (b.activity_id || b.activityId) === currentActivity.id && (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start)
@@ -207,68 +250,82 @@ export default function StepSlots() {
               const totalCap = currentActivity.maxPlayers;
               const playersInSlot = occ?.players || 0;
               const groupsInSlot = occ?.groups || 0;
-              const wouldFit = playersInSlot + cart.players <= totalCap;
 
-              // cutoff — can't join less than JOIN_CUTOFF_MIN before start (only for today)
+              // Privative : dès 1 groupe, complet
+              const privative = currentActivity.privative;
+              const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
+              const shared = !privative && playersInSlot > 0 && !full;
+
+              // Cutoff 10 min en ligne pour rejoindre
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
               if (isToday) {
                 const now = new Date();
                 const nowM = now.getHours() * 60 + now.getMinutes();
                 const slotM = toMinutes(slot.start);
-                if (slotM - nowM < JOIN_CUTOFF_MIN) pastCutoff = true;
+                if (slotM - nowM < JOIN_CUTOFF_MIN_ONLINE) pastCutoff = true;
               }
 
-              // Activités privatives : dès qu'il y a 1 groupe, le créneau est complet
-              const privative = currentActivity.privative;
-              const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
-              const shared = !privative && playersInSlot > 0 && !full;
-              const blocked = Boolean(blockedHere) || pastCutoff || (shared && !wouldFit);
-              const disabled = conflict || full || blocked;
+              // Capacité de cette session spécifique qu'on ajouterait
+              const currentSessionIdx = nextUnassignedIndex();
+              const currentSessionPlayers = currentSessions[currentSessionIdx]?.players || 0;
+              const wouldFit = shared ? playersInSlot + currentSessionPlayers <= totalCap : true;
+
+              // Est-ce que ce slot est assigné à une session de notre panier ?
+              const assignedSessionIdx = currentSlots.findIndex((s) => s && s.start === slot.start);
+              const isAssigned = assignedSessionIdx >= 0;
+
+              const disabled = Boolean(blockedHere) || full || pastCutoff || (shared && !wouldFit);
 
               let classes = '';
-              if (selected) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
-              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/20 text-white/40 line-through';
+              if (isAssigned) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
+              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/20 text-white/40';
               else if (full) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
-              else if (shared && wouldFit) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
               else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30';
-              else if (conflict) classes = 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20 line-through';
+              else if (shared) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
               else if (pastCutoff) classes = 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20';
               else classes = 'border-white/15 bg-white/[0.03] text-white hover:border-mw-pink';
 
               return (
                 <button
                   key={slot.start}
-                  onClick={() => !disabled && toggleSlot(slot)}
+                  onClick={() => !disabled && handleSlotClick(slot)}
                   disabled={disabled}
-                  className={`relative rounded-lg border py-2.5 text-sm font-bold transition ${classes}`}
+                  className={`relative rounded border py-2.5 text-sm font-bold transition ${classes}`}
                   title={
                     blockedHere ? `Bloqué: ${blockedHere.block_reason || blockedHere.reason || 'staff'}`
-                      : shared ? `${playersInSlot}/${totalCap} joueurs (${groupsInSlot} groupe${groupsInSlot > 1 ? 's' : ''}) — vous les rejoindrez`
+                      : shared ? `Libre : ${playersInSlot}/${totalCap} — ${groupsInSlot} groupe(s) déjà présent(s)`
                       : full ? 'Complet'
-                      : pastCutoff ? 'Trop tard pour rejoindre ce créneau (briefing 10 min)'
-                      : undefined
+                      : pastCutoff ? 'Trop tard (briefing 10 min)'
+                      : `Libre : ${playersInSlot}/${totalCap}`
                   }
                 >
+                  {isAssigned && (
+                    <div className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white ring-2 ring-mw-darker">
+                      {assignedSessionIdx + 1}
+                    </div>
+                  )}
                   {slot.start}
-                  {shared && !full && wouldFit && (
-                    <div className="mt-0.5 text-[8px] font-normal">{playersInSlot}/{totalCap}</div>
+                  {!privative && shared && wouldFit && (
+                    <div className="mt-0.5 text-[8px] font-normal">Libre: {playersInSlot}/{totalCap}</div>
+                  )}
+                  {!privative && !shared && !full && !blockedHere && !pastCutoff && (
+                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre: 0/{totalCap}</div>
                   )}
                   {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">{blockedHere ? 'bloqué' : 'complet'}</div>}
-                  {pastCutoff && !full && !blockedHere && <div className="text-[8px] font-normal opacity-60">trop tard</div>}
                 </button>
               );
             })}
             {allSlots.length === 0 && (
-              <div className="col-span-full rounded-xl border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-white/50">
+              <div className="col-span-full rounded border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-white/50">
                 Aucun créneau disponible pour cette activité ce jour-là.
               </div>
             )}
           </div>
 
-          {currentActivity && ownSelected.length > 0 && (
-            <div className="mt-4 rounded-xl border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-xs text-mw-yellow">
-              ℹ Le briefing sécurité démarre 10 minutes avant le créneau. Merci d'arriver au moins 15 min à l'avance.
+          {currentSlots.filter(Boolean).length > 0 && (
+            <div className="mt-4 rounded border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-[11px] text-mw-yellow">
+              ℹ Le briefing sécurité démarre 10 min avant. Merci d'arriver au moins 15 min à l'avance.
             </div>
           )}
         </>

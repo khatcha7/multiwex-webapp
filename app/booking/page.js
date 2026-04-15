@@ -1,36 +1,51 @@
 'use client';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useBooking, computeSessionsNeeded } from '@/lib/store';
+import { useBooking } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
 import { getPackage } from '@/lib/packages';
+import { getConfig } from '@/lib/data';
+import StepDate from '@/components/booking/StepDate';
 import StepActivities from '@/components/booking/StepActivities';
-import StepPlayers from '@/components/booking/StepPlayers';
+import StepSessions from '@/components/booking/StepSessions';
 import StepSlots from '@/components/booking/StepSlots';
 import StepRecap from '@/components/booking/StepRecap';
 import StepConfirm from '@/components/booking/StepConfirm';
 
-const STEPS = [
-  { id: 'activities', label: 'Activités', short: '1' },
-  { id: 'players', label: 'Joueurs', short: '2' },
-  { id: 'slots', label: 'Créneaux', short: '3' },
-  { id: 'recap', label: 'Récap', short: '4' },
-  { id: 'confirm', label: 'OK', short: '✓' },
+// Steps possibles. Certains peuvent être bypassés via la config.
+const ALL_STEPS = [
+  { id: 'date', label: 'Date', short: 'Date', Component: StepDate },
+  { id: 'activities', label: 'Activités', short: 'Activités', Component: StepActivities },
+  { id: 'sessions', label: 'Joueurs', short: 'Joueurs', Component: StepSessions },
+  { id: 'slots', label: 'Créneaux', short: 'Créneaux', Component: StepSlots },
+  { id: 'recap', label: 'Récap', short: 'Récap', Component: StepRecap },
+  { id: 'confirm', label: 'OK', short: 'OK', Component: StepConfirm },
 ];
 
 function BookingInner() {
-  const [step, setStep] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const topRef = useRef(null);
   const { cart, hydrated, applyPackage } = useBooking();
   const params = useSearchParams();
   const packageId = params.get('package');
+
+  // Récupère la config (certaines étapes peuvent être bypassées)
+  const packageStepBypassed = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const v = getConfig('booking.bypass_package_toggle');
+    return v === true || v === 'true';
+  }, [hydrated]);
+
+  const STEPS = ALL_STEPS;
 
   useEffect(() => {
     if (hydrated && packageId) {
       const pkg = getPackage(packageId);
       if (pkg && pkg.activities && applyPackage) {
         applyPackage(pkg);
-        setStep(1);
+        // Avec un package, on part direct de la date si pas encore choisie,
+        // sinon on saute à slots
+        setStepIndex(cart.date ? 3 : 0);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38,53 +53,64 @@ function BookingInner() {
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [step]);
+  }, [stepIndex]);
 
   if (!hydrated) {
     return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-white/60">Chargement…</div>;
   }
 
-  const activityIds = Object.keys(cart.items);
-  const bookable = activityIds.map(getActivity).filter((a) => a && a.bookable);
+  const currentStep = STEPS[stepIndex];
+  const StepComponent = currentStep.Component;
+
+  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && a.bookable);
 
   const canNext = () => {
-    if (step === 0) return bookable.length > 0;
-    if (step === 1) return cart.players > 0;
-    if (step === 2) {
-      if (!cart.date) return false;
+    if (currentStep.id === 'date') return !!cart.date;
+    if (currentStep.id === 'activities') return bookable.length > 0;
+    if (currentStep.id === 'sessions') {
       return bookable.every((a) => {
         const item = cart.items[a.id];
-        const needed = computeSessionsNeeded(a, cart.players, item.quantity);
-        return (cart.slots[a.id] || []).length === needed;
+        return (item?.sessions || []).length > 0 && item.sessions.every((s) => s.players >= (a.minPlayers || 1));
+      });
+    }
+    if (currentStep.id === 'slots') {
+      return bookable.every((a) => {
+        const needed = (cart.items[a.id]?.sessions || []).length;
+        const assigned = (cart.slots[a.id] || []).filter(Boolean).length;
+        return assigned === needed;
       });
     }
     return true;
   };
 
+  const goNext = () => setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
+  const goPrev = () => setStepIndex((i) => Math.max(0, i - 1));
+
   return (
     <div ref={topRef} className="mx-auto max-w-4xl px-4 py-6 md:py-10">
-      <Stepper step={step} />
+      <Stepper steps={STEPS} activeIndex={stepIndex} />
       <div className="mt-6 md:mt-10">
-        {step === 0 && <Suspense fallback={null}><StepActivities /></Suspense>}
-        {step === 1 && <StepPlayers />}
-        {step === 2 && <StepSlots />}
-        {step === 3 && <StepRecap onConfirm={() => setStep(4)} />}
-        {step === 4 && <StepConfirm onRestart={() => setStep(0)} />}
+        <StepComponent onNext={goNext} onConfirm={() => setStepIndex(STEPS.length - 1)} onRestart={() => setStepIndex(0)} />
       </div>
-      {step < 4 && (
-        <div className="sticky bottom-3 mt-8 flex items-center justify-between gap-3 rounded-full border border-white/10 bg-black/70 p-2 backdrop-blur-md md:static md:bg-transparent md:p-0 md:backdrop-blur-0">
+      {currentStep.id !== 'confirm' && currentStep.id !== 'recap' && (
+        <div className="sticky bottom-3 mt-8 flex items-center justify-between gap-3 rounded border border-white/10 bg-black/70 p-2 backdrop-blur-md md:static md:bg-transparent md:p-0 md:backdrop-blur-0">
           <button
-            onClick={() => setStep(Math.max(0, step - 1))}
-            disabled={step === 0}
+            onClick={goPrev}
+            disabled={stepIndex === 0}
             className="btn-outline !py-2.5 !px-5 text-sm disabled:opacity-30"
           >
             ← Retour
           </button>
-          {step < 3 ? (
-            <button onClick={() => setStep(step + 1)} disabled={!canNext()} className="btn-primary !py-2.5 !px-5 text-sm">
-              Continuer →
-            </button>
-          ) : null}
+          <button onClick={goNext} disabled={!canNext()} className="btn-primary !py-2.5 !px-5 text-sm">
+            Continuer →
+          </button>
+        </div>
+      )}
+      {currentStep.id === 'recap' && (
+        <div className="sticky bottom-3 mt-4 flex items-center justify-start gap-3 md:static">
+          <button onClick={goPrev} className="btn-outline !py-2.5 !px-5 text-sm">
+            ← Retour
+          </button>
         </div>
       )}
     </div>
@@ -99,29 +125,29 @@ export default function BookingPage() {
   );
 }
 
-function Stepper({ step }) {
+function Stepper({ steps, activeIndex }) {
   return (
     <div className="flex items-center justify-between gap-1">
-      {STEPS.map((s, i) => (
+      {steps.map((s, i) => (
         <div key={s.id} className="flex flex-1 min-w-0 items-center gap-1 last:flex-none">
           <div
-            className={`flex h-7 w-7 md:h-8 md:w-8 shrink-0 items-center justify-center rounded-full border text-[10px] md:text-xs font-bold transition ${
-              i === step
+            className={`flex h-7 w-7 md:h-8 md:w-8 shrink-0 items-center justify-center rounded border text-[10px] md:text-xs font-bold transition ${
+              i === activeIndex
                 ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
-                : i < step
+                : i < activeIndex
                 ? 'border-mw-pink/60 bg-mw-pink/20 text-mw-pink'
                 : 'border-white/20 text-white/40'
             }`}
           >
-            {i < step ? '✓' : i + 1}
+            {i < activeIndex ? '✓' : i + 1}
           </div>
-          <span className={`display hidden truncate text-[11px] md:inline md:text-sm ${i === step ? 'text-white' : 'text-white/40'}`}>
-            {s.label}
+          <span className={`display hidden truncate text-[11px] md:inline md:text-sm ${i === activeIndex ? 'text-white' : 'text-white/40'}`}>
+            {s.short}
           </span>
-          <span className={`display truncate text-[10px] md:hidden ${i === step ? 'text-white' : 'text-white/40'}`}>
-            {s.label}
+          <span className={`display truncate text-[10px] md:hidden ${i === activeIndex ? 'text-white' : 'text-white/40'}`}>
+            {s.short}
           </span>
-          {i < STEPS.length - 1 && <div className="h-px flex-1 min-w-[6px] bg-white/20" />}
+          {i < steps.length - 1 && <div className="h-px flex-1 min-w-[6px] bg-white/20" />}
         </div>
       ))}
     </div>

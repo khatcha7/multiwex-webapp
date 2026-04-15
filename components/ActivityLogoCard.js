@@ -1,8 +1,11 @@
 'use client';
 import Image from 'next/image';
+import { getActivityPrice, isWednesdayDiscount } from '@/lib/activities';
 
-export default function ActivityLogoCard({ activity, selected, onClick, badge, players, as = 'button' }) {
+export default function ActivityLogoCard({ activity, selected, onClick, badge, players, as = 'button', date }) {
   const Tag = as;
+  const dayPrice = date ? getActivityPrice(activity, date) : null;
+  const isWed = date && isWednesdayDiscount(date);
   return (
     <Tag
       onClick={onClick}
@@ -49,9 +52,19 @@ export default function ActivityLogoCard({ activity, selected, onClick, badge, p
 
       {activity.bookable && (
         <div className="relative z-10 flex items-center justify-center gap-2 border-t border-white/10 bg-black/40 px-3 py-2 text-center">
-          <div className="text-sm font-black text-white">{activity.priceRegular}€</div>
-          <span className="text-xs text-white/40">·</span>
-          <div className="text-xs font-bold text-mw-pink">{activity.priceWed}€ mer</div>
+          {dayPrice != null ? (
+            <>
+              <div className="display text-base text-white">{dayPrice}€</div>
+              {isWed && <span className="text-[9px] font-bold text-mw-pink">-50%</span>}
+              <span className="text-[9px] text-white/40">· {activity.minPlayers}-{activity.maxPlayers}j</span>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-black text-white">{activity.priceRegular}€</div>
+              <span className="text-xs text-white/40">·</span>
+              <div className="text-xs font-bold text-mw-pink">{activity.priceWed}€ mer</div>
+            </>
+          )}
         </div>
       )}
       {!activity.bookable && (

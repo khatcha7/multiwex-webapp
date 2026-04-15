@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
 
 const AMOUNTS = [20, 50, 100, 150];
@@ -60,6 +61,9 @@ export default function GiftCardPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
+      <Link href="/booking" className="mb-4 inline-flex items-center gap-1 text-xs text-white/60 hover:text-mw-pink">
+        ← Retour au booking
+      </Link>
       <h1 className="section-title mb-2">🎁 Carte cadeau Multiwex</h1>
       <p className="mb-8 text-white/60">Offrez l'accès à toutes nos activités. La carte est envoyée par email au bénéficiaire.</p>
 
