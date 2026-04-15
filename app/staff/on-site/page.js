@@ -67,7 +67,17 @@ export default function OnSiteBookingPage() {
 
   const setSessionPlayers = (id, idx, players) => {
     const a = activities.find((x) => x.id === id);
-    const clamped = Math.min(Math.max(a.minPlayers || 1, players), a.maxPlayers);
+    const minP = a.minPlayers || 1;
+    let maxP = a.maxPlayers;
+    // Si un slot est déjà sélectionné, max = places restantes
+    const cur = items[id]?.[idx];
+    if (cur?.slot) {
+      const occ = (occupancy[id] || {})[cur.slot.start];
+      const playersInSlot = occ?.players || 0;
+      if (a.privative && playersInSlot > 0) maxP = 0;
+      else maxP = Math.min(a.maxPlayers, a.maxPlayers - playersInSlot);
+    }
+    const clamped = Math.min(Math.max(minP, players), Math.max(minP, maxP));
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
       arr[idx] = { ...arr[idx], players: clamped };
@@ -76,9 +86,17 @@ export default function OnSiteBookingPage() {
   };
 
   const setSessionSlot = (id, idx, slot) => {
+    const a = activities.find((x) => x.id === id);
+    const occ = (occupancy[id] || {})[slot.start];
+    const playersInSlot = occ?.players || 0;
+    // Clamp joueurs à la capacité restante
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
-      arr[idx] = { ...arr[idx], slot };
+      const cur = arr[idx] || { players: a.minPlayers || 1 };
+      let maxAllowed = a.maxPlayers - playersInSlot;
+      if (a.privative && playersInSlot > 0) return prev; // bloqué
+      const newPlayers = Math.max(a.minPlayers || 1, Math.min(cur.players, Math.max(a.minPlayers || 1, maxAllowed)));
+      arr[idx] = { ...cur, slot, players: newPlayers };
       return { ...prev, [id]: arr };
     });
   };

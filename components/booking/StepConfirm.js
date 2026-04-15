@@ -36,8 +36,17 @@ export default function StepConfirm({ onRestart }) {
       setZenchefOpen(true);
     } else if (current.cta_action === 'upsell_addactivities') {
       const code = current.promo_code || 'UPSELL20';
-      sessionStorage.setItem('mw_upsell_code', code);
-      window.location.href = '/booking';
+      const discount = current.discount_pct || 20;
+      // Préserve la date de la résa initiale + pré-applique le code promo
+      sessionStorage.setItem('mw_upsell', JSON.stringify({
+        code,
+        discount,
+        originalBookingId: booking?.id,
+        originalDate: booking?.date,
+      }));
+      // Redirige vers l'étape activités (skip date grâce au param)
+      window.location.href = `/booking?upsell=1&date=${booking?.date}`;
+      return;
     } else if (current.cta_url) {
       window.open(current.cta_url, '_blank');
     }

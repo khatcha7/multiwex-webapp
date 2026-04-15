@@ -26,13 +26,13 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:brightness-100;
-    background-image: linear-gradient(135deg, #e8005a 0%, #7b00e0 100%);
-    box-shadow: 0 4px 20px -4px rgba(232, 0, 90, 0.45);
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:brightness-100;
+    background-image: linear-gradient(to right, #ff0040 0%, #ff0068 40%, #e8005a 100%);
+    box-shadow: 0 4px 20px -4px rgba(255, 0, 64, 0.45);
     border-radius: 4px;
   }
   .btn-primary:hover {
-    box-shadow: 0 6px 30px -4px rgba(232, 0, 90, 0.7);
+    box-shadow: 0 6px 30px -4px rgba(255, 0, 64, 0.7);
   }
   .btn-outline {
     @apply inline-flex items-center justify-center gap-2 rounded border border-white/30 bg-white/[0.03] px-7 py-3 font-display text-[13px] uppercase tracking-[0.1em] text-white transition hover:border-mw-pink hover:text-mw-pink;

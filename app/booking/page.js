@@ -25,9 +25,11 @@ const ALL_STEPS = [
 function BookingInner() {
   const [stepIndex, setStepIndex] = useState(0);
   const topRef = useRef(null);
-  const { cart, hydrated, applyPackage } = useBooking();
+  const { cart, hydrated, applyPackage, setDate, clearCart, applyPromoCode } = useBooking();
   const params = useSearchParams();
   const packageId = params.get('package');
+  const upsellFlag = params.get('upsell');
+  const upsellDate = params.get('date');
 
   // Récupère la config (certaines étapes peuvent être bypassées)
   const packageStepBypassed = useMemo(() => {
@@ -43,13 +45,29 @@ function BookingInner() {
       const pkg = getPackage(packageId);
       if (pkg && pkg.activities && applyPackage) {
         applyPackage(pkg);
-        // Avec un package, on part direct de la date si pas encore choisie,
-        // sinon on saute à slots
         setStepIndex(cart.date ? 3 : 0);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, packageId]);
+
+  // Flow upsell après confirmation : on préserve la date, on vide le cart,
+  // on saute direct à l'étape Activités avec un code promo pré-appliqué
+  useEffect(() => {
+    if (!hydrated || !upsellFlag) return;
+    try {
+      const raw = sessionStorage.getItem('mw_upsell');
+      if (raw) {
+        const upsell = JSON.parse(raw);
+        clearCart();
+        if (upsellDate) setDate(upsellDate);
+        applyPromoCode(upsell.code);
+        sessionStorage.removeItem('mw_upsell');
+        setStepIndex(1); // Étape Activités
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, upsellFlag]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });

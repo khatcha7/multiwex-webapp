@@ -17,6 +17,9 @@ import {
   getSlotBlocks,
   blockSlot,
   unblockSlot,
+  unblockBatch,
+  updateSlotBlock,
+  updateSlotBlockBatch,
   subscribeBookings,
   logAudit,
 } from '@/lib/data';
@@ -29,16 +32,24 @@ const ZOOM_PRESETS = [
   { id: 'xl', label: 'XL', pxPerHour: 128 },
 ];
 
+// Pour chaque K7 booking, attribue une salle déterministiquement (hash du booking id)
+function hashRoomForBooking(bookingId) {
+  const hash = String(bookingId || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ['k7-studio', 'k7-record', 'k7-dancefloor'][hash % 3];
+}
+
 export default function StaffCalendarPage() {
   const [date, setDateStr] = useState(toDateStr(new Date()));
   const [view, setView] = useState('day');
   const [zoom, setZoom] = useState('normal');
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
+  const [k7Expanded, setK7Expanded] = useState(false);
   const [bookings, setBookings] = useState([]);
   const [blocks, setBlocks] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(null); // either {...slot} or {batch:[...]}
   const [refreshTick, setRefreshTick] = useState(0);
-  const [multiSelection, setMultiSelection] = useState([]); // { activityId, slot }
+  const [selectionStart, setSelectionStart] = useState(null); // {activityId, slot} for range-select anchor
+  const [multiSelection, setMultiSelection] = useState([]);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -50,7 +61,21 @@ export default function StaffCalendarPage() {
     return unsub;
   }, []);
 
-  const bookable = activities.filter((a) => a.bookable && visible.has(a.id));
+  // Construit la liste des "lanes" à afficher. K7 = 1 lane ou 3 si expanded.
+  const lanes = useMemo(() => {
+    const out = [];
+    activities.filter((a) => a.bookable && visible.has(a.id)).forEach((a) => {
+      if (a.id === 'k7' && k7Expanded && a.rooms) {
+        a.rooms.forEach((room) => {
+          out.push({ ...a, laneId: room.id, laneLabel: `${a.name} ${room.name}`, isRoom: true, roomId: room.id, maxPlayers: room.maxPlayers });
+        });
+      } else {
+        out.push({ ...a, laneId: a.id, laneLabel: a.name, isRoom: false });
+      }
+    });
+    return out;
+  }, [visible, k7Expanded]);
+
   const hours = getHoursForDate(date);
   const pxPerHour = ZOOM_PRESETS.find((p) => p.id === zoom).pxPerHour;
 
@@ -61,52 +86,97 @@ export default function StaffCalendarPage() {
     setVisible(next);
   };
 
-  const toggleSelect = (activityId, slot, withShift) => {
+  // Range-select : si on shift-click sur un slot dans la MÊME lane que l'ancre, on
+  // sélectionne tout entre les deux. Sinon, toggle simple.
+  const handleSlotClick = (laneId, activityDef, slot, e) => {
+    const withShift = e.shiftKey || e.metaKey || e.ctrlKey;
+
+    // Si pas de shift et pas de multi-sel en cours → ouvre le détail
+    if (!withShift && multiSelection.length === 0) {
+      const block = blocks.find(
+        (b) =>
+          (b.activity_id || b.activityId) === activityDef.id &&
+          (b.laneId || b.roomId || b.activityId || b.activity_id) === laneId &&
+          (b.start_time?.slice(0, 5) || b.start) === slot.start
+      );
+      const items = bookings.flatMap((bk) =>
+        (bk.items || [])
+          .filter((i) => i.activityId === activityDef.id && i.start === slot.start)
+          .map((i) => ({ ...i, booking: bk }))
+      );
+      setSelected({ ...slot, laneId, activityId: activityDef.id, activity: activityDef, date, items, block });
+      return;
+    }
+
+    // Shift-click range
+    if (withShift && selectionStart && selectionStart.laneId === laneId) {
+      const allSlots = generateSlotsForActivity(activityDef, date);
+      const startIdx = allSlots.findIndex((s) => s.start === selectionStart.slot.start);
+      const endIdx = allSlots.findIndex((s) => s.start === slot.start);
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const range = allSlots.slice(lo, hi + 1).map((s) => ({ laneId, activityDef, slot: s }));
+        setMultiSelection(range);
+        return;
+      }
+    }
+
+    // Toggle simple
     setMultiSelection((prev) => {
-      const key = `${activityId}-${slot.start}`;
-      const exists = prev.find((s) => `${s.activityId}-${s.slot.start}` === key);
-      if (exists) return prev.filter((s) => `${s.activityId}-${s.slot.start}` !== key);
-      if (!withShift) return [{ activityId, slot }];
-      return [...prev, { activityId, slot }];
+      const key = `${laneId}-${slot.start}`;
+      const exists = prev.find((s) => `${s.laneId}-${s.slot.start}` === key);
+      if (exists) return prev.filter((s) => `${s.laneId}-${s.slot.start}` !== key);
+      return [...prev, { laneId, activityDef, slot }];
     });
+    setSelectionStart({ laneId, slot });
   };
 
-  const blockSelection = async (reason, note) => {
+  const blockSelection = async (reason, note, label) => {
+    const batchId = 'batch-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
     for (const sel of multiSelection) {
       await blockSlot({
-        activityId: sel.activityId,
+        activityId: sel.activityDef.id,
+        laneId: sel.laneId,
+        roomId: sel.laneId !== sel.activityDef.id ? sel.laneId : null,
         date,
         start: sel.slot.start,
         end: sel.slot.end,
         reason,
         note,
-      });
-      await logAudit({
-        action: 'block_slot',
-        entityType: 'slot',
-        entityId: `${sel.activityId}-${date}-${sel.slot.start}`,
-        notes: reason,
-        after: { reason, note },
+        label,
+        batchId,
       });
     }
+    await logAudit({
+      action: 'block_slots_batch',
+      entityType: 'slots',
+      entityId: batchId,
+      notes: `${multiSelection.length} slots — ${reason}${label ? ` — ${label}` : ''}`,
+      after: { reason, note, label, count: multiSelection.length },
+    });
     setMultiSelection([]);
+    setSelectionStart(null);
+    setSelected(null);
     setRefreshTick((t) => t + 1);
   };
 
   const blockHourTransversal = async (hourStart) => {
-    // Bloque ce slot sur toutes les activités visibles
     if (!confirm(`Bloquer ${hourStart} sur toutes les activités affichées ?`)) return;
-    for (const a of bookable) {
-      const slots = generateSlotsForActivity(a, date);
-      const s = slots.find((sl) => sl.start === hourStart || (toMinutes(sl.start) <= toMinutes(hourStart) && toMinutes(sl.start) + a.duration > toMinutes(hourStart)));
+    const batchId = 'batch-h-' + Date.now();
+    for (const lane of lanes) {
+      const slots = generateSlotsForActivity(lane, date);
+      const s = slots.find((sl) => sl.start === hourStart);
       if (s) {
         await blockSlot({
-          activityId: a.id,
+          activityId: lane.id,
+          laneId: lane.laneId,
+          roomId: lane.isRoom ? lane.roomId : null,
           date,
           start: s.start,
           end: s.end,
           reason: 'b2b',
           note: `Blocage transversal ${hourStart}`,
+          batchId,
         });
       }
     }
@@ -186,18 +256,33 @@ export default function StaffCalendarPage() {
             </button>
           );
         })}
+        {visible.has('k7') && (
+          <button
+            onClick={() => setK7Expanded(!k7Expanded)}
+            className={`flex items-center gap-1.5 rounded border px-3 py-1 text-xs transition ${
+              k7Expanded ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'
+            }`}
+          >
+            {k7Expanded ? '−' : '+'} K7 Salles
+          </button>
+        )}
       </div>
 
       {multiSelection.length > 0 && (
-        <div className="sticky top-[158px] z-20 mb-3 flex items-center justify-between gap-3 rounded border border-mw-pink/50 bg-mw-pink/10 px-3 py-2 text-sm">
-          <div className="display text-mw-pink">{multiSelection.length} créneau(x) sélectionné(s)</div>
+        <div className="sticky top-[158px] z-20 mb-3 flex items-center justify-between gap-3 rounded border-2 border-mw-pink bg-mw-pink/15 px-4 py-3 text-sm">
+          <div className="display text-mw-pink">
+            {multiSelection.length} créneau(x) sélectionné(s)
+            <span className="ml-2 text-[10px] font-normal opacity-70">Shift+clic pour étendre la sélection</span>
+          </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setMultiSelection([])} className="text-xs text-white/60 hover:text-mw-red">Annuler</button>
+            <button onClick={() => { setMultiSelection([]); setSelectionStart(null); }} className="text-xs text-white/60 hover:text-mw-red">
+              Annuler
+            </button>
             <button
               onClick={() => setSelected({ batch: multiSelection })}
-              className="btn-primary !py-1.5 !px-4 text-xs"
+              className="btn-primary !py-2 !px-4 text-xs"
             >
-              Bloquer en batch
+              Bloquer & noter →
             </button>
           </div>
         </div>
@@ -206,54 +291,68 @@ export default function StaffCalendarPage() {
       {view === 'day' && (
         <DayView
           date={date}
-          activities={bookable}
+          lanes={lanes}
           bookings={bookings}
           blocks={blocks}
           onSelect={setSelected}
           hours={hours}
           pxPerHour={pxPerHour}
           multiSelection={multiSelection}
-          onToggleSelect={toggleSelect}
+          onSlotClick={handleSlotClick}
           onBlockHour={blockHourTransversal}
         />
       )}
-      {view === 'week' && <WeekView date={date} activities={bookable} bookings={bookings} blocks={blocks} />}
+      {view === 'week' && <WeekView date={date} activities={lanes} bookings={bookings} />}
       {view === 'month' && <MonthView date={date} bookings={bookings} onChangeDate={setDateStr} />}
 
       {selected && (
         <SlotDetailPanel
           slot={selected}
           onClose={() => setSelected(null)}
-          onBlockBatch={async (reason, note) => {
-            await blockSelection(reason, note);
-            setSelected(null);
-          }}
-          onBlock={async (reason, note) => {
+          onBlockBatch={blockSelection}
+          onBlock={async (reason, note, label) => {
+            const batchId = 'single-' + Date.now();
             const entry = await blockSlot({
               activityId: selected.activityId,
+              laneId: selected.laneId,
               date: selected.date,
               start: selected.start,
               end: selected.end,
               reason,
               note,
+              label,
+              batchId,
             });
             await logAudit({
               action: 'block_slot',
               entityType: 'slot',
               entityId: `${selected.activityId}-${selected.date}-${selected.start}`,
-              notes: reason,
-              after: { reason, note },
+              notes: `${reason}${label ? ` — ${label}` : ''}`,
+              after: { reason, note, label },
             });
             setSelected(null);
             setRefreshTick((t) => t + 1);
           }}
-          onUnblock={async (id) => {
-            await unblockSlot(id);
+          onUnblock={async (block) => {
+            if (block.batchId && block.batchId.startsWith('batch-')) {
+              await unblockBatch(block.batchId);
+            } else {
+              await unblockSlot(block.id);
+            }
             await logAudit({
               action: 'unblock_slot',
               entityType: 'slot',
               entityId: `${selected.activityId}-${selected.date}-${selected.start}`,
             });
+            setSelected(null);
+            setRefreshTick((t) => t + 1);
+          }}
+          onUpdateLabel={async (block, label, note) => {
+            if (block.batchId) {
+              await updateSlotBlockBatch(block.batchId, { label, note });
+            } else {
+              await updateSlotBlock(block.id, { label, note });
+            }
             setSelected(null);
             setRefreshTick((t) => t + 1);
           }}
@@ -263,7 +362,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayView({ date, activities: acts, bookings, blocks, onSelect, hours, pxPerHour, multiSelection, onToggleSelect, onBlockHour }) {
+function DayView({ date, lanes, bookings, blocks, onSelect, hours, pxPerHour, multiSelection, onSlotClick, onBlockHour }) {
   if (!hours) return <div className="rounded border border-white/10 bg-white/[0.02] p-10 text-center text-white/50">Fermé ce jour-là.</div>;
 
   const openM = toMinutes(hours.open);
@@ -293,62 +392,137 @@ function DayView({ date, activities: acts, bookings, blocks, onSelect, hours, px
           })}
         </div>
 
-        {acts.map((a) => {
-          const slots = generateSlotsForActivity(a, date);
-          const activityBookings = bookings.flatMap((b) => b.items?.filter((i) => i.activityId === a.id).map((i) => ({ ...i, booking: b })) || []);
-          const activityBlocks = blocks.filter((bl) => (bl.activity_id || bl.activityId) === a.id);
+        {lanes.map((lane) => {
+          const activityDef = lane;
+          const slots = generateSlotsForActivity(lane, date);
+          // Filter bookings for this lane (K7 room filter)
+          const laneBookings = bookings.flatMap((b) =>
+            (b.items || [])
+              .filter((i) => i.activityId === lane.id)
+              .filter((i) => {
+                if (!lane.isRoom) return true;
+                // If room view, route K7 bookings to specific rooms via hash
+                const assigned = hashRoomForBooking(b.id || b.reference);
+                return assigned === lane.roomId;
+              })
+              .map((i) => ({ ...i, booking: b }))
+          );
+          const laneBlocks = blocks.filter(
+            (bl) =>
+              (bl.activity_id || bl.activityId) === lane.id &&
+              (lane.isRoom ? (bl.roomId === lane.roomId || bl.laneId === lane.roomId) : !bl.roomId)
+          );
+
+          // Group blocks by batchId for merged visual display
+          const byBatch = {};
+          const standalone = [];
+          laneBlocks.forEach((bl) => {
+            const bid = bl.batchId;
+            if (bid && bid.startsWith('batch-')) {
+              if (!byBatch[bid]) byBatch[bid] = [];
+              byBatch[bid].push(bl);
+            } else {
+              standalone.push(bl);
+            }
+          });
 
           return (
-            <div key={a.id} className="w-40 shrink-0 border-r border-white/10">
+            <div key={lane.laneId} className="w-40 shrink-0 border-r border-white/10">
               <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b border-white/10 bg-mw-bg px-2">
                 <div className="relative h-6 w-6">
-                  <Image src={a.logo} alt={a.name} fill sizes="24px" className="object-contain" />
+                  <Image src={lane.logo} alt={lane.name} fill sizes="24px" className="object-contain" />
                 </div>
-                <div className="display min-w-0 truncate text-xs">{a.name}</div>
+                <div className="display min-w-0 truncate text-xs">{lane.laneLabel}</div>
               </div>
               <div className="relative" style={{ height: `${hourCount * pxPerHour}px` }}>
                 {Array.from({ length: hourCount }).map((_, i) => (
                   <div key={i} className="absolute left-0 right-0 border-b border-white/5" style={{ top: `${i * pxPerHour}px`, height: `${pxPerHour}px` }} />
                 ))}
 
+                {/* Slot boutons normaux */}
                 {slots.map((slot) => {
                   const slotMinutes = toMinutes(slot.start) - openM;
                   const top = (slotMinutes / 60) * pxPerHour;
-                  const height = Math.max((a.duration / 60) * pxPerHour - 1, 14);
-                  const slotItems = activityBookings.filter((i) => i.start === slot.start);
+                  const height = Math.max((lane.duration / 60) * pxPerHour - 1, 14);
+                  const slotItems = laneBookings.filter((i) => i.start === slot.start);
                   const players = slotItems.reduce((s, i) => s + (i.players || 0), 0);
-                  const block = activityBlocks.find((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start);
-                  const isSelected = multiSelection.some((s) => s.activityId === a.id && s.slot.start === slot.start);
+                  const standaloneBlock = standalone.find((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start);
+                  // Si ce slot fait partie d'un batch, on ne l'affiche pas (le merged block s'en occupe)
+                  const inBatch = Object.values(byBatch).some((arr) =>
+                    arr.some((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start)
+                  );
+                  if (inBatch) return null;
+
+                  const isSelected = multiSelection.some((s) => s.laneId === lane.laneId && s.slot.start === slot.start);
 
                   let bg = 'bg-white/[0.02] hover:bg-white/[0.08] border-white/10';
-                  if (isSelected) bg = 'bg-mw-pink/30 border-mw-pink';
-                  else if (block) bg = 'bg-mw-red/30 border-mw-red hover:bg-mw-red/40';
-                  else if (players >= a.maxPlayers) bg = 'bg-mw-red/20 border-mw-red/50';
+                  if (isSelected) bg = 'bg-mw-pink/40 border-mw-pink';
+                  else if (standaloneBlock) bg = 'bg-mw-red/30 border-mw-red hover:bg-mw-red/40';
+                  else if (players >= lane.maxPlayers) bg = 'bg-mw-red/20 border-mw-red/50';
                   else if (players > 0) bg = 'bg-mw-yellow/20 border-mw-yellow/60 hover:bg-mw-yellow/30';
 
                   return (
                     <button
                       key={slot.start}
-                      onClick={(e) => {
-                        if (e.shiftKey || e.metaKey || e.ctrlKey) {
-                          onToggleSelect(a.id, slot, true);
-                        } else if (multiSelection.length > 0) {
-                          onToggleSelect(a.id, slot, true);
-                        } else {
-                          onSelect({ ...slot, activityId: a.id, activity: a, date, items: slotItems, block });
-                        }
-                      }}
+                      onClick={(e) => onSlotClick(lane.laneId, activityDef, slot, e)}
                       className={`absolute left-0.5 right-0.5 flex flex-col items-start justify-between overflow-hidden rounded border px-1 py-0.5 text-left text-[10px] transition ${bg}`}
                       style={{ top: `${top}px`, height: `${height}px` }}
                     >
                       <div className="flex w-full items-center justify-between">
                         <span className="display text-white">{slot.start}</span>
-                        {block ? (
+                        {standaloneBlock ? (
                           <span className="text-[9px] text-mw-red">🔒</span>
                         ) : (
-                          <span className="text-[9px] text-white/60">{players}/{a.maxPlayers}</span>
+                          <span className="text-[9px] text-white/60">{players}/{lane.maxPlayers}</span>
                         )}
                       </div>
+                      {standaloneBlock?.label && (
+                        <div className="truncate text-[9px] text-white/80">{standaloneBlock.label}</div>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {/* Merged batch blocks — span across all slots of the same batch */}
+                {Object.entries(byBatch).map(([bid, arr]) => {
+                  const sorted = arr.slice().sort((a, b) =>
+                    (a.start_time || a.start).localeCompare(b.start_time || b.start)
+                  );
+                  const firstStart = (sorted[0].start_time || sorted[0].start).slice(0, 5);
+                  const lastEnd = (sorted[sorted.length - 1].end_time || sorted[sorted.length - 1].end).slice(0, 5);
+                  const startM = toMinutes(firstStart);
+                  const endM = toMinutes(lastEnd);
+                  const top = ((startM - openM) / 60) * pxPerHour;
+                  const height = Math.max(((endM - startM) / 60) * pxPerHour - 1, 20);
+                  const label = sorted[0].label;
+                  const note = sorted[0].note;
+                  const reason = sorted[0].block_reason || sorted[0].reason;
+                  return (
+                    <button
+                      key={bid}
+                      onClick={() =>
+                        onSelect({
+                          ...sorted[0],
+                          start: firstStart,
+                          end: lastEnd,
+                          laneId: lane.laneId,
+                          activityId: lane.id,
+                          activity: lane,
+                          date,
+                          block: sorted[0],
+                          batchSlots: sorted,
+                        })
+                      }
+                      className="absolute left-0.5 right-0.5 flex flex-col items-start justify-start overflow-hidden rounded border-2 border-mw-red bg-gradient-to-br from-mw-red/50 to-mw-red/30 px-1.5 py-1 text-left text-[10px] hover:from-mw-red/60"
+                      style={{ top: `${top}px`, height: `${height}px` }}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <span className="display text-[11px] text-white">{firstStart}–{lastEnd}</span>
+                        <span className="text-[9px] text-white/80">🔒</span>
+                      </div>
+                      {label && <div className="mt-1 display truncate text-[11px] font-bold text-white">{label}</div>}
+                      {!label && reason && <div className="mt-1 text-[9px] text-white/80">{reason}</div>}
+                      {note && <div className="truncate text-[9px] text-white/70">{note}</div>}
                     </button>
                   );
                 })}
@@ -389,13 +563,13 @@ function WeekView({ date, activities: acts, bookings }) {
         </thead>
         <tbody>
           {acts.map((a) => (
-            <tr key={a.id} className="border-b border-white/5">
+            <tr key={a.laneId} className="border-b border-white/5">
               <td className="sticky left-0 z-10 bg-mw-bg px-2 py-3">
                 <div className="flex items-center gap-2">
                   <div className="relative h-6 w-6">
                     <Image src={a.logo} alt="" fill sizes="24px" className="object-contain" />
                   </div>
-                  <span className="display">{a.name}</span>
+                  <span className="display">{a.laneLabel}</span>
                 </div>
               </td>
               {days.map((d) => {
@@ -479,37 +653,73 @@ function MonthView({ date, bookings, onChangeDate }) {
   );
 }
 
-function SlotDetailPanel({ slot, onClose, onBlock, onUnblock, onBlockBatch }) {
+function SlotDetailPanel({ slot, onClose, onBlock, onUnblock, onBlockBatch, onUpdateLabel }) {
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
+  const [label, setLabel] = useState('');
   const isBatch = Boolean(slot.batch);
+  const existingBlock = slot.block;
+
+  useEffect(() => {
+    if (existingBlock) {
+      setReason(existingBlock.block_reason || existingBlock.reason || '');
+      setNote(existingBlock.note || '');
+      setLabel(existingBlock.label || '');
+    }
+  }, [existingBlock]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm md:items-center">
-      <div className="w-full max-w-lg rounded-t border-t border-mw-pink/50 bg-mw-surface p-5 md:rounded md:border">
+      <div className="w-full max-w-lg rounded-t border-t-2 border-mw-pink bg-mw-surface p-5 md:rounded md:border-2">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <div className="display text-2xl">{isBatch ? `${slot.batch.length} créneaux` : slot.activity.name}</div>
+            <div className="display text-2xl">
+              {isBatch ? `${slot.batch.length} créneaux` : slot.activity?.name || 'Créneau'}
+            </div>
             {!isBatch && (
               <div className="text-sm text-white/60">
                 {new Date(slot.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} · {slot.start} → {slot.end}
               </div>
             )}
             {isBatch && (
-              <div className="text-sm text-white/60">Blocage en batch</div>
+              <div className="text-sm text-white/60">Sélection multiple — toutes bloquées ensemble</div>
             )}
           </div>
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-mw-pink">✕</button>
         </div>
 
-        {!isBatch && slot.block ? (
-          <div className="rounded border border-mw-red/40 bg-mw-red/10 p-4">
-            <div className="display mb-1 text-mw-red">🔒 Créneau bloqué</div>
-            <div className="text-xs text-white/70">Raison : {slot.block.block_reason || slot.block.reason || '—'}</div>
-            {(slot.block.note || slot.block.notes) && <div className="mt-1 text-xs text-white/50">{slot.block.note || slot.block.notes}</div>}
-            <button onClick={() => onUnblock(slot.block.id)} className="btn-outline mt-3 !py-2 text-xs">
-              Débloquer ce créneau
-            </button>
+        {!isBatch && existingBlock ? (
+          <div className="space-y-3">
+            <div className="rounded border border-mw-red/40 bg-mw-red/10 p-4">
+              <div className="display mb-1 text-mw-red">🔒 Créneau bloqué</div>
+              {slot.batchSlots && <div className="text-[10px] text-white/60">Fait partie d'un lot de {slot.batchSlots.length} créneaux</div>}
+              <div className="mt-2 text-xs">
+                <div className="mb-1 text-white/40">Label visible</div>
+                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex: ERES 25P" className="input text-sm" />
+              </div>
+              <div className="mt-2 text-xs">
+                <div className="mb-1 text-white/40">Raison</div>
+                <select value={reason} onChange={(e) => setReason(e.target.value)} className="input text-sm">
+                  <option value="">—</option>
+                  <option value="b2b">Team building B2B</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="private">Privatisation</option>
+                  <option value="other">Autre</option>
+                </select>
+              </div>
+              <div className="mt-2 text-xs">
+                <div className="mb-1 text-white/40">Note détaillée</div>
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="input resize-none text-sm" />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => onUpdateLabel(existingBlock, label, note)} className="btn-outline flex-1 !py-2 text-xs">
+                  Mettre à jour
+                </button>
+                <button onClick={() => onUnblock(existingBlock)} className="btn-outline flex-1 !py-2 text-xs text-mw-red">
+                  Débloquer
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -530,28 +740,46 @@ function SlotDetailPanel({ slot, onClose, onBlock, onUnblock, onBlockBatch }) {
               <div className="mb-4 rounded bg-white/5 p-4 text-center text-sm text-white/50">Créneau libre</div>
             )}
 
-            <div className="rounded border border-white/10 p-3">
-              <div className="display mb-2 text-xs text-white/70">{isBatch ? `Bloquer les ${slot.batch.length} créneaux` : 'Bloquer ce créneau'}</div>
-              <select value={reason} onChange={(e) => setReason(e.target.value)} className="input mb-2 text-sm">
-                <option value="">Raison…</option>
-                <option value="b2b">Team building B2B</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="private">Privatisation</option>
-                <option value="other">Autre</option>
-              </select>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                placeholder="Note (facultatif)"
-                className="input mb-2 text-sm resize-none"
-              />
+            <div className="rounded border-2 border-mw-pink/40 bg-mw-pink/5 p-4">
+              <div className="display mb-3 text-sm text-mw-pink">
+                {isBatch ? `🔒 Bloquer les ${slot.batch.length} créneaux` : '🔒 Bloquer ce créneau'}
+              </div>
+              <div className="mb-3">
+                <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Label visible *</label>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="Ex: ERES 25P, Mariage Dupont, …"
+                  className="input text-sm"
+                />
+                <p className="mt-1 text-[10px] text-white/40">Ce label apparaîtra directement sur le créneau dans le calendrier</p>
+              </div>
+              <div className="mb-3">
+                <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Raison *</label>
+                <select value={reason} onChange={(e) => setReason(e.target.value)} className="input text-sm">
+                  <option value="">Choisir…</option>
+                  <option value="b2b">Team building B2B</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="private">Privatisation</option>
+                  <option value="other">Autre</option>
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="mb-1 block text-[10px] uppercase tracking-wider text-white/50">Note détaillée (optionnel)</label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  placeholder="Détails sur l'événement, contact, etc."
+                  className="input text-sm resize-none"
+                />
+              </div>
               <button
-                onClick={() => isBatch ? onBlockBatch(reason, note) : onBlock(reason, note)}
-                disabled={!reason}
-                className="btn-primary w-full !py-2 text-xs"
+                onClick={() => (isBatch ? onBlockBatch(reason, note, label) : onBlock(reason, note, label))}
+                disabled={!reason || !label}
+                className="btn-primary w-full !py-3 text-sm"
               >
-                Bloquer
+                Confirmer le blocage
               </button>
             </div>
           </>
