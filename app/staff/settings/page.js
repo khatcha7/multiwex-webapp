@@ -1,19 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllConfig, setConfig, logAudit } from '@/lib/data';
+import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup } from '@/lib/data';
 import { activities } from '@/lib/activities';
 
 export default function StaffSettingsPage() {
   const [cfg, setCfg] = useState({});
-  const [editedActivities, setEditedActivities] = useState({});
+  const [popups, setPopups] = useState([]);
+  const [editingPopup, setEditingPopup] = useState(null);
 
   useEffect(() => {
     setCfg(getAllConfig());
-    const ed = {};
-    activities.forEach((a) => {
-      ed[a.id] = { priceRegular: a.priceRegular, priceWed: a.priceWed, duration: a.duration, maxPlayers: a.maxPlayers };
-    });
-    setEditedActivities(ed);
+    setPopups(getPopups());
   }, []);
 
   const save = (key, value) => {
@@ -22,33 +19,135 @@ export default function StaffSettingsPage() {
     logAudit({ action: 'update_config', entityType: 'config', entityId: key, after: { value } });
   };
 
+  const savePopup = (popup) => {
+    const all = upsertPopup(popup);
+    setPopups(all);
+    setEditingPopup(null);
+    logAudit({ action: 'upsert_popup', entityType: 'popup', entityId: popup.id, after: popup });
+  };
+
+  const removePopup = (id) => {
+    if (!confirm('Supprimer cette pop-up ?')) return;
+    const all = deletePopup(id);
+    setPopups(all);
+    logAudit({ action: 'delete_popup', entityType: 'popup', entityId: id });
+  };
+
+  const togglePopupEnabled = (id) => {
+    const p = popups.find((x) => x.id === id);
+    if (!p) return;
+    const updated = { ...p, enabled: !p.enabled };
+    savePopup(updated);
+  };
+
+  const movePopup = (id, delta) => {
+    const sorted = [...popups].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+    [sorted[idx], sorted[newIdx]] = [sorted[newIdx], sorted[idx]];
+    const renumbered = sorted.map((p, i) => ({ ...p, order: i }));
+    savePopups(renumbered);
+    setPopups(renumbered);
+  };
+
+  const addNewPopup = () => {
+    setEditingPopup({
+      id: 'popup-' + Date.now(),
+      title: 'Nouveau titre',
+      body: 'Contenu de la pop-up…',
+      emoji: '✨',
+      cta_label: 'OK',
+      cta_action: 'dismiss',
+      cta_url: null,
+      promo_code: null,
+      discount_pct: 0,
+      enabled: false,
+      order: popups.length,
+      trigger: 'after_confirmation',
+    });
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="section-title mb-4">Réglages</h1>
 
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Contenu éditable</h2>
         <div className="space-y-4">
           <Field label="Tagline homepage" value={cfg['site.tagline']} onSave={(v) => save('site.tagline', v)} />
-          <Field label="Texte Flash Sale" value={cfg['site.flash_sale_text']} onSave={(v) => save('site.flash_sale_text', v)} />
+          <Field label="Texte Flash Sale (marquee)" value={cfg['site.flash_sale_text']} onSave={(v) => save('site.flash_sale_text', v)} />
           <Field label="Téléphone contact" value={cfg['contact.phone']} onSave={(v) => save('contact.phone', v)} />
           <Field label="Email contact" value={cfg['contact.email']} onSave={(v) => save('contact.email', v)} />
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Règles métier</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <NumField label="Buffer entre activités (min)" value={cfg['booking.buffer_min']} onSave={(v) => save('booking.buffer_min', v)} />
+        <div className="grid gap-3 sm:grid-cols-2">
           <NumField label="Cutoff rejoindre groupe (min)" value={cfg['booking.join_cutoff_min']} onSave={(v) => save('booking.join_cutoff_min', v)} />
           <NumField label="Cutoff modification (h)" value={cfg['booking.cancel_cutoff_hours']} onSave={(v) => save('booking.cancel_cutoff_hours', v)} />
         </div>
+        <label className="mt-4 flex items-center gap-2 text-sm text-white/80">
+          <input
+            type="checkbox"
+            checked={cfg['booking.bypass_package_toggle'] === true || cfg['booking.bypass_package_toggle'] === 'true'}
+            onChange={(e) => save('booking.bypass_package_toggle', e.target.checked)}
+            className="h-4 w-4 accent-mw-pink"
+          />
+          Masquer le bloc "Packages de groupe" dans l'étape Activités
+        </label>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="display text-xl">Pop-ups post-confirmation</h2>
+          <button onClick={addNewPopup} className="btn-outline !py-2 !px-4 text-xs">+ Ajouter</button>
+        </div>
+        <p className="mb-4 text-xs text-white/50">
+          Ces pop-ups s'affichent après la confirmation d'une réservation, dans l'ordre défini ci-dessous (ordre croissant).
+          Si l'utilisateur refuse la première, la deuxième s'affiche, etc.
+        </p>
+        <div className="space-y-2">
+          {popups.sort((a, b) => (a.order || 0) - (b.order || 0)).map((p, idx) => (
+            <div key={p.id} className="flex items-center gap-3 rounded border border-white/10 bg-white/[0.02] p-3">
+              <div className="flex flex-col gap-1">
+                <button onClick={() => movePopup(p.id, -1)} disabled={idx === 0} className="text-xs disabled:opacity-20">↑</button>
+                <button onClick={() => movePopup(p.id, 1)} disabled={idx === popups.length - 1} className="text-xs disabled:opacity-20">↓</button>
+              </div>
+              <div className="text-2xl">{p.emoji || '💬'}</div>
+              <div className="min-w-0 flex-1">
+                <div className="display truncate text-sm">{p.title}</div>
+                <div className="truncate text-[10px] text-white/50">{p.body?.slice(0, 80)}</div>
+                <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
+                  <span className="chip">{p.cta_action || 'dismiss'}</span>
+                  {p.promo_code && <span className="chip chip-pink">{p.promo_code} -{p.discount_pct}%</span>}
+                </div>
+              </div>
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={p.enabled}
+                  onChange={() => togglePopupEnabled(p.id)}
+                  className="accent-mw-pink"
+                />
+                <span className={p.enabled ? 'text-mw-pink' : 'text-white/40'}>{p.enabled ? 'ON' : 'OFF'}</span>
+              </label>
+              <button onClick={() => setEditingPopup(p)} className="text-xs text-white/60 hover:text-mw-pink">Éditer</button>
+              <button onClick={() => removePopup(p.id)} className="text-xs text-white/40 hover:text-mw-red">✕</button>
+            </div>
+          ))}
+          {popups.length === 0 && (
+            <div className="py-6 text-center text-sm text-white/40">Aucune pop-up configurée.</div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-1 text-xl">Tarifs & capacités</h2>
         <p className="mb-4 text-xs text-white/50">
-          ⚠ Édition locale uniquement en démo. En prod, sync avec Odoo bidirectionnelle via <code className="text-mw-pink">/api/odoo/pricing</code>.
+          ⚠ Synchro Odoo à venir. En prod, ces valeurs sont lues depuis la table <code className="text-mw-pink">product.template</code> via API.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -58,36 +157,92 @@ export default function StaffSettingsPage() {
                 <th className="py-2 text-right">Prix normal</th>
                 <th className="py-2 text-right">Prix mer.</th>
                 <th className="py-2 text-right">Durée</th>
+                <th className="py-2 text-right">Min joueurs</th>
                 <th className="py-2 text-right">Max joueurs</th>
               </tr>
             </thead>
             <tbody>
-              {activities.filter((a) => a.bookable).map((a) => {
-                const ed = editedActivities[a.id] || {};
-                return (
-                  <tr key={a.id} className="border-b border-white/5">
-                    <td className="py-2 display">{a.name}</td>
-                    <td className="py-1.5">
-                      <input type="number" defaultValue={ed.priceRegular} className="input !py-1 text-right text-sm" />
-                    </td>
-                    <td className="py-1.5">
-                      <input type="number" defaultValue={ed.priceWed} className="input !py-1 text-right text-sm" />
-                    </td>
-                    <td className="py-1.5">
-                      <input type="number" defaultValue={ed.duration} className="input !py-1 text-right text-sm" />
-                    </td>
-                    <td className="py-1.5">
-                      <input type="number" defaultValue={ed.maxPlayers} className="input !py-1 text-right text-sm" />
-                    </td>
-                  </tr>
-                );
-              })}
+              {activities.filter((a) => a.bookable).map((a) => (
+                <tr key={a.id} className="border-b border-white/5">
+                  <td className="py-2 display">{a.name}</td>
+                  <td className="py-2 text-right">{a.priceRegular}€</td>
+                  <td className="py-2 text-right text-mw-pink">{a.priceWed}€</td>
+                  <td className="py-2 text-right">{a.duration}'</td>
+                  <td className="py-2 text-right">{a.minPlayers}</td>
+                  <td className="py-2 text-right">{a.maxPlayers}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-white/40">
-          En prod, ces valeurs sont lues depuis Odoo (table <code>product.template</code>). Sauvegarde désactivée en démo.
-        </p>
+      </div>
+
+      {editingPopup && <PopupEditor popup={editingPopup} onSave={savePopup} onCancel={() => setEditingPopup(null)} />}
+    </div>
+  );
+}
+
+function PopupEditor({ popup, onSave, onCancel }) {
+  const [p, setP] = useState(popup);
+  const upd = (k, v) => setP({ ...p, [k]: v });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={onCancel}>
+      <div className="w-full max-w-md rounded border border-mw-pink/40 bg-mw-surface p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="display mb-4 text-xl">Éditer la pop-up</h3>
+        <div className="space-y-3 text-sm">
+          <div>
+            <div className="mb-1 text-xs text-white/50">Emoji</div>
+            <input value={p.emoji || ''} onChange={(e) => upd('emoji', e.target.value)} className="input" />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-white/50">Titre</div>
+            <input value={p.title} onChange={(e) => upd('title', e.target.value)} className="input" />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-white/50">Corps (texte)</div>
+            <textarea value={p.body || ''} onChange={(e) => upd('body', e.target.value)} rows={4} className="input resize-none" />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-white/50">Label bouton CTA</div>
+            <input value={p.cta_label || ''} onChange={(e) => upd('cta_label', e.target.value)} className="input" />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-white/50">Action CTA</div>
+            <select value={p.cta_action || 'dismiss'} onChange={(e) => upd('cta_action', e.target.value)} className="input">
+              <option value="dismiss">Fermer</option>
+              <option value="zenchef">Ouvrir Zenchef brasserie</option>
+              <option value="upsell_addactivities">Upsell — ajouter activités</option>
+              <option value="external">Lien externe</option>
+            </select>
+          </div>
+          {p.cta_action === 'external' && (
+            <div>
+              <div className="mb-1 text-xs text-white/50">URL externe</div>
+              <input value={p.cta_url || ''} onChange={(e) => upd('cta_url', e.target.value)} className="input" />
+            </div>
+          )}
+          {p.cta_action === 'upsell_addactivities' && (
+            <>
+              <div>
+                <div className="mb-1 text-xs text-white/50">Code promo auto-appliqué</div>
+                <input value={p.promo_code || ''} onChange={(e) => upd('promo_code', e.target.value)} className="input" placeholder="UPSELL20" />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-white/50">% de réduction</div>
+                <input type="number" value={p.discount_pct || 0} onChange={(e) => upd('discount_pct', Number(e.target.value))} className="input" />
+              </div>
+            </>
+          )}
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={p.enabled} onChange={(e) => upd('enabled', e.target.checked)} className="accent-mw-pink" />
+            <span>Activée</span>
+          </label>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button onClick={onCancel} className="btn-outline flex-1 !py-2 text-sm">Annuler</button>
+          <button onClick={() => onSave(p)} className="btn-primary flex-1 !py-2 text-sm">Sauvegarder</button>
+        </div>
       </div>
     </div>
   );
@@ -101,7 +256,7 @@ function Field({ label, value, onSave }) {
       <div className="mb-1 text-xs text-white/50">{label}</div>
       <div className="flex gap-2">
         <input value={v} onChange={(e) => setV(e.target.value)} className="input flex-1" />
-        <button onClick={() => onSave(v)} className="btn-outline !py-2.5 text-xs">Sauver</button>
+        <button onClick={() => onSave(v)} className="btn-outline !py-2.5 !px-4 text-xs">Sauver</button>
       </div>
     </div>
   );
