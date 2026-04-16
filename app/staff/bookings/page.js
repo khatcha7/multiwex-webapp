@@ -50,6 +50,7 @@ export default function StaffBookingsPage() {
               <th className="px-3 py-3 text-left">Activités</th>
               <th className="px-3 py-3 text-center">Joueurs</th>
               <th className="px-3 py-3 text-right">Total</th>
+              <th className="px-3 py-3 text-center">Formule</th>
               <th className="px-3 py-3 text-center">Source</th>
               <th className="px-3 py-3 text-center">Statut</th>
             </tr>
@@ -68,6 +69,13 @@ export default function StaffBookingsPage() {
                 </td>
                 <td className="px-3 py-2 text-center">{b.players}</td>
                 <td className="px-3 py-2 text-right font-bold">{(b.total || 0).toFixed(0)}€</td>
+                <td className="px-3 py-2 text-center text-xs">
+                  {b.packageId ? (
+                    <span className="chip chip-pink">{b.packageId.replace('anniv-', 'Anniv ').replace('evg', 'EVG').replace('evjf', 'EVJF').replace('-', ' ')}</span>
+                  ) : (
+                    <span className="text-white/30">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-center">
                   <span className={`chip ${b.source === 'on_site' ? 'chip-yellow' : ''}`}>
                     {b.source === 'on_site' ? '🏢 Sur place' : '💻 En ligne'}

@@ -7,9 +7,12 @@ import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib
 
 export default function OnSiteBookingPage() {
   const today = toDateStr(new Date());
-  const [date, setDate] = useState(today);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [isCompany, setIsCompany] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
+  const date = today;
   // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
   const [occupancy, setOccupancy] = useState({});
@@ -140,7 +143,7 @@ export default function OnSiteBookingPage() {
       total: subtotal,
       paid: true,
       source: 'on_site',
-      customer: { name, email: '', phone },
+      customer: { name, email: '', phone, companyName: isCompany ? companyName : null, vatNumber: isCompany ? vatNumber : null },
       createdAt: new Date().toISOString(),
       staffId: staff?.id,
       staffName: staff?.name,
@@ -206,17 +209,21 @@ export default function OnSiteBookingPage() {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom" className="input" />
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone" className="input" />
         </div>
-      </div>
-
-      {/* Date */}
-      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
-        <div className="mb-2 display text-sm">2. Date</div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input max-w-xs" />
+        <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
+          <input type="checkbox" checked={isCompany} onChange={(e) => setIsCompany(e.target.checked)} className="accent-mw-pink" />
+          Entreprise (facture TVA)
+        </label>
+        {isCompany && (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Raison sociale" className="input" />
+            <input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} placeholder="N° TVA (ex: BE0123456789)" className="input" />
+          </div>
+        )}
       </div>
 
       {/* Activities */}
       <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
-        <div className="mb-2 display text-sm">3. Activités</div>
+        <div className="mb-2 display text-sm">2. Activités</div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
           {activities.filter((a) => a.bookable).map((a) => {
             const sel = !!items[a.id];
@@ -242,7 +249,7 @@ export default function OnSiteBookingPage() {
       {/* Sessions */}
       {Object.keys(items).length > 0 && (
         <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
-          <div className="mb-2 display text-sm">4. Créneaux & joueurs</div>
+          <div className="mb-2 display text-sm">3. Créneaux & joueurs</div>
           {Object.entries(items).map(([id, arr]) => {
             const a = activities.find((x) => x.id === id);
             const allSlots = generateSlotsForActivity(a, date);
@@ -312,7 +319,7 @@ export default function OnSiteBookingPage() {
       {allAssigned && subtotal > 0 && (
         <div className="rounded border border-mw-pink/30 bg-gradient-to-br from-mw-pink/10 to-transparent p-4">
           <div className="mb-3 flex items-center justify-between">
-            <div className="display text-sm">5. Paiement</div>
+            <div className="display text-sm">4. Paiement</div>
             <div className="display text-3xl text-mw-pink">{subtotal.toFixed(2)}€</div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
