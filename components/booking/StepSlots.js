@@ -17,8 +17,9 @@ import {
 } from '@/lib/hours';
 
 export default function StepSlots() {
-  const { cart, setDate, assignSlot, clearSlot } = useBooking();
+  const { cart, setDate, assignSlot, clearSlot, setCart } = useBooking();
   const [activeActivityId, setActiveActivityId] = useState(null);
+  const [prevDate, setPrevDate] = useState(cart.date);
   const [occupancy, setOccupancy] = useState({});
   const [blocks, setBlocks] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -27,7 +28,16 @@ export default function StepSlots() {
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
-  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && a.bookable);
+  // Reset tous les slots si la date change
+  useEffect(() => {
+    if (prevDate && cart.date && prevDate !== cart.date) {
+      setCart((c) => ({ ...c, slots: {} }));
+    }
+    setPrevDate(cart.date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.date]);
+
+  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && (a.bookable || a.selectable));
   const currentActivityId = activeActivityId || bookable[0]?.id;
   const currentActivity = getActivity(currentActivityId);
   const currentSessions = cart.items[currentActivityId]?.sessions || [];
@@ -307,10 +317,10 @@ export default function StepSlots() {
                   )}
                   {slot.start}
                   {!privative && shared && wouldFit && (
-                    <div className="mt-0.5 text-[8px] font-normal">Libre: {playersInSlot}/{totalCap}</div>
+                    <div className="mt-0.5 text-[8px] font-normal">Libre {totalCap - playersInSlot}/{totalCap}</div>
                   )}
                   {!privative && !shared && !full && !blockedHere && !pastCutoff && (
-                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre: 0/{totalCap}</div>
+                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{totalCap}</div>
                   )}
                   {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">{blockedHere ? 'bloqué' : 'complet'}</div>}
                 </button>

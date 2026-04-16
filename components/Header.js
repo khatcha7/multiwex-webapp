@@ -18,6 +18,16 @@ export default function Header() {
 
         <div className="flex items-center gap-2 shrink-0">
           <Link
+            href="/account"
+            className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
+            aria-label="Mon compte"
+            title="Mon compte"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+          </Link>
+          <Link
             href="/giftcard"
             className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
             aria-label="Carte cadeau"

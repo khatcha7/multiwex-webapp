@@ -1,24 +1,180 @@
 'use client';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { useBooking } from '@/lib/store';
 import { getActivity } from '@/lib/activities';
+import { getPackage } from '@/lib/packages';
 import { getRestrictions } from '@/lib/restrictions';
 
 export default function StepSessions() {
-  const { cart, setSessionPlayers } = useBooking();
+  const { cart, setSessionPlayers, setSessionCount } = useBooking();
   const activityIds = Object.keys(cart.items);
-  const bookable = activityIds.map(getActivity).filter((a) => a && a.bookable);
+  const bookable = activityIds.map(getActivity).filter((a) => a && (a.bookable || a.selectable));
+  const isFormula = Boolean(cart.packageId);
+  const currentPkg = isFormula ? getPackage(cart.packageId) : null;
 
+  // Formula mode : nombre total de participants
+  const [formulaTotal, setFormulaTotal] = useState(() => {
+    if (!isFormula || !currentPkg) return currentPkg?.minPlayers || 6;
+    return Math.max(currentPkg.minPlayers || 6, ...bookable.map((a) => {
+      const item = cart.items[a.id];
+      return (item?.sessions || []).reduce((s, ss) => s + ss.players, 0);
+    }));
+  });
+
+  // Auto-split : quand formulaTotal change, recalculer les sessions par activité
+  useEffect(() => {
+    if (!isFormula) return;
+    bookable.forEach((a) => {
+      if (a.id === 'battlekart') return;
+      // Combien de créneaux faut-il pour cette activité ?
+      const needed = Math.ceil(formulaTotal / a.maxPlayers);
+      const current = (cart.items[a.id]?.sessions || []).length;
+      if (needed !== current) {
+        setSessionCount(a.id, needed);
+      }
+      // Répartir les joueurs uniformément (arrondi haut/bas)
+      const basePerSlot = Math.floor(formulaTotal / needed);
+      const remainder = formulaTotal - basePerSlot * needed;
+      for (let i = 0; i < needed; i++) {
+        const players = basePerSlot + (i < remainder ? 1 : 0);
+        const clamped = Math.max(a.minPlayers || 1, Math.min(players, a.maxPlayers));
+        setSessionPlayers(a.id, i, clamped);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formulaTotal, isFormula]);
+
+  const formulaMin = currentPkg?.minPlayers || 1;
+
+  if (isFormula) {
+    return (
+      <div>
+        <h1 className="section-title mb-2">Combien de participants ?</h1>
+        <p className="mb-6 text-white/60">
+          Formule <span className="text-mw-pink">{currentPkg?.name}</span> — indiquez le nombre total de participants.
+          Les créneaux supplémentaires seront créés automatiquement si nécessaire.
+        </p>
+
+        <div className="mb-8 flex items-center justify-center gap-4 rounded border border-white/10 bg-mw-surface p-8">
+          <button
+            onClick={() => setFormulaTotal(Math.max(formulaMin, formulaTotal - 1))}
+            disabled={formulaTotal <= formulaMin}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-3xl font-bold disabled:opacity-30 hover:border-mw-pink hover:text-mw-pink"
+          >
+            −
+          </button>
+          <div className="w-24 text-center">
+            <div className="display text-7xl text-mw-pink">{formulaTotal}</div>
+            <div className="text-xs uppercase tracking-wider text-white/50">participant{formulaTotal > 1 ? 's' : ''}</div>
+          </div>
+          <button
+            onClick={() => setFormulaTotal(formulaTotal + 1)}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-3xl font-bold hover:border-mw-pink hover:text-mw-pink"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="mb-3 text-xs text-mw-yellow">
+          ⚠ Minimum {formulaMin} participants pour la formule {currentPkg?.name}.
+        </div>
+
+        {/* Répartition auto par activité */}
+        <div className="space-y-3 rounded border border-white/10 bg-mw-surface p-4">
+          <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Répartition automatique</div>
+          {bookable.filter((a) => a.id !== 'battlekart').map((a) => {
+            const item = cart.items[a.id];
+            const sessions = item?.sessions || [];
+            const needed = Math.ceil(formulaTotal / a.maxPlayers);
+            return (
+              <div key={a.id} className="rounded bg-white/[0.02] p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="relative h-8 w-8 shrink-0 rounded border border-white/10 bg-black/40">
+                    <Image src={a.logo} alt="" fill sizes="32px" className="object-contain p-1" />
+                  </div>
+                  <div className="flex-1 display text-sm">{a.name}</div>
+                  <div className="text-sm text-mw-pink">
+                    {needed} créneau{needed > 1 ? 'x' : ''}
+                    {needed > 1 && <span className="ml-1 text-[10px] text-mw-yellow">(auto-split)</span>}
+                  </div>
+                </div>
+                {sessions.length > 1 && (
+                  <div className="space-y-1 pl-10">
+                    <div className="text-[10px] text-white/40">Répartition des {formulaTotal} joueurs :</div>
+                    {sessions.map((sess, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[9px] font-bold text-white">{idx + 1}</div>
+                        <span className="text-white/60">Créneau {idx + 1} :</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              if (sess.players <= (a.minPlayers || 1)) return;
+                              // Redistribue : prend 1 au créneau courant, donne au suivant
+                              const nextIdx = (idx + 1) % sessions.length;
+                              setSessionPlayers(a.id, idx, sess.players - 1);
+                              setSessionPlayers(a.id, nextIdx, sessions[nextIdx].players + 1);
+                            }}
+                            disabled={sess.players <= (a.minPlayers || 1)}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs disabled:opacity-30"
+                          >
+                            −
+                          </button>
+                          <span className="display w-6 text-center text-mw-pink">{sess.players}</span>
+                          <button
+                            onClick={() => {
+                              if (sess.players >= a.maxPlayers) return;
+                              const nextIdx = (idx + 1) % sessions.length;
+                              if (sessions[nextIdx].players <= (a.minPlayers || 1)) return;
+                              setSessionPlayers(a.id, idx, sess.players + 1);
+                              setSessionPlayers(a.id, nextIdx, sessions[nextIdx].players - 1);
+                            }}
+                            disabled={sess.players >= a.maxPlayers}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs disabled:opacity-30"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {bookable.some((a) => a.id === 'battlekart') && (
+            <div className="rounded bg-mw-yellow/5 border border-mw-yellow/30 p-3 text-xs text-mw-yellow">
+              🏁 BattleKart — réservation séparée après paiement (lien fourni sur la page de confirmation)
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 rounded bg-mw-pink/10 border border-mw-pink/30 p-3 text-center">
+          <div className="display text-sm text-mw-pink">Formule {currentPkg?.name}</div>
+          <div className="display text-2xl text-white">{(currentPkg?.pricePerPerson || 0) * formulaTotal}€</div>
+          <div className="text-xs text-white/50">{currentPkg?.pricePerPerson}€ × {formulaTotal} participants</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal mode (pas de formule)
   return (
     <div>
       <h1 className="section-title mb-2">Vos joueurs</h1>
       <p className="mb-6 text-white/60">
-        Indiquez combien de joueurs participent à chaque créneau. Vous pouvez splitter votre groupe
-        (ex&nbsp;: 3 enfants sur un créneau, 5 adultes sur un autre).
+        Indiquez combien de joueurs participent à chaque créneau. Vous pouvez splitter votre groupe.
       </p>
 
       <div className="space-y-4">
         {bookable.map((a) => {
+          if (a.id === 'battlekart') {
+            return (
+              <div key={a.id} className="rounded border border-mw-yellow/30 bg-mw-yellow/5 p-4 text-xs text-mw-yellow">
+                🏁 <span className="display">{a.name}</span> — réservation séparée (lien après paiement)
+              </div>
+            );
+          }
           const item = cart.items[a.id];
           const sessions = item?.sessions || [];
           const r = getRestrictions(a.id);
@@ -39,7 +195,7 @@ export default function StepSessions() {
 
               <div className="space-y-2">
                 {sessions.map((sess, idx) => {
-                  const atMin = sess.players <= a.minPlayers;
+                  const atMin = sess.players <= (a.minPlayers || 1);
                   const atMax = sess.players >= a.maxPlayers;
                   return (
                     <div key={idx} className="flex items-center gap-3 rounded bg-white/[0.03] p-2">
@@ -71,7 +227,7 @@ export default function StepSessions() {
 
               {a.minPlayers > 1 && (
                 <p className="mt-2 text-[10px] text-mw-yellow">
-                  ⚠ Minimum {a.minPlayers} joueurs — en dessous, le tarif minimum de {a.minPlayers} est appliqué.
+                  ⚠ Min {a.minPlayers} joueurs — facturé au minimum de {a.minPlayers} en dessous.
                 </p>
               )}
               {r?.disclaimerShort && (
