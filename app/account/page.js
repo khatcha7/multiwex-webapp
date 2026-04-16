@@ -144,7 +144,9 @@ function EditModal({ booking, onClose, onUpdated }) {
         if (!act) continue;
         const occ = await getSlotOccupancy(item.activityId, booking.date);
         const slotOcc = occ[item.start] || { players: 0 };
-        const remainingCapacity = act.privative ? 0 : Math.max(0, act.maxPlayers - slotOcc.players);
+        // Pour les activités privatives : le même groupe PEUT ajouter des joueurs
+        // jusqu'au max de la salle (car c'est son créneau privatisé)
+        const remainingCapacity = Math.max(0, act.maxPlayers - slotOcc.players);
         res[i] = {
           activityName: act.name,
           logo: act.logo,
@@ -166,7 +168,7 @@ function EditModal({ booking, onClose, onUpdated }) {
     for (const [idx, extra] of extras) {
       const c = checks[idx];
       if (!c) continue;
-      if (c.privative) return alert(`${c.activityName} est une activité privative — impossible d'ajouter des joueurs après coup.`);
+      // Privative OK car c'est le même groupe (propriétaire du créneau)
       if (extra > c.maxAdd) return alert(`${c.activityName} @ ${c.start} : ce créneau est complet ou il ne reste que ${c.maxAdd} places.`);
     }
 
@@ -207,9 +209,9 @@ function EditModal({ booking, onClose, onUpdated }) {
             const c = checks[idx];
             if (!c) return null;
             const extra = addPerSession[idx] || 0;
-            const isFull = !c.privative && c.maxAdd === 0;
+            const isFull = c.maxAdd === 0;
             return (
-              <div key={idx} className={`rounded border p-3 ${isFull || c.privative ? 'border-white/5 bg-white/[0.02] opacity-50' : 'border-white/10 bg-white/[0.03]'}`}>
+              <div key={idx} className={`rounded border p-3 ${isFull ? 'border-white/5 bg-white/[0.02] opacity-50' : 'border-white/10 bg-white/[0.03]'}`}>
                 <div className="mb-2 flex items-center gap-2">
                   <div className="relative h-8 w-8 shrink-0">
                     <Image src={c.logo} alt="" fill sizes="32px" className="object-contain" />
@@ -219,7 +221,7 @@ function EditModal({ booking, onClose, onUpdated }) {
                     <div className="text-[10px] text-white/50">{c.start} · actuellement {c.current}j</div>
                   </div>
                 </div>
-                {c.privative ? (
+                {false ? (
                   <div className="text-[11px] text-mw-yellow">Activité privative — impossible d'ajouter après coup</div>
                 ) : isFull ? (
                   <div className="text-[11px] text-mw-red">Complet — impossible d'ajouter sur ce créneau</div>

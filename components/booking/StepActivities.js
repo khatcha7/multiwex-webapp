@@ -10,7 +10,7 @@ import { getConfig } from '@/lib/data';
 import ActivityLogoCard from '@/components/ActivityLogoCard';
 
 export default function StepActivities() {
-  const { cart, toggleActivity, setSessionCount, applyPackage, clearCart, setDate } = useBooking();
+  const { cart, toggleActivity, setSessionCount, applyPackage, clearPackage } = useBooking();
   const [showPackages, setShowPackages] = useState(false);
 
   const bypassPackage = typeof window !== 'undefined' && (getConfig('booking.bypass_package_toggle') === true || getConfig('booking.bypass_package_toggle') === 'true');
@@ -50,14 +50,9 @@ export default function StepActivities() {
             <div className="text-xs text-white/60">{currentPkg.tagline} · {currentPkg.pricePerPerson}€/pers</div>
           </div>
           <button
-            onClick={() => {
-              // Reset to normal mode : keep activities selected, remove formula
-              const { setCart } = cart;
-              // We need to unset packageId. Use a workaround via toggleActivity re-apply
-              window.location.href = '/booking';
-            }}
+            onClick={() => clearPackage()}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 hover:bg-mw-red text-xs"
-            title="Quitter la formule"
+            title="Quitter la formule — revenir en mode libre"
           >
             ✕
           </button>

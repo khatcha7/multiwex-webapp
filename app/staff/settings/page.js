@@ -159,6 +159,7 @@ export default function StaffSettingsPage() {
                 <th className="py-2 text-right">Durée</th>
                 <th className="py-2 text-right">Min joueurs</th>
                 <th className="py-2 text-right">Max joueurs</th>
+                <th className="py-2 text-right">Buffer (min)</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +171,7 @@ export default function StaffSettingsPage() {
                   <td className="py-2 text-right">{a.duration}'</td>
                   <td className="py-2 text-right">{a.minPlayers}</td>
                   <td className="py-2 text-right">{a.maxPlayers}</td>
+                  <td className="py-2 text-right">{a.bufferMin || 0}'</td>
                 </tr>
               ))}
             </tbody>
