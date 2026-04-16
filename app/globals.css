@@ -103,3 +103,62 @@ body {
   50% { box-shadow: 0 0 0 6px rgba(243, 209, 11, 0); }
 }
 .animate-shared { animation: mw-pulse-shared 2s infinite; }
+
+/* ============================
+   CALENDRIER BACK-OFFICE — CSS SCOPÉ
+   Classes dédiées pour ne PAS impacter le reste du site.
+   ============================ */
+.cal-slot-free {
+  background: rgba(157, 255, 255, 0.46);
+  border-color: #000;
+  color: #000;
+}
+.cal-slot-free .cal-time,
+.cal-slot-free .cal-players {
+  color: #000;
+  font-size: 12px;
+}
+.cal-slot-partial {
+  background: #EBC800;
+  border-color: #000;
+  color: #000;
+}
+.cal-slot-partial .cal-time,
+.cal-slot-partial .cal-players {
+  color: #000;
+  font-size: 12px;
+}
+.cal-slot-full {
+  background: #CC003C;
+  border-color: #000;
+  color: #fff;
+}
+.cal-slot-full .cal-time,
+.cal-slot-full .cal-players {
+  color: #fff;
+  font-size: 12px;
+}
+.cal-slot-blocked {
+  background: rgba(204, 0, 60, 0.6);
+  border-color: #CC003C;
+  color: #fff;
+}
+.cal-slot-selected {
+  outline: 3px solid #3B82F6 !important;
+  outline-offset: -1px;
+  z-index: 5;
+}
+.cal-slot-highlight {
+  outline: 3px solid #F3D10B !important;
+  outline-offset: -1px;
+  z-index: 5;
+}
+.cal-closed-hour {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255,255,255,0.03) 4px,
+    rgba(255,255,255,0.03) 8px
+  );
+}
