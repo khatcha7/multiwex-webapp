@@ -62,14 +62,14 @@ export default function StepActivities() {
 
       {/* Bloc groupes / entreprises (si pas déjà en formule et pas bypass) */}
       {!bypassPackage && !isFormula && (
-        <div className="mb-5 grid gap-2 sm:grid-cols-2">
+        <div className="mb-4 grid gap-2 sm:grid-cols-2">
           <a
             href="https://www.multiwex.be/fr/groupes/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
+            className="flex items-center gap-2.5 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent px-3 py-2.5 transition hover:border-mw-pink"
           >
-            <div className="text-2xl">🎉</div>
+            <div className="text-xl">🎉</div>
             <div>
               <div className="display text-sm">Groupe · Anniversaire · EVG · EVJF</div>
               <div className="text-[11px] text-white/60">Packages tout inclus — demandez un devis →</div>
@@ -79,9 +79,9 @@ export default function StepActivities() {
             href="https://www.multiwex.be/fr/entreprises/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
+            className="flex items-center gap-2.5 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent px-3 py-2.5 transition hover:border-mw-pink"
           >
-            <div className="text-2xl">🏢</div>
+            <div className="text-xl">🏢</div>
             <div>
               <div className="display text-sm">Team building · Entreprise · Family day</div>
               <div className="text-[11px] text-white/60">Événements sur mesure — contactez-nous →</div>
@@ -90,24 +90,27 @@ export default function StepActivities() {
         </div>
       )}
 
-      {/* Grille d'activités */}
+      {/* Grille d'activités — BattleKart + Starcadium fusionnés en 1 cell pour avoir 8 cards propres */}
       <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 ${isFormula ? 'opacity-50 pointer-events-none' : ''}`}>
-        {activities.map((a) => {
-          const selected = !!cart.items[a.id];
-          const external = !a.bookable && !a.selectable && !a.walkIn;
+        {activities
+          .filter((a) => a.id !== 'battlekart' && a.id !== 'starcadium')
+          .map((a) => {
+            const selected = !!cart.items[a.id];
 
-          // Activité désactivée par le staff
-          const actDisabled = disabledActivities[a.id];
-          if (actDisabled?.disabled) {
-            return (
-              <div key={a.id} className="relative opacity-40 cursor-not-allowed" onClick={() => alert(`${a.name} n'est pas disponible actuellement.\n${actDisabled.reason || ''}`)}>
-                <ActivityLogoCard activity={a} as="div" date={cart.date} badge="Indisponible" />
-              </div>
-            );
-          }
+            // Activité désactivée par le staff
+            const actDisabled = disabledActivities[a.id];
+            if (actDisabled?.disabled) {
+              return (
+                <div key={a.id} className="relative opacity-40 cursor-not-allowed" onClick={() => alert(`${a.name} n'est pas disponible actuellement.\n${actDisabled.reason || ''}`)}>
+                  <ActivityLogoCard activity={a} as="div" date={cart.date} badge="Indisponible" />
+                </div>
+              );
+            }
 
-          // BattleKart : sélectionnable mais pas réservable chez nous
-          if (a.id === 'battlekart') {
+            if (a.walkIn) {
+              return <ActivityLogoCard key={a.id} activity={a} as="div" date={cart.date} />;
+            }
+            if (!a.bookable) return null;
             return (
               <ActivityLogoCard
                 key={a.id}
@@ -115,24 +118,53 @@ export default function StepActivities() {
                 selected={selected}
                 onClick={() => !isFormula && toggleActivity(a.id)}
                 date={cart.date}
-                badge={selected ? null : 'Résa séparée'}
               />
             );
-          }
-          if (a.walkIn) {
-            return <ActivityLogoCard key={a.id} activity={a} as="div" date={cart.date} />;
-          }
-          if (!a.bookable) return null;
+          })}
+
+        {/* Cell composite : BattleKart + Starcadium côte à côte */}
+        {(() => {
+          const bk = activities.find((a) => a.id === 'battlekart');
+          const sk = activities.find((a) => a.id === 'starcadium');
+          if (!bk && !sk) return null;
+          const bkSelected = bk && !!cart.items[bk.id];
+          const bkDisabled = bk && disabledActivities[bk.id]?.disabled;
+          const skDisabled = sk && disabledActivities[sk.id]?.disabled;
           return (
-            <ActivityLogoCard
-              key={a.id}
-              activity={a}
-              selected={selected}
-              onClick={() => !isFormula && toggleActivity(a.id)}
-              date={cart.date}
-            />
+            <div className="grid grid-cols-2 overflow-hidden rounded border border-white/10 bg-mw-surface">
+              {bk && (
+                <button
+                  onClick={() => !isFormula && !bkDisabled && toggleActivity(bk.id)}
+                  disabled={bkDisabled}
+                  className={`group flex flex-col items-center justify-center gap-1 border-r border-white/10 p-2 transition ${
+                    bkDisabled
+                      ? 'cursor-not-allowed opacity-40'
+                      : bkSelected
+                      ? 'bg-mw-pink/15'
+                      : 'hover:bg-white/[0.03]'
+                  }`}
+                >
+                  <div className="relative h-10 w-10">
+                    <Image src={bk.logo} alt={bk.name} fill sizes="40px" className="object-contain" />
+                  </div>
+                  <div className="display text-[11px] leading-tight text-white">{bk.name}</div>
+                  <div className={`text-[9px] ${bkSelected ? 'text-mw-pink' : 'text-mw-yellow'}`}>
+                    {bkSelected ? '✓ Sélectionné' : '🏁 Résa séparée'}
+                  </div>
+                </button>
+              )}
+              {sk && (
+                <div className={`flex flex-col items-center justify-center gap-1 p-2 ${skDisabled ? 'opacity-40' : ''}`}>
+                  <div className="relative h-10 w-10">
+                    <Image src={sk.logo} alt={sk.name} fill sizes="40px" className="object-contain" />
+                  </div>
+                  <div className="display text-[11px] leading-tight text-white">{sk.name}</div>
+                  <div className="text-[9px] text-white/50">Sur place uniquement</div>
+                </div>
+              )}
+            </div>
           );
-        })}
+        })()}
       </div>
 
       {/* Info sélection figée pour formules */}

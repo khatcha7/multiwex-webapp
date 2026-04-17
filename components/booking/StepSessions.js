@@ -171,11 +171,11 @@ export default function StepSessions() {
         Indiquez combien de joueurs participent à chaque créneau. Vous pouvez splitter votre groupe.
       </p>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {bookable.map((a) => {
           if (a.id === 'battlekart') {
             return (
-              <div key={a.id} className="rounded border border-mw-yellow/30 bg-mw-yellow/5 p-4 text-xs text-mw-yellow">
+              <div key={a.id} className="rounded border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-xs text-mw-yellow">
                 🏁 <span className="display">{a.name}</span> — réservation séparée (lien après paiement)
               </div>
             );
@@ -184,14 +184,14 @@ export default function StepSessions() {
           const sessions = item?.sessions || [];
           const r = getRestrictions(a.id);
           return (
-            <div key={a.id} className="rounded border border-white/10 bg-mw-surface p-4">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="relative h-10 w-10 shrink-0 rounded border border-white/10 bg-black/40">
-                  <Image src={a.logo} alt={a.name} fill className="object-contain p-1.5" sizes="40px" />
+            <div key={a.id} className="rounded border border-white/10 bg-mw-surface p-3">
+              <div className="mb-2 flex items-center gap-3">
+                <div className="relative h-9 w-9 shrink-0 rounded border border-white/10 bg-black/40">
+                  <Image src={a.logo} alt={a.name} fill className="object-contain p-1.5" sizes="36px" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="display text-lg leading-none">{a.name}</div>
-                  <div className="text-[11px] text-white/50">
+                  <div className="display text-base leading-none">{a.name}</div>
+                  <div className="mt-0.5 text-[11px] text-white/50">
                     {a.duration} min · {a.minPlayers}-{a.maxPlayers} joueurs
                     {a.privative && <span className="ml-1 text-mw-pink">· privatif</span>}
                   </div>

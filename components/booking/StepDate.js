@@ -53,28 +53,28 @@ export default function StepDate() {
       <h1 className="section-title mb-2">Quand venez-vous&nbsp;?</h1>
       <p className="mb-6 text-white/60">Choisissez votre date de visite.</p>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
-        {/* Calendrier compact */}
-        <div className="flex-1 rounded border border-white/10 bg-mw-surface p-3 md:max-w-sm md:p-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-6">
+        {/* Calendrier — étiré */}
+        <div className="flex flex-1 flex-col rounded border border-white/10 bg-mw-surface p-3 md:p-5">
           <div className="mb-3 flex items-center justify-between">
             <button
               onClick={prevMonth}
               disabled={isPastMonth || (year === today.getFullYear() && month === today.getMonth())}
-              className="flex h-7 w-7 items-center justify-center rounded border border-white/15 text-sm disabled:opacity-20"
+              className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm disabled:opacity-20"
             >
               ←
             </button>
-            <div className="display text-base">{monthsFr[month]} {year}</div>
-            <button onClick={nextMonth} className="flex h-7 w-7 items-center justify-center rounded border border-white/15 text-sm hover:border-mw-pink hover:text-mw-pink">
+            <div className="display text-lg">{monthsFr[month]} {year}</div>
+            <button onClick={nextMonth} className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm hover:border-mw-pink hover:text-mw-pink">
               →
             </button>
           </div>
 
-          <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[9px] font-bold uppercase tracking-wider text-white/40">
+          <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/40">
             {dayLabelsFrMondayFirst.map((d) => <div key={d}>{d}</div>)}
           </div>
 
-          <div className="grid grid-cols-7 gap-0.5">
+          <div className="grid flex-1 grid-cols-7 gap-1">
             {cells.map((cell, idx) => {
               if (!cell) return <div key={idx} />;
               const open = isOpenOn(cell);
@@ -90,7 +90,7 @@ export default function StepDate() {
                   key={cell}
                   onClick={() => !disabled && setDate(cell)}
                   disabled={disabled}
-                  className={`relative flex flex-col items-center justify-center rounded border py-1 text-center transition ${
+                  className={`relative flex min-h-[44px] flex-col items-center justify-center rounded border py-2 text-center transition ${
                     active
                       ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
                       : disabled
@@ -98,44 +98,44 @@ export default function StepDate() {
                       : 'border-white/10 hover:border-white/30'
                   }`}
                 >
-                  {isToday && !active && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-mw-pink" />}
-                  <div className="display text-sm leading-none">{date.getDate()}</div>
-                  {isWed && !disabled && <div className={`text-[10px] font-bold ${active ? 'text-white' : 'text-mw-pink'}`}>-50%</div>}
-                  {isToday && <div className={`text-[10px] ${active ? 'text-white' : 'text-mw-pink'}`}>auj</div>}
+                  {isToday && !active && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-mw-pink" />}
+                  <div className="display text-base leading-none">{date.getDate()}</div>
+                  {isWed && !disabled && <div className={`mt-0.5 text-[10px] font-bold ${active ? 'text-white' : 'text-mw-pink'}`}>-50%</div>}
+                  {isToday && <div className={`mt-0.5 text-[10px] ${active ? 'text-white' : 'text-mw-pink'}`}>auj</div>}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Horaires + infos du jour à droite */}
-        <div className="flex-1 md:max-w-xs">
+        {/* Horaires + infos du jour à droite — même hauteur que le calendrier */}
+        <div className="flex flex-1 flex-col">
           {cart.date && selectedDate ? (
-            <div className="rounded border border-mw-pink/30 bg-mw-pink/5 p-4">
-              <div className="display text-xl">
+            <div className="flex flex-1 flex-col rounded border border-mw-pink/30 bg-mw-pink/5 p-5">
+              <div className="display text-2xl">
                 {dayLabelsFrFull[selectedDate.getDay()]} {selectedDate.getDate()} {monthsFr[selectedDate.getMonth()]}
               </div>
               {selectedHours ? (
                 <>
-                  <div className="mt-2 text-sm text-white/70">
-                    Ouverture&nbsp;: <span className="display text-lg text-mw-pink">{selectedHours.open} → {selectedHours.close}</span>
+                  <div className="mt-3 text-sm text-white/70">
+                    Ouverture&nbsp;: <span className="display text-xl text-mw-pink">{selectedHours.open} → {selectedHours.close}</span>
                   </div>
                   {selectedDate.getDay() === 3 && (
-                    <div className="mt-2 rounded bg-mw-pink/10 p-2 text-center text-sm font-bold text-mw-pink">
+                    <div className="mt-3 rounded bg-mw-pink/10 p-2 text-center text-sm font-bold text-mw-pink">
                       MERCREDI -50%
                     </div>
                   )}
                 </>
               ) : (
-                <div className="mt-2 text-sm text-mw-red">Fermé ce jour-là</div>
+                <div className="mt-3 text-sm text-mw-red">Fermé ce jour-là</div>
               )}
-              <div className="mt-3 text-[11px] text-white/50">
+              <div className="mt-auto pt-4 text-[11px] text-white/50">
                 Rue des Deux Provinces 1, 6900 Marche-en-Famenne<br />
                 +32 (0)84 770 222
               </div>
             </div>
           ) : (
-            <div className="rounded border border-white/10 bg-white/[0.02] p-4 text-center text-sm text-white/50">
+            <div className="flex flex-1 items-center justify-center rounded border border-white/10 bg-white/[0.02] p-5 text-center text-sm text-white/50">
               ← Sélectionnez une date pour voir les horaires
             </div>
           )}
