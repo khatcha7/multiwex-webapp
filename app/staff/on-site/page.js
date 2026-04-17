@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { activities, getActivityPrice } from '@/lib/activities';
-import { generateSlotsForActivity, toDateStr } from '@/lib/hours';
+import { generateSlotsForActivity, applySlotShifts, toDateStr } from '@/lib/hours';
 import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
 
 export default function OnSiteBookingPage() {
   const today = toDateStr(new Date());
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isCompany, setIsCompany] = useState(false);
   const [companyName, setCompanyName] = useState('');
@@ -170,7 +172,7 @@ export default function OnSiteBookingPage() {
       total: subtotal,
       paid: true,
       source: 'on_site',
-      customer: { name, email: '', phone, companyName: isCompany ? companyName : null, vatNumber: isCompany ? vatNumber : null },
+      customer: { firstName, lastName, name: `${firstName} ${lastName}`, email, phone, companyName: isCompany ? companyName : null, vatNumber: isCompany ? vatNumber : null },
       createdAt: new Date().toISOString(),
       staffId: staff?.id,
       staffName: staff?.name,
@@ -213,7 +215,7 @@ export default function OnSiteBookingPage() {
           </div>
         </div>
         <button
-          onClick={() => { setConfirmed(null); setPayment(null); setName(''); setPhone(''); setItems({}); }}
+          onClick={() => { setConfirmed(null); setPayment(null); setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setItems({}); }}
           className="btn-primary mt-6"
         >
           Nouvelle réservation
@@ -233,7 +235,9 @@ export default function OnSiteBookingPage() {
       <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
         <div className="mb-2 display text-sm">1. Client</div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom" className="input" />
+          <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom" className="input" />
+          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Prénom" className="input" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="input" />
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone" className="input" />
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm text-white/80">
@@ -279,7 +283,8 @@ export default function OnSiteBookingPage() {
           <div className="mb-2 display text-sm">3. Créneaux & joueurs</div>
           {Object.entries(items).map(([id, arr]) => {
             const a = activities.find((x) => x.id === id);
-            const allSlots = generateSlotsForActivity(a, date);
+            const allSlotsRaw = generateSlotsForActivity(a, date);
+            const allSlots = applySlotShifts(allSlotsRaw, a.id, date);
             const occ = occupancy[id] || {};
             return (
               <div key={id} className="mb-4 rounded bg-white/[0.02] p-3">
@@ -350,10 +355,10 @@ export default function OnSiteBookingPage() {
             <div className="display text-3xl text-mw-pink">{subtotal.toFixed(2)}€</div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button onClick={() => submitPayment('card')} disabled={!name} className="btn-primary !py-4 disabled:opacity-30">
+            <button onClick={() => submitPayment('card')} disabled={!firstName || !lastName} className="btn-primary !py-4 disabled:opacity-30">
               💳 Carte bancaire
             </button>
-            <button onClick={() => submitPayment('cash')} disabled={!name} className="btn-outline !py-4 disabled:opacity-30">
+            <button onClick={() => submitPayment('cash')} disabled={!firstName || !lastName} className="btn-outline !py-4 disabled:opacity-30">
               💵 Espèces
             </button>
           </div>
