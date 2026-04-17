@@ -55,6 +55,7 @@ export default function StaffCalendarPage() {
   const [ctxMenu, setCtxMenu] = useState(null);
   const [search, setSearch] = useState('');
   const [hoverSlot, setHoverSlot] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const hoverTimer = useRef(null);
   const [datePicker, setDatePicker] = useState(false);
 
@@ -216,7 +217,7 @@ export default function StaffCalendarPage() {
   }, []);
 
   return (
-    <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }}>
+    <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -330,6 +331,7 @@ export default function StaffCalendarPage() {
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
           onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          onOpenBlock={setSelected}
         />
       )}
       {view === 'day' && !hours && (
@@ -343,7 +345,7 @@ export default function StaffCalendarPage() {
 
       {/* Month view */}
       {view === 'month' && (
-        <MonthView date={date} bookings={bookings} onChangeDate={setDate} />
+        <MonthView date={date} bookings={bookings} onChangeDate={setDate} visibleActivityIds={visible} />
       )}
 
       {/* Context menu */}
@@ -397,8 +399,8 @@ export default function StaffCalendarPage() {
 
       {/* Hover tooltip */}
       {hoverSlot && (
-        <div className="fixed z-40 rounded border border-white/20 bg-mw-surface px-3 py-2 shadow-lg text-xs"
-          style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+        <div className="fixed z-40 rounded border border-white/20 bg-mw-surface px-3 py-2 shadow-lg text-xs pointer-events-none"
+          style={{ left: Math.min(hoverPos.x + 15, (typeof window !== 'undefined' ? window.innerWidth - 250 : 500)), top: Math.min(hoverPos.y - 10, (typeof window !== 'undefined' ? window.innerHeight - 100 : 400)) }}>
           <div className="display text-sm">{hoverSlot.actDef.name} · {hoverSlot.slot.start}→{hoverSlot.slot.end}</div>
           {hoverSlot.items.length === 0 && <div className="text-white/50">Libre</div>}
           {hoverSlot.items.map((it, i) => (
@@ -429,7 +431,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7 }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, onOpenBlock }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -542,7 +544,11 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   return (
                     <button
                       key={bid}
-                      onClick={() => setSelected && onClick(lane.laneId, lane, { start: firstS, end: lastE }, { ctrlKey: false, shiftKey: false, metaKey: false })}
+                      onClick={() => onOpenBlock && onOpenBlock({
+                        start: firstS, end: lastE, laneId: lane.laneId, activityId: lane.id, activity: lane, date,
+                        block: sorted[0], batchSlots: sorted,
+                        items: [],
+                      })}
                       className="absolute left-0.5 right-0.5 flex flex-col items-start justify-start overflow-hidden rounded border-2 border-[#CC003C] bg-[#CC003C]/60 px-1.5 py-1 text-left hover:bg-[#CC003C]/70"
                       style={{ top: `${top}px`, height: `${height}px` }}
                     >
@@ -732,10 +738,9 @@ function WeekView({ date, lanes, bookings }) {
               {days.map((d) => {
                 const dayBookings = bookings.filter((b) => b.date === d);
                 const items = dayBookings.flatMap((b) => (b.items || []).filter((i) => i.activityId === a.id));
-                const players = items.reduce((s, i) => s + (i.players || 0), 0);
+                const resaCount = items.length;
                 const slotsForDay = generateSlotsForActivity(a, d).length;
-                const capacityTotal = slotsForDay * a.maxPlayers;
-                const rate = capacityTotal > 0 ? players / capacityTotal : 0;
+                const rate = slotsForDay > 0 ? resaCount / slotsForDay : 0;
                 let color = 'bg-white/5';
                 if (rate > 0.7) color = 'cal-slot-full';
                 else if (rate > 0.3) color = 'cal-slot-partial';
@@ -743,8 +748,8 @@ function WeekView({ date, lanes, bookings }) {
                 return (
                   <td key={d} className="px-1 py-2">
                     <div className={`rounded border p-2 text-center ${color}`}>
-                      <div className="display text-sm">{players}</div>
-                      <div className="text-[9px]">/{capacityTotal}</div>
+                      <div className="display text-sm">{resaCount}</div>
+                      <div className="text-[9px]">/{slotsForDay}</div>
                     </div>
                   </td>
                 );
@@ -760,7 +765,7 @@ function WeekView({ date, lanes, bookings }) {
 // ============================================================
 // MONTH VIEW
 // ============================================================
-function MonthView({ date, bookings, onChangeDate }) {
+function MonthView({ date, bookings, onChangeDate, visibleActivityIds }) {
   const current = parseDate(date);
   const year = current.getFullYear();
   const month = current.getMonth();
@@ -799,12 +804,18 @@ function MonthView({ date, bookings, onChangeDate }) {
               className={`relative aspect-square border-b border-r border-white/5 p-2 text-left transition hover:bg-white/5 ${color}`}
             >
               <div className={`display text-sm ${isToday ? 'text-mw-pink' : 'text-white'}`}>{parseDate(cell).getDate()}</div>
-              {dayBookings.length > 0 && (
-                <div className="mt-1 text-[9px] text-white/60">
-                  <div>{dayBookings.length} résas</div>
-                  <div>{totalPlayers} joueurs</div>
-                </div>
-              )}
+              <div className="mt-0.5 text-[8px] leading-tight text-white/60">
+                {activities.filter((a) => a.bookable && (visibleActivityIds || new Set()).has(a.id)).map((a) => {
+                  const totalSlots = generateSlotsForActivity(a, cell).length;
+                  if (totalSlots === 0) return null;
+                  const resaCount = dayBookings.reduce((s, b) => s + (b.items || []).filter((i) => i.activityId === a.id).length, 0);
+                  return (
+                    <div key={a.id} className={resaCount > 0 ? 'text-mw-pink' : 'text-white/30'}>
+                      {a.name.slice(0, 6)}: {resaCount}/{totalSlots}
+                    </div>
+                  );
+                })}
+              </div>
             </button>
           );
         })}

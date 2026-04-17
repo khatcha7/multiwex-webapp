@@ -310,7 +310,7 @@ export default function TransposedDayView({
             height: rowHeight - 1,
             justifyContent: 'center',
             zIndex: 4,
-            pointerEvents: 'none',
+            cursor: 'pointer',
             fontSize: 13,
             fontWeight: 700,
             color: '#fff',
@@ -609,7 +609,7 @@ export default function TransposedDayView({
                 height: gridHeight,
                 background: 'rgba(157, 255, 255, 0.08)',
                 zIndex: 0,
-                pointerEvents: 'none',
+                cursor: 'pointer',
               }}
             />
 
