@@ -87,9 +87,14 @@ export default function AccountPage() {
       </div>
 
       {/* Cartes cadeaux */}
-      {giftCards.length > 0 && (
-        <div className="mb-8">
-          <h2 className="display mb-3 text-2xl">Mes cartes cadeaux</h2>
+      <div className="mb-8">
+        <h2 className="display mb-3 text-2xl">Mes cartes cadeaux</h2>
+        {giftCards.length === 0 ? (
+          <div className="rounded border border-white/10 bg-mw-surface p-4 text-center">
+            <div className="text-sm text-white/50 mb-2">Aucune carte cadeau associée à votre compte</div>
+            <a href="/giftcard" className="text-xs text-mw-pink hover:underline">Acheter ou offrir une carte cadeau →</a>
+          </div>
+        ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {giftCards.map((gc) => {
               const bal = gc.balance != null ? gc.balance : gc.amount;
@@ -108,8 +113,8 @@ export default function AccountPage() {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="display text-2xl">Mes réservations</h2>

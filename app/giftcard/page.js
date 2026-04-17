@@ -124,21 +124,15 @@ export default function GiftCardPage() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-6">
-        <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Code promo</div>
-        <div className="flex gap-2">
-          <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="DEMO100" disabled={applied} className="input flex-1" />
-          <button onClick={apply} disabled={applied} className="btn-outline shrink-0">{applied ? '✓' : 'Appliquer'}</button>
-        </div>
-        <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-sm">
-          <div className="flex justify-between text-white/70"><span>Montant</span><span>{(value || 0).toFixed(2)}€</span></div>
-          {applied && <div className="flex justify-between text-mw-pink"><span>Code DEMO100</span><span>−{(value || 0).toFixed(2)}€</span></div>}
-          <div className="flex justify-between pt-2 text-lg font-black"><span>Total</span><span className="text-mw-pink">{final.toFixed(2)}€</span></div>
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between text-white/70"><span>Montant carte cadeau</span><span>{(value || 0).toFixed(2)}€</span></div>
+          <div className="flex justify-between pt-2 text-lg font-black"><span>Total à payer</span><span className="text-mw-pink">{(value || 0).toFixed(2)}€</span></div>
         </div>
       </div>
 
       <button
         onClick={submit}
-        disabled={!applied || !from || !to || !email || !value}
+        disabled={!from || !to || !email || !value}
         className="btn-primary mt-6 w-full md:w-auto"
       >
         Offrir cette carte →
