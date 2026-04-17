@@ -20,6 +20,28 @@ export default function CartDrawer({ open, onClose }) {
 
   const isComplete = hasDate && activityIds.length > 0 && allSlotsAssigned;
 
+  // Détermine à quelle étape le client s'est arrêté
+  const getCurrentStep = () => {
+    if (!hasDate) return 'date';
+    if (activityIds.length === 0) return 'activities';
+    // Vérifie si les sessions sont complètes (joueurs + rooms)
+    const sessionsOk = activityIds.every((id) => {
+      const a = getActivity(id);
+      if (!a || a.id === 'battlekart') return true;
+      const item = cart.items[id];
+      if (!item?.sessions?.length) return false;
+      return item.sessions.every((s) => {
+        if (s.players < (a?.minPlayers || 1)) return false;
+        if (a.rooms?.length > 0 && !s.roomId) return false;
+        return true;
+      });
+    });
+    if (!sessionsOk) return 'sessions';
+    if (!allSlotsAssigned) return 'slots';
+    return 'recap';
+  };
+  const currentStep = getCurrentStep();
+
   if (!open) return null;
 
   return (
@@ -80,7 +102,7 @@ export default function CartDrawer({ open, onClose }) {
                         return (
                           <div key={idx} className="mt-1.5 flex items-center gap-2 pl-10 text-[11px]">
                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-mw-pink text-[9px] font-bold text-white">{idx + 1}</span>
-                            <span className="text-white/60">{sess.players}j</span>
+                            <span className="text-white/60">{sess.players} joueur{sess.players > 1 ? 's' : ''}</span>
                             {roomName && <span className="text-white/40">{roomName}</span>}
                             {slot ? (
                               <span className="font-mono text-mw-pink">{slot.start}</span>
@@ -100,12 +122,16 @@ export default function CartDrawer({ open, onClose }) {
 
         <div className="border-t border-white/10 p-4">
           {isComplete ? (
-            <Link href="/booking?step=recap" onClick={onClose} className="btn-primary w-full text-center">
+            <Link href={`/booking?step=recap`} onClick={onClose} className="btn-primary w-full text-center block">
               Finaliser ma commande →
             </Link>
-          ) : (
-            <Link href="/booking" onClick={onClose} className="btn-primary w-full text-center">
+          ) : activityIds.length > 0 ? (
+            <Link href={`/booking?step=${currentStep}`} onClick={onClose} className="btn-primary w-full text-center block">
               Continuer ma réservation →
+            </Link>
+          ) : (
+            <Link href="/booking" onClick={onClose} className="btn-outline w-full text-center block">
+              Commencer une réservation
             </Link>
           )}
         </div>

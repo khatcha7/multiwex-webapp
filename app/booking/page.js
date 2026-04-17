@@ -30,6 +30,16 @@ function BookingInner() {
   const packageId = params.get('package');
   const upsellFlag = params.get('upsell');
   const upsellDate = params.get('date');
+  const stepParam = params.get('step');
+
+  // Si ?step= est passé, sauter directement à cette étape
+  useEffect(() => {
+    if (hydrated && stepParam && !packageId && !upsellFlag) {
+      const idx = ALL_STEPS.findIndex((s) => s.id === stepParam);
+      if (idx >= 0) setStepIndex(idx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, stepParam]);
 
   // Récupère la config (certaines étapes peuvent être bypassées)
   const packageStepBypassed = useMemo(() => {

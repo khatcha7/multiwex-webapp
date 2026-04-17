@@ -193,7 +193,7 @@ export default function StepSessions() {
                   <div className="display text-lg leading-none">{a.name}</div>
                   <div className="text-[11px] text-white/50">
                     {a.duration} min · {a.minPlayers}-{a.maxPlayers} joueurs
-                    {a.privative && <span className="ml-1 text-mw-yellow">· privatif</span>}
+                    {a.privative && <span className="ml-1 text-mw-pink">· privatif</span>}
                   </div>
                 </div>
               </div>
