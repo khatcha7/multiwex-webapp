@@ -88,6 +88,7 @@ export default function StaffSettingsPage() {
         <div className="grid gap-3 sm:grid-cols-3">
           <NumField label="Fermeture auto en ligne (min avant)" value={cfg['booking.closure_min_online']} onSave={(v) => save('booking.closure_min_online', v)} />
           <NumField label="Cutoff modification client (h)" value={cfg['booking.cancel_cutoff_hours']} onSave={(v) => save('booking.cancel_cutoff_hours', v)} />
+          <NumField label="Max cartes cadeaux par commande" value={cfg['payment.max_giftcards']} onSave={(v) => save('payment.max_giftcards', v)} />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-white/80">
           <input type="checkbox" checked={cfg['booking.bypass_package_toggle'] === true || cfg['booking.bypass_package_toggle'] === 'true'} onChange={(e) => save('booking.bypass_package_toggle', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
