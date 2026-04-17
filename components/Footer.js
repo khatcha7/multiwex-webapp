@@ -1,25 +1,17 @@
 export default function Footer() {
   return (
-    <footer className="mt-20 border-t border-white/10 bg-mw-darker/60">
-      <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-white/60">
-        <div className="grid gap-6 md:grid-cols-3">
+    <footer className="border-t border-white/10 bg-mw-darker/60">
+      <div className="mx-auto max-w-7xl px-4 py-3 text-[11px] text-white/55">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 md:justify-between">
           <div>
-            <div className="mb-2 font-bold text-white">Multiwex</div>
-            <div>Rue des Deux Provinces, 1</div>
-            <div>6900 Marche-en-Famenne</div>
+            <span className="font-medium text-white/80">Multiwex</span> · Rue des Deux Provinces 1, 6900 Marche-en-Famenne
           </div>
           <div>
-            <div className="mb-2 font-bold text-white">Contact</div>
-            <div>+32 (0)84 770 222</div>
-            <div>info@multiwex.be</div>
+            +32 (0)84 770 222 · <span className="text-mw-pink/80">info@multiwex.be</span>
           </div>
-          <div>
-            <div className="mb-2 font-bold text-white">Démo</div>
-            <div className="text-xs">Maquette de réservation — paiement bypassé par code promo <span className="font-mono text-mw-pink">DEMO100</span></div>
+          <div className="text-white/35">
+            © 2026 — Maquette démo · Code promo <span className="font-mono text-mw-pink/70">DEMO100</span>
           </div>
-        </div>
-        <div className="mt-6 border-t border-white/10 pt-4 text-center text-xs text-white/40">
-          © 2026 Multiwex — Maquette démonstration
         </div>
       </div>
     </footer>

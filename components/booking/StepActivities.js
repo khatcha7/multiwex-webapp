@@ -62,14 +62,14 @@ export default function StepActivities() {
 
       {/* Bloc groupes / entreprises (si pas déjà en formule et pas bypass) */}
       {!bypassPackage && !isFormula && (
-        <div className="mb-5 grid gap-2 sm:grid-cols-2">
+        <div className="mb-4 grid gap-2 sm:grid-cols-2">
           <a
             href="https://www.multiwex.be/fr/groupes/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
+            className="flex items-center gap-2.5 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent px-3 py-2.5 transition hover:border-mw-pink"
           >
-            <div className="text-2xl">🎉</div>
+            <div className="text-xl">🎉</div>
             <div>
               <div className="display text-sm">Groupe · Anniversaire · EVG · EVJF</div>
               <div className="text-[11px] text-white/60">Packages tout inclus — demandez un devis →</div>
@@ -79,9 +79,9 @@ export default function StepActivities() {
             href="https://www.multiwex.be/fr/entreprises/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
+            className="flex items-center gap-2.5 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent px-3 py-2.5 transition hover:border-mw-pink"
           >
-            <div className="text-2xl">🏢</div>
+            <div className="text-xl">🏢</div>
             <div>
               <div className="display text-sm">Team building · Entreprise · Family day</div>
               <div className="text-[11px] text-white/60">Événements sur mesure — contactez-nous →</div>
@@ -90,24 +90,91 @@ export default function StepActivities() {
         </div>
       )}
 
-      {/* Grille d'activités */}
+      {/* Grille d'activités — BattleKart + Starcadium fusionnés en position 1 pour avoir 8 cards propres */}
       <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 ${isFormula ? 'opacity-50 pointer-events-none' : ''}`}>
-        {activities.map((a) => {
-          const selected = !!cart.items[a.id];
-          const external = !a.bookable && !a.selectable && !a.walkIn;
+        {/* Cell composite : BattleKart + Starcadium — position 1, même style qu'ActivityLogoCard */}
+        {(() => {
+          const bk = activities.find((a) => a.id === 'battlekart');
+          const sk = activities.find((a) => a.id === 'starcadium');
+          if (!bk && !sk) return null;
+          const bkSelected = bk && !!cart.items[bk.id];
+          const bkDisabled = bk && disabledActivities[bk.id]?.disabled;
+          const skDisabled = sk && disabledActivities[sk.id]?.disabled;
+          return (
+            <div
+              className={`relative flex overflow-hidden rounded-2xl border bg-gradient-to-br from-white/[0.06] to-white/[0.01] backdrop-blur-sm transition ${
+                bkSelected ? 'border-mw-pink shadow-neon-pink' : 'border-white/10'
+              }`}
+            >
+              {/* Sous-cell BattleKart — lien externe direct */}
+              {bk && (
+                <a
+                  href="https://www.battlekart.com/fr/wex/booking"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex flex-1 flex-col border-r border-white/10 text-left transition hover:-translate-y-0.5"
+                >
+                  {/* Image background + overlay */}
+                  <div className="absolute inset-0 opacity-30 transition group-hover:opacity-50">
+                    {bk.image && (
+                      <Image src={bk.image} alt="" fill sizes="(max-width: 640px) 25vw, 16vw" className="object-cover blur-[1px]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
+                  </div>
+                  {/* Logo */}
+                  <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
+                    <div className="relative h-10 w-full">
+                      <Image src={bk.logo} alt={bk.name} fill sizes="90px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(255,0,125,0.35))]" />
+                    </div>
+                  </div>
+                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-white/70">
+                    Réservation externe ↗
+                  </div>
+                </a>
+              )}
+              {/* Sous-cell Starcadium — info */}
+              {sk && (
+                <div className={`relative flex flex-1 flex-col ${skDisabled ? 'opacity-40' : ''}`}>
+                  <div className="absolute inset-0 opacity-30">
+                    {sk.image && (
+                      <Image src={sk.image} alt="" fill sizes="(max-width: 640px) 25vw, 16vw" className="object-cover blur-[1px]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
+                  </div>
+                  <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
+                    <div className="relative h-8 w-full">
+                      <Image src={sk.logo} alt={sk.name} fill sizes="70px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(0,217,255,0.35))]" />
+                    </div>
+                  </div>
+                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-white/70">
+                    Sans réservation
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
-          // Activité désactivée par le staff
-          const actDisabled = disabledActivities[a.id];
-          if (actDisabled?.disabled) {
-            return (
-              <div key={a.id} className="relative opacity-40 cursor-not-allowed" onClick={() => alert(`${a.name} n'est pas disponible actuellement.\n${actDisabled.reason || ''}`)}>
-                <ActivityLogoCard activity={a} as="div" date={cart.date} badge="Indisponible" />
-              </div>
-            );
-          }
+        {/* Activités normales (hors BK/SK) */}
+        {activities
+          .filter((a) => a.id !== 'battlekart' && a.id !== 'starcadium')
+          .map((a) => {
+            const selected = !!cart.items[a.id];
 
-          // BattleKart : sélectionnable mais pas réservable chez nous
-          if (a.id === 'battlekart') {
+            // Activité désactivée par le staff
+            const actDisabled = disabledActivities[a.id];
+            if (actDisabled?.disabled) {
+              return (
+                <div key={a.id} className="relative opacity-40 cursor-not-allowed" onClick={() => alert(`${a.name} n'est pas disponible actuellement.\n${actDisabled.reason || ''}`)}>
+                  <ActivityLogoCard activity={a} as="div" date={cart.date} badge="Indisponible" />
+                </div>
+              );
+            }
+
+            if (a.walkIn) {
+              return <ActivityLogoCard key={a.id} activity={a} as="div" date={cart.date} />;
+            }
+            if (!a.bookable) return null;
             return (
               <ActivityLogoCard
                 key={a.id}
@@ -115,24 +182,9 @@ export default function StepActivities() {
                 selected={selected}
                 onClick={() => !isFormula && toggleActivity(a.id)}
                 date={cart.date}
-                badge={selected ? null : 'Résa séparée'}
               />
             );
-          }
-          if (a.walkIn) {
-            return <ActivityLogoCard key={a.id} activity={a} as="div" date={cart.date} />;
-          }
-          if (!a.bookable) return null;
-          return (
-            <ActivityLogoCard
-              key={a.id}
-              activity={a}
-              selected={selected}
-              onClick={() => !isFormula && toggleActivity(a.id)}
-              date={cart.date}
-            />
-          );
-        })}
+          })}
       </div>
 
       {/* Info sélection figée pour formules */}

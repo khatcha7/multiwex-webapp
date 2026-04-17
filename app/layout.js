@@ -22,11 +22,11 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={`${display.variable} ${body.variable}`}>
-      <body>
+      <body className="flex min-h-screen flex-col">
         <BookingProvider>
           <Marquee />
           <Header />
-          <main className="min-h-[calc(100vh-180px)]">{children}</main>
+          <main className="flex-1">{children}</main>
           <Footer />
         </BookingProvider>
       </body>
