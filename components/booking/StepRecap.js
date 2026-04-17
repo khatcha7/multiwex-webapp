@@ -160,8 +160,8 @@ export default function StepRecap({ onConfirm }) {
 
   return (
     <div>
-      <h1 className="section-title mb-1">Récap</h1>
-      <p className="mb-3 text-sm text-white/60">Vérifiez votre sélection, acceptez les conditions et payez.</p>
+      <h1 className="section-title mb-2">Récap</h1>
+      <p className="mb-6 text-white/60">Vérifiez votre sélection, acceptez les conditions et payez.</p>
 
       {largeGroup && (
         <div className="mb-4 rounded border border-mw-yellow/40 bg-mw-yellow/10 p-4">

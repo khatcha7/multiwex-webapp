@@ -122,9 +122,9 @@ function BookingInner() {
   const goPrev = () => setStepIndex((i) => Math.max(0, i - 1));
 
   return (
-    <div ref={topRef} className="mx-auto max-w-5xl px-4 py-3 md:py-5">
+    <div ref={topRef} className="mx-auto max-w-4xl px-4 py-6 md:py-10">
       <Stepper steps={STEPS} activeIndex={stepIndex} />
-      <div className="mt-4 md:mt-6">
+      <div className="mt-6 md:mt-10">
         <StepComponent onNext={goNext} onConfirm={() => setStepIndex(STEPS.length - 1)} onRestart={() => setStepIndex(0)} />
       </div>
       {currentStep.id !== 'confirm' && currentStep.id !== 'recap' && (

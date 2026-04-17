@@ -38,9 +38,9 @@ export default function StepActivities() {
 
   return (
     <div>
-      <h1 className="section-title mb-1">Vos activités</h1>
-      <p className="mb-3 text-sm text-white/60">
-        Sélectionnez vos activités puis indiquez le nombre de parties.
+      <h1 className="section-title mb-2">Vos activités</h1>
+      <p className="mb-4 text-white/60">
+        Sélectionnez une ou plusieurs activités puis indiquez combien de parties vous voulez faire.
       </p>
 
       {/* Bulle formule active */}
@@ -144,9 +144,9 @@ export default function StepActivities() {
 
       {/* Encart nombre de parties + infos */}
       {Object.keys(cart.items).length > 0 && (
-        <div className="mt-4">
-          <div className="mb-2 text-xs uppercase tracking-wider text-white/50">Nombre de parties</div>
-          <div className="grid gap-2 md:grid-cols-2">
+        <div className="mt-8">
+          <div className="mb-3 text-xs uppercase tracking-wider text-white/50">Nombre de parties par activité</div>
+          <div className="space-y-2">
             {Object.entries(cart.items).map(([id, item]) => {
               const a = activities.find((x) => x.id === id);
               if (!a) return null;

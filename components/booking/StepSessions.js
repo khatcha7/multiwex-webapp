@@ -166,12 +166,12 @@ export default function StepSessions() {
   // Normal mode (pas de formule)
   return (
     <div>
-      <h1 className="section-title mb-1">Vos joueurs</h1>
-      <p className="mb-3 text-sm text-white/60">
-        Indiquez le nombre de joueurs par créneau.
+      <h1 className="section-title mb-2">Vos joueurs</h1>
+      <p className="mb-6 text-white/60">
+        Indiquez combien de joueurs participent à chaque créneau. Vous pouvez splitter votre groupe.
       </p>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="space-y-4">
         {bookable.map((a) => {
           if (a.id === 'battlekart') {
             return (

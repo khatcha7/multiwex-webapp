@@ -50,8 +50,8 @@ export default function StepDate() {
 
   return (
     <div>
-      <h1 className="section-title mb-1">Quand venez-vous&nbsp;?</h1>
-      <p className="mb-3 text-sm text-white/60">Choisissez votre date de visite.</p>
+      <h1 className="section-title mb-2">Quand venez-vous&nbsp;?</h1>
+      <p className="mb-6 text-white/60">Choisissez votre date de visite.</p>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
         {/* Calendrier compact */}
