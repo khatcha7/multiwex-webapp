@@ -18,7 +18,34 @@ export default function OnSiteBookingPage() {
   const [occupancy, setOccupancy] = useState({});
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
+  const [prefilled, setPrefilled] = useState(false);
   const staff = typeof window !== 'undefined' ? getActiveStaff() : null;
+
+  // Pré-remplissage depuis le calendrier (sessionStorage)
+  useEffect(() => {
+    if (prefilled) return;
+    try {
+      const raw = sessionStorage.getItem('mw_onsite_prefill');
+      if (raw) {
+        const slotsToBook = JSON.parse(raw);
+        sessionStorage.removeItem('mw_onsite_prefill');
+        const newItems = {};
+        slotsToBook.forEach((s) => {
+          const a = activities.find((x) => x.id === s.activityId);
+          if (!a) return;
+          if (!newItems[s.activityId]) newItems[s.activityId] = [];
+          newItems[s.activityId].push({
+            players: a.minPlayers || 1,
+            slot: { start: s.start, end: s.end },
+          });
+        });
+        if (Object.keys(newItems).length > 0) {
+          setItems(newItems);
+          setPrefilled(true);
+        }
+      }
+    } catch {}
+  }, [prefilled]);
 
   useEffect(() => {
     // Charge occupation pour toutes les activités sélectionnées

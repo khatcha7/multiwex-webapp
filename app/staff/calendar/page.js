@@ -389,10 +389,18 @@ export default function StaffCalendarPage() {
               🔒 Bloquer ce(s) créneau(x)
             </button>
             <button
-              onClick={() => { window.location.href = '/staff/on-site'; setCtxMenu(null); }}
+              onClick={() => {
+                // Pré-remplir avec les créneaux sélectionnés (multiSel ou créneau unique)
+                const slotsToBook = multiSel.length > 0
+                  ? multiSel.map((s) => ({ activityId: s.actDef.id, start: s.slot.start, end: s.slot.end }))
+                  : [{ activityId: ctxMenu.actDef.id, start: ctxMenu.slot.start, end: ctxMenu.slot.end }];
+                sessionStorage.setItem('mw_onsite_prefill', JSON.stringify(slotsToBook));
+                setCtxMenu(null);
+                window.location.href = '/staff/on-site';
+              }}
               className="block w-full rounded px-3 py-2 text-left text-xs hover:bg-white/10"
             >
-              📝 Effectuer une réservation
+              📝 Réserver sur ce(s) créneau(x)
             </button>
             <div className="border-t border-white/10 mt-1 pt-1">
               <div className="px-3 py-1 text-[10px] text-white/40">Décaler ce créneau</div>
