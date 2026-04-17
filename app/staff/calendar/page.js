@@ -5,6 +5,7 @@ import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
 import {
   generateSlotsForActivity,
+  applySlotShifts,
   getHoursForDate,
   toMinutes,
   fromMinutes,
@@ -428,12 +429,12 @@ export default function StaffCalendarPage() {
                     localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
                     setCtxMenu(null);
                     setTick((t) => t + 1);
-                    alert(`Toute la ligne ${ctxMenu.actDef.name} décalée de ${val} min à partir de ${ctxMenu.slot.start}`);
+                    alert(`${ctxMenu.actDef.name} décalé(e) de ${val} min à partir de ${ctxMenu.slot.start}`);
                   }
                 }}
                 className="block w-full rounded px-3 py-1.5 text-left text-[10px] text-white/60 hover:bg-white/10"
               >
-                ↔ Décaler toute la ligne…
+                ↔ Décaler toute l'activité…
               </button>
             </div>
           </div>
@@ -502,7 +503,8 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
         {/* Lanes */}
         {lanes.map((lane) => {
-          const slots = generateSlotsForActivity(lane, date, { fullDay: true });
+          const slotsRaw = generateSlotsForActivity(lane, date, { fullDay: true });
+          const slots = applySlotShifts(slotsRaw, lane.id, date);
           const laneW = lane.compact ? Math.round(pxActivity / 3) : pxActivity;
           const laneBookings = bookings.flatMap((b) =>
             (b.items || []).filter((i) => i.activityId === lane.id).filter((i) => {
