@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useBooking } from '@/lib/store';
-import { listBookings, updateBooking, logAudit, getSlotOccupancy } from '@/lib/data';
+import { listBookings, updateBooking, logAudit, getSlotOccupancy, getConfig } from '@/lib/data';
 import { getActivity, getActivityPrice } from '@/lib/activities';
 import { getPackage } from '@/lib/packages';
 
@@ -14,8 +14,15 @@ export default function AccountPage() {
   const [email, setEmail] = useState('');
   const [editing, setEditing] = useState(null);
 
+  const [giftCards, setGiftCards] = useState([]);
+
   useEffect(() => {
-    if (hydrated && user) listBookings({ customerEmail: user.email }).then(setBookings);
+    if (hydrated && user) {
+      listBookings({ customerEmail: user.email }).then(setBookings);
+      // Charger les cartes cadeaux de l'utilisateur
+      const allCards = JSON.parse(localStorage.getItem('mw_giftcards') || '[]');
+      setGiftCards(allCards.filter((gc) => gc.to_email === user.email));
+    }
   }, [hydrated, user]);
 
   if (!hydrated) return <div className="mx-auto max-w-4xl px-4 py-10 text-white/60">Chargement…</div>;
@@ -80,6 +87,31 @@ export default function AccountPage() {
         <Stat label="Membre depuis" value={new Date(user.createdAt).toLocaleDateString('fr-FR')} />
       </div>
 
+      {/* Cartes cadeaux */}
+      {giftCards.length > 0 && (
+        <div className="mb-8">
+          <h2 className="display mb-3 text-2xl">Mes cartes cadeaux</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {giftCards.map((gc) => {
+              const bal = gc.balance != null ? gc.balance : gc.amount;
+              const empty = bal <= 0;
+              return (
+                <div key={gc.code} className={`rounded border p-4 ${empty ? 'border-white/5 opacity-40' : 'border-mw-pink/30 bg-gradient-to-br from-mw-pink/10 to-mw-surface'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono text-sm text-mw-pink">{gc.code}</div>
+                    <div className="display text-xl">{bal.toFixed(2)}€</div>
+                  </div>
+                  <div className="mt-1 text-[10px] text-white/50">
+                    {gc.from_name && <>De {gc.from_name} · </>}
+                    {empty ? 'Épuisée' : 'Disponible'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="display text-2xl">Mes réservations</h2>
         <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
@@ -99,7 +131,7 @@ export default function AccountPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredBookings.slice().reverse().map((b) => {
+          {filteredBookings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((b) => {
             const isFormula = Boolean(b.packageId);
             const pkg = isFormula ? getPackage(b.packageId) : null;
             const isPast = b.date < todayStr;
@@ -155,9 +187,12 @@ export default function AccountPage() {
                 <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3">
                   <button
                     onClick={() => {
+                      const pdfName = getConfig('pdf.company_name') || 'MULTIWEX';
+                      const pdfFooter = getConfig('pdf.footer') || '';
+                      const pdfColor = getConfig('pdf.accent_color') || '#e8005a';
                       const w = window.open('', '_blank');
-                      const items = (b.items || []).map((i) => `<tr><td style="padding:6px;border-bottom:1px solid #222;">${i.activityName || ''}</td><td style="padding:6px;border-bottom:1px solid #222;">${i.start || ''}</td><td style="padding:6px;border-bottom:1px solid #222;">${i.players || '?'} joueurs</td></tr>`).join('');
-                      w.document.write(`<!doctype html><html><head><title>Réservation ${b.id}</title><style>body{font-family:sans-serif;background:#fff;color:#000;padding:40px;max-width:600px;margin:0 auto}h1{color:#e8005a}table{width:100%;border-collapse:collapse}td{text-align:left}</style></head><body><h1>MULTIWEX</h1><h2>Réservation ${b.id || b.reference}</h2><p>${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><p>${b.players || 0} joueurs · ${(b.total || 0).toFixed(2)}€</p><table>${items}</table><p style="margin-top:20px;font-size:12px;color:#888;">Multiwex · Rue des Deux Provinces 1, 6900 Marche-en-Famenne · +32 (0)84 770 222</p></body></html>`);
+                      const items = (b.items || []).map((i) => `<tr><td style="padding:8px;border-bottom:1px solid #eee;">${i.activityName || ''}</td><td style="padding:8px;border-bottom:1px solid #eee;">${i.start || ''}</td><td style="padding:8px;border-bottom:1px solid #eee;">${i.players || '?'} joueurs</td></tr>`).join('');
+                      w.document.write(`<!doctype html><html><head><title>Réservation ${b.id}</title><style>body{font-family:sans-serif;background:#fff;color:#000;padding:40px;max-width:600px;margin:0 auto}h1{color:${pdfColor};font-size:28px;letter-spacing:0.1em}h2{font-size:18px;color:#333}table{width:100%;border-collapse:collapse;margin:20px 0}td{text-align:left}.footer{margin-top:30px;padding-top:15px;border-top:2px solid ${pdfColor};font-size:11px;color:#888}</style></head><body><h1>${pdfName}</h1><h2>Réservation ${b.id || b.reference}</h2><p style="font-size:16px;">${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><p>${b.players || 0} joueurs · <strong>${(b.total || 0).toFixed(2)}€</strong></p><table>${items}</table><div class="footer">${pdfFooter}</div></body></html>`);
                       w.document.close();
                       w.print();
                     }}
@@ -168,12 +203,13 @@ export default function AccountPage() {
                   </button>
                   <button
                     onClick={() => {
-                      const text = `Réservation Multiwex ${b.id || b.reference}\n${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}\n${(b.items || []).map((i) => `${i.activityName} à ${i.start} (${i.players}j)`).join('\n')}\nTotal : ${(b.total || 0).toFixed(2)}€`;
+                      const url = `${window.location.origin}/invite/${b.id || b.reference}`;
+                      const text = `On se retrouve au Multiwex !\n${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}\n${(b.items || []).map((i) => `${i.activityName} à ${i.start}`).join('\n')}\n\nDétails : ${url}`;
                       if (navigator.share) {
-                        navigator.share({ title: `Réservation Multiwex ${b.id}`, text });
+                        navigator.share({ title: 'Invitation Multiwex', text, url });
                       } else {
                         navigator.clipboard.writeText(text);
-                        alert('Résumé copié dans le presse-papiers !');
+                        alert('Lien d\'invitation copié !');
                       }
                     }}
                     className="flex items-center gap-1 text-xs text-white/50 hover:text-mw-pink"

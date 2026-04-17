@@ -181,6 +181,15 @@ export default function StaffSettingsPage() {
       </div>
 
       <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Template PDF / Invitation</h2>
+        <div className="space-y-3">
+          <Field label="Nom entreprise (header PDF)" value={cfg['pdf.company_name']} onSave={(v) => save('pdf.company_name', v)} />
+          <Field label="Footer PDF" value={cfg['pdf.footer']} onSave={(v) => save('pdf.footer', v)} />
+          <Field label="Couleur accent (hex)" value={cfg['pdf.accent_color']} onSave={(v) => save('pdf.accent_color', v)} />
+        </div>
+      </div>
+
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Disponibilité des activités</h2>
         <p className="mb-3 text-xs text-white/50">Désactivez temporairement une activité (maintenance, panne, etc.). Elle apparaîtra grisée et non cliquable côté client.</p>
         <div className="space-y-2">
