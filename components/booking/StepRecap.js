@@ -12,7 +12,8 @@ export default function StepRecap({ onConfirm }) {
   const [promo, setPromo] = useState(cart.appliedPromoCode || '');
   const [promoApplied, setPromoApplied] = useState(Boolean(cart.appliedPromoCode));
   const [email, setEmail] = useState(user?.email || '');
-  const [name, setName] = useState(user?.name || '');
+  const [firstName, setFirstName] = useState(user?.firstName || '');
+  const [lastName, setLastName] = useState(user?.lastName || '');
   const [phone, setPhone] = useState('');
   const [withCompany, setWithCompany] = useState(false);
   const [vatNumber, setVatNumber] = useState('');
@@ -26,7 +27,8 @@ export default function StepRecap({ onConfirm }) {
   // Génère les lignes : 1 ligne par session (créneau) = 1 activité × 1 créneau × N joueurs
   const items = Object.entries(cart.items).flatMap(([activityId, item]) => {
     const a = getActivity(activityId);
-    if (!a || !a.bookable) return [];
+    if (!a || (!a.bookable && !a.selectable)) return [];
+    if (a.id === 'battlekart') return []; // BattleKart = pas facturé ici
     const slots = cart.slots[activityId] || [];
     return (item.sessions || []).map((sess, idx) => {
       const slot = slots[idx];
@@ -48,20 +50,44 @@ export default function StepRecap({ onConfirm }) {
 
   const uniqueActivities = [...new Set(items.map((i) => i.activity.id))].map(getActivity);
 
-  const subtotal = items.reduce((s, i) => s + i.total, 0);
-  const discount = promoApplied ? subtotal : 0;
-  const total = subtotal - discount;
+  const isFormula = Boolean(cart.packageId);
+  const currentPkg = isFormula ? require('@/lib/packages').getPackage(cart.packageId) : null;
   const wed = cart.date && isWednesdayDiscount(cart.date);
+
+  // Calcul du total selon mode formule ou individuel
+  let subtotal;
+  let formulaTotal = 0;
+  let formulaTotalPlayers = 0;
+  if (isFormula && currentPkg) {
+    // Formule : pricePerPerson × nb participants (PAS les prix individuels)
+    formulaTotalPlayers = Object.values(cart.items).reduce((s, it) => {
+      const maxInSessions = Math.max(...(it.sessions || []).map((ss) => ss.players), 0);
+      return Math.max(s, maxInSessions);
+    }, currentPkg.minPlayers || 1);
+    formulaTotal = currentPkg.pricePerPerson * formulaTotalPlayers;
+    subtotal = formulaTotal;
+  } else {
+    subtotal = items.reduce((s, i) => s + i.total, 0);
+  }
+
+  // Promo rules : pas sur formules, pas sur mercredis, pas cumulable
+  const promoBlocked = isFormula || wed;
+  const discount = promoApplied && !promoBlocked ? subtotal : 0;
+  const total = subtotal - discount;
   const maxPlayers = Math.max(...items.map((i) => i.players), 0);
   const largeGroup = maxPlayers >= 12;
 
   const applyPromo = () => {
+    if (promoBlocked) {
+      if (isFormula) return alert('Les codes promos ne sont pas applicables sur les formules (tarif déjà réduit).');
+      if (wed) return alert('Les codes promos ne sont pas cumulables avec le tarif mercredi -50%.');
+    }
     if (promo.trim().toUpperCase() === 'DEMO100') setPromoApplied(true);
     else alert('Code promo invalide. Essayez DEMO100 pour la démo.');
   };
 
   const startPayment = () => {
-    if (!email || !name) return alert('Nom et email requis');
+    if (!email || !firstName || !lastName) return alert('Nom, prénom et email requis');
     if (!cgvAccepted) return alert('Veuillez accepter les CGV');
     if (!disclaimersAccepted) return alert('Veuillez confirmer avoir pris connaissance des restrictions');
     if (total === 0) {
@@ -104,7 +130,8 @@ export default function StepRecap({ onConfirm }) {
       source: 'online',
       packageId: cart.packageId || null,
       customer: {
-        name, email, phone,
+        firstName, lastName, name: `${firstName} ${lastName}`,
+        email, phone,
         companyName: withCompany ? companyName : null,
         vatNumber: withCompany ? vatNumber : null,
       },
@@ -157,10 +184,27 @@ export default function StepRecap({ onConfirm }) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wider text-white/50">Max joueurs</div>
-            <div className="display text-2xl text-mw-pink">{maxPlayers}</div>
+            {isFormula && currentPkg ? (
+              <>
+                <div className="text-xs uppercase tracking-wider text-white/50">Formule</div>
+                <div className="display text-sm text-mw-pink">{currentPkg.name}</div>
+                <div className="text-xs text-white/60">{formulaTotalPlayers} participants · {currentPkg.pricePerPerson}€/pers</div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs uppercase tracking-wider text-white/50">Joueurs</div>
+                <div className="display text-2xl text-mw-pink">{maxPlayers}</div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* BattleKart mention si dans le panier */}
+        {cart.items.battlekart && (
+          <div className="mb-3 rounded border border-mw-yellow/40 bg-mw-yellow/10 p-3 text-xs text-mw-yellow">
+            🏁 <span className="display">BattleKart</span> — réservation séparée. Lien fourni après paiement.
+          </div>
+        )}
 
         <div className="space-y-2">
           {items.map((i, idx) => (
@@ -176,8 +220,14 @@ export default function StepRecap({ onConfirm }) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-bold">{i.total.toFixed(2)}€</div>
-                <div className="text-xs text-white/50">{i.unit}€ × {i.billedPlayers}</div>
+                {isFormula ? (
+                  <div className="text-sm text-mw-red line-through opacity-60">{i.total.toFixed(2)}€</div>
+                ) : (
+                  <>
+                    <div className="font-bold">{i.total.toFixed(2)}€</div>
+                    <div className="text-xs text-white/50">{i.unit}€ × {i.billedPlayers}</div>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -197,12 +247,22 @@ export default function StepRecap({ onConfirm }) {
               {promoApplied ? '✓' : 'Appliquer'}
             </button>
           </div>
-          {wed && <p className="mt-2 text-xs text-mw-pink">✓ Tarif mercredi -50% déjà appliqué</p>}
-          {promoApplied && <p className="mt-2 text-xs text-mw-pink">✓ Code DEMO100 appliqué</p>}
+          {wed && !isFormula && <p className="mt-2 text-xs text-mw-pink">✓ Tarif mercredi -50% déjà appliqué</p>}
+          {promoBlocked && <p className="mt-2 text-xs text-mw-yellow">⚠ {isFormula ? 'Codes promos non applicables sur les formules' : 'Codes promos non cumulables avec le tarif mercredi'}</p>}
+          {promoApplied && !promoBlocked && <p className="mt-2 text-xs text-mw-pink">✓ Code DEMO100 appliqué</p>}
         </div>
 
         <div className="mt-4 space-y-1 border-t border-white/10 pt-4 text-sm">
-          <div className="flex justify-between text-white/70"><span>Sous-total</span><span>{subtotal.toFixed(2)}€</span></div>
+          {isFormula && currentPkg ? (
+            <>
+              <div className="flex justify-between text-white/70">
+                <span>Formule {currentPkg.name}</span>
+                <span>{currentPkg.pricePerPerson}€ × {formulaTotalPlayers} = {formulaTotal.toFixed(2)}€</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between text-white/70"><span>Sous-total</span><span>{subtotal.toFixed(2)}€</span></div>
+          )}
           {discount > 0 && <div className="flex justify-between text-mw-pink"><span>Code promo</span><span>−{discount.toFixed(2)}€</span></div>}
           <div className="flex justify-between pt-2 text-lg font-black"><span>Total</span><span className="display text-2xl text-mw-pink">{total.toFixed(2)}€</span></div>
         </div>
@@ -211,9 +271,10 @@ export default function StepRecap({ onConfirm }) {
       <div className="mt-6 rounded border border-white/10 bg-mw-surface p-4 md:p-6">
         <div className="mb-3 text-xs uppercase tracking-wider text-white/50">Vos infos</div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className="input" />
+          <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom" className="input" />
+          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Prénom" className="input" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="input" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone (facultatif)" className="input sm:col-span-2" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Téléphone (facultatif)" className="input" />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-white/80">
           <input type="checkbox" checked={withCompany} onChange={(e) => setWithCompany(e.target.checked)} className="h-4 w-4 accent-mw-pink" />
@@ -266,7 +327,7 @@ export default function StepRecap({ onConfirm }) {
 
       <button
         onClick={startPayment}
-        disabled={!name || !email || !cgvAccepted || !disclaimersAccepted || sending}
+        disabled={!firstName || !lastName || !email || !cgvAccepted || !disclaimersAccepted || sending}
         className="btn-primary mt-6 w-full md:w-auto"
       >
         {sending ? 'Envoi…' : total === 0 ? 'Confirmer la réservation →' : `Payer ${total.toFixed(2)}€ →`}

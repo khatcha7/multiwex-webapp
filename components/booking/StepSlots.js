@@ -6,6 +6,7 @@ import { getActivity } from '@/lib/activities';
 import { getSlotOccupancy, getSlotBlocks, subscribeBookings } from '@/lib/data';
 import {
   generateSlotsForActivity,
+  dayLabelsFrMondayFirst,
   dayLabelsFr,
   dayLabelsFrFull,
   monthsFr,
@@ -13,7 +14,8 @@ import {
   toDateStr,
   parseDate,
   toMinutes,
-  JOIN_CUTOFF_MIN_ONLINE,
+  dayToMondayIndex,
+  CLOSURE_MIN_ONLINE,
 } from '@/lib/hours';
 
 export default function StepSlots() {
@@ -28,16 +30,18 @@ export default function StepSlots() {
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
-  // Reset tous les slots si la date change
+  // Reset tous les slots si la date change + revenir sur la première activité
   useEffect(() => {
     if (prevDate && cart.date && prevDate !== cart.date) {
       setCart((c) => ({ ...c, slots: {} }));
+      setActiveActivityId(null); // revient à la première activité
     }
     setPrevDate(cart.date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.date]);
 
-  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && (a.bookable || a.selectable));
+  // BattleKart exclu des créneaux (réservation séparée)
+  const bookable = Object.keys(cart.items).map(getActivity).filter((a) => a && (a.bookable || a.selectable) && a.id !== 'battlekart');
   const currentActivityId = activeActivityId || bookable[0]?.id;
   const currentActivity = getActivity(currentActivityId);
   const currentSessions = cart.items[currentActivityId]?.sessions || [];
@@ -266,14 +270,14 @@ export default function StepSlots() {
               const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
               const shared = !privative && playersInSlot > 0 && !full;
 
-              // Cutoff 10 min en ligne pour rejoindre
+              // Fermeture auto 30 min avant le créneau en ligne
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
               if (isToday) {
                 const now = new Date();
                 const nowM = now.getHours() * 60 + now.getMinutes();
                 const slotM = toMinutes(slot.start);
-                if (slotM - nowM < JOIN_CUTOFF_MIN_ONLINE) pastCutoff = true;
+                if (slotM - nowM < CLOSURE_MIN_ONLINE) pastCutoff = true;
               }
 
               // Capacité de cette session spécifique qu'on ajouterait
@@ -291,7 +295,7 @@ export default function StepSlots() {
               if (isAssigned) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
               else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/20 text-white/40';
               else if (full) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
-              else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30';
+              else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/15 text-mw-red';
               else if (shared) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
               else if (pastCutoff) classes = 'cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20';
               else classes = 'border-white/15 bg-white/[0.03] text-white hover:border-mw-pink';
@@ -304,10 +308,10 @@ export default function StepSlots() {
                   className={`relative rounded border py-2.5 text-sm font-bold transition ${classes}`}
                   title={
                     blockedHere ? `Bloqué: ${blockedHere.block_reason || blockedHere.reason || 'staff'}`
-                      : shared ? `Libre : ${playersInSlot}/${totalCap} — ${groupsInSlot} groupe(s) déjà présent(s)`
                       : full ? 'Complet'
-                      : pastCutoff ? 'Trop tard (briefing 10 min)'
-                      : `Libre : ${playersInSlot}/${totalCap}`
+                      : shared ? `Libre ${totalCap - playersInSlot}/${totalCap} — ${groupsInSlot} groupe(s) déjà présent(s)`
+                      : pastCutoff ? 'Fermé (moins de 30 min avant le créneau)'
+                      : `Libre ${totalCap}/${totalCap}`
                   }
                 >
                   {isAssigned && (

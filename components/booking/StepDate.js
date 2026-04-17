@@ -2,13 +2,14 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useBooking } from '@/lib/store';
 import {
-  dayLabelsFr,
+  dayLabelsFrMondayFirst,
   dayLabelsFrFull,
   monthsFr,
   isOpenOn,
   toDateStr,
   parseDate,
   getHoursForDate,
+  dayToMondayIndex,
 } from '@/lib/hours';
 
 export default function StepDate() {
@@ -26,8 +27,10 @@ export default function StepDate() {
   const daysInMonth = lastDay.getDate();
   const isPastMonth = new Date(year, month, 1) < new Date(today.getFullYear(), today.getMonth(), 1);
 
+  // Commence par lundi (dayToMondayIndex convertit getDay 0=dim en 0=lun)
+  const mondayOffset = dayToMondayIndex(startDayOfWeek);
   const cells = [];
-  for (let i = 0; i < startDayOfWeek; i++) cells.push(null);
+  for (let i = 0; i < mondayOffset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(toDateStr(new Date(year, month, d)));
 
   const todayStr = toDateStr(today);
@@ -68,7 +71,7 @@ export default function StepDate() {
           </div>
 
           <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[9px] font-bold uppercase tracking-wider text-white/40">
-            {dayLabelsFr.map((d) => <div key={d}>{d}</div>)}
+            {dayLabelsFrMondayFirst.map((d) => <div key={d}>{d}</div>)}
           </div>
 
           <div className="grid grid-cols-7 gap-0.5">
@@ -91,7 +94,7 @@ export default function StepDate() {
                     active
                       ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
                       : disabled
-                      ? 'cursor-not-allowed border-transparent text-white/20'
+                      ? 'cursor-not-allowed border-transparent text-white/15 opacity-40'
                       : 'border-white/10 hover:border-white/30'
                   }`}
                 >
