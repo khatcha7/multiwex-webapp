@@ -9,38 +9,10 @@ export default function CartDrawer({ open, onClose }) {
   const activityIds = Object.keys(cart.items || {});
   const hasDate = Boolean(cart.date);
 
-  // Vérifie si le panier est "complet" (toutes les sessions ont un slot assigné)
-  const allSlotsAssigned = activityIds.every((id) => {
-    const a = getActivity(id);
-    if (!a || a.id === 'battlekart') return true;
-    const sessions = cart.items[id]?.sessions || [];
-    const slots = cart.slots[id] || [];
-    return slots.filter(Boolean).length === sessions.length;
-  });
-
-  const isComplete = hasDate && activityIds.length > 0 && allSlotsAssigned;
-
-  // Détermine à quelle étape le client s'est arrêté
-  const getCurrentStep = () => {
-    if (!hasDate) return 'date';
-    if (activityIds.length === 0) return 'activities';
-    // Vérifie si les sessions sont complètes (joueurs + rooms)
-    const sessionsOk = activityIds.every((id) => {
-      const a = getActivity(id);
-      if (!a || a.id === 'battlekart') return true;
-      const item = cart.items[id];
-      if (!item?.sessions?.length) return false;
-      return item.sessions.every((s) => {
-        if (s.players < (a?.minPlayers || 1)) return false;
-        if (a.rooms?.length > 0 && !s.roomId) return false;
-        return true;
-      });
-    });
-    if (!sessionsOk) return 'sessions';
-    if (!allSlotsAssigned) return 'slots';
-    return 'recap';
-  };
-  const currentStep = getCurrentStep();
+  // Destination = étape la plus avancée réellement atteinte par le client (mise à jour par markReached
+  // sur clic Continuer). Si cart vide ou reachedStep manquant, fallback 'date'.
+  const reachedStep = cart.reachedStep || 'date';
+  const isFinalized = reachedStep === 'recap' || reachedStep === 'confirm';
 
   if (!open) return null;
 
@@ -121,17 +93,25 @@ export default function CartDrawer({ open, onClose }) {
         </div>
 
         <div className="border-t border-white/10 p-4">
-          {isComplete ? (
-            <Link href={`/booking?step=recap`} onClick={onClose} className="btn-primary w-full text-center block">
-              Finaliser ma commande →
-            </Link>
-          ) : activityIds.length > 0 ? (
-            <Link href={`/booking?step=${currentStep}`} onClick={onClose} className="btn-primary w-full text-center block">
-              Continuer ma réservation →
-            </Link>
-          ) : (
+          {activityIds.length === 0 ? (
             <Link href="/booking" onClick={onClose} className="btn-outline w-full text-center block">
               Commencer une réservation
+            </Link>
+          ) : isFinalized ? (
+            <Link
+              href="/booking?step=recap"
+              onClick={() => { onClose(); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
+              className="btn-primary w-full text-center block"
+            >
+              Finaliser ma commande →
+            </Link>
+          ) : (
+            <Link
+              href={`/booking?step=${reachedStep}`}
+              onClick={() => { onClose(); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
+              className="btn-primary w-full text-center block"
+            >
+              Continuer ma réservation →
             </Link>
           )}
         </div>

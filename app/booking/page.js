@@ -25,7 +25,7 @@ const ALL_STEPS = [
 function BookingInner() {
   const [stepIndex, setStepIndex] = useState(0);
   const topRef = useRef(null);
-  const { cart, hydrated, applyPackage, setDate, clearCart, applyPromoCode } = useBooking();
+  const { cart, hydrated, applyPackage, setDate, clearCart, applyPromoCode, markReached } = useBooking();
   const params = useSearchParams();
   const packageId = params.get('package');
   const upsellFlag = params.get('upsell');
@@ -55,7 +55,9 @@ function BookingInner() {
       const pkg = getPackage(packageId);
       if (pkg && pkg.activities && applyPackage) {
         applyPackage(pkg);
-        setStepIndex(cart.date ? 3 : 0);
+        const startIdx = cart.date ? 3 : 0;
+        setStepIndex(startIdx);
+        markReached(ALL_STEPS[startIdx].id);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +76,7 @@ function BookingInner() {
         applyPromoCode(upsell.code);
         sessionStorage.removeItem('mw_upsell');
         setStepIndex(1); // Étape Activités
+        markReached('activities');
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,14 +121,26 @@ function BookingInner() {
     return true;
   };
 
-  const goNext = () => setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
+  const goNext = () => {
+    const nextIdx = Math.min(STEPS.length - 1, stepIndex + 1);
+    setStepIndex(nextIdx);
+    markReached(STEPS[nextIdx].id);
+  };
   const goPrev = () => setStepIndex((i) => Math.max(0, i - 1));
 
   return (
     <div ref={topRef} className="mx-auto max-w-4xl px-4 py-4 md:py-6">
       <Stepper steps={STEPS} activeIndex={stepIndex} />
       <div className="mt-4 md:mt-6">
-        <StepComponent onNext={goNext} onConfirm={() => setStepIndex(STEPS.length - 1)} onRestart={() => setStepIndex(0)} />
+        <StepComponent
+          onNext={goNext}
+          onConfirm={() => {
+            const confirmIdx = STEPS.length - 1;
+            setStepIndex(confirmIdx);
+            markReached(STEPS[confirmIdx].id);
+          }}
+          onRestart={() => setStepIndex(0)}
+        />
       </div>
       {currentStep.id !== 'confirm' && currentStep.id !== 'recap' && (
         <div className="sticky bottom-3 mt-6 mb-2 flex items-center justify-between gap-3 rounded border border-white/10 bg-black/70 p-2 backdrop-blur-md md:static md:mb-6 md:bg-transparent md:p-0 md:backdrop-blur-0">
