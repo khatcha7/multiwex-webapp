@@ -57,15 +57,14 @@ export default function StepConfirm({ onRestart }) {
 
   return (
     <div className="text-center">
-      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-mw-pink/20 text-5xl shadow-neon-pink">
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-mw-pink/20 text-3xl shadow-neon-pink">
         ✓
       </div>
-      <h1 className="section-title mb-2">Réservation confirmée&nbsp;!</h1>
-      <p className="mb-6 text-white/60">
-        Un email de confirmation a été envoyé à <span className="text-mw-pink">{booking.customer.email}</span>
-        <span className="text-xs text-white/40"> (simulation démo)</span>
+      <h1 className="section-title mb-1">Réservation confirmée&nbsp;!</h1>
+      <p className="mb-3 text-sm text-white/60">
+        Email envoyé à <span className="text-mw-pink">{booking.customer.email}</span>
       </p>
-      <div className="mx-auto max-w-md rounded border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
+      <div className="mx-auto max-w-md rounded border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-4 text-left">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-white/50">Numéro</div>

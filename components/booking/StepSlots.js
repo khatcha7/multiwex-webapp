@@ -125,10 +125,9 @@ export default function StepSlots() {
 
   return (
     <div>
-      <h1 className="section-title mb-2">Créneaux</h1>
-      <p className="mb-6 text-white/60">
-        Sélectionnez un créneau pour chaque session. Numéro de la bulle = numéro du créneau.
-        Les activités peuvent se chevaucher (votre groupe peut se splitter).
+      <h1 className="section-title mb-1">Créneaux</h1>
+      <p className="mb-2 text-sm text-white/60">
+        Sélectionnez un créneau par session. Votre groupe peut se splitter sur plusieurs activités en parallèle.
       </p>
 
       <div className="mb-2 flex items-center justify-between">
@@ -152,7 +151,7 @@ export default function StepSlots() {
         </div>
       </div>
 
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
         {monthDays.map((d) => {
           const dt = parseDate(d);
           const open = isOpenOn(d);
