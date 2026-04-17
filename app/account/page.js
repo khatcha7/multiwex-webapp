@@ -13,8 +13,8 @@ export default function AccountPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [editing, setEditing] = useState(null);
-
   const [giftCards, setGiftCards] = useState([]);
+  const [filter, setFilter] = useState('upcoming');
 
   useEffect(() => {
     if (hydrated && user) {
@@ -50,7 +50,6 @@ export default function AccountPage() {
     );
   }
 
-  const [filter, setFilter] = useState('upcoming'); // 'all', 'past', 'today', 'upcoming'
   const totalSpent = bookings.reduce((s, b) => s + (b.total || 0), 0);
   const displayName = user.firstName ? `${user.firstName}` : user.name?.split(' ')[0] || '';
   const todayStr = new Date().toISOString().split('T')[0];
