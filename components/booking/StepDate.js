@@ -53,9 +53,9 @@ export default function StepDate() {
       <h1 className="section-title mb-2">Quand venez-vous&nbsp;?</h1>
       <p className="mb-6 text-white/60">Choisissez votre date de visite.</p>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-6">
-        {/* Calendrier — étiré */}
-        <div className="flex flex-1 flex-col rounded border border-white/10 bg-mw-surface p-3 md:p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+        {/* Calendrier — 60% largeur */}
+        <div className="flex flex-col rounded border border-white/10 bg-mw-surface p-3 md:flex-[3] md:p-5">
           <div className="mb-3 flex items-center justify-between">
             <button
               onClick={prevMonth}
@@ -108,34 +108,34 @@ export default function StepDate() {
           </div>
         </div>
 
-        {/* Horaires + infos du jour à droite — même hauteur que le calendrier */}
-        <div className="flex flex-1 flex-col">
+        {/* Horaires + infos du jour à droite — 40% largeur, hauteur naturelle compacte */}
+        <div className="md:flex-[2]">
           {cart.date && selectedDate ? (
-            <div className="flex flex-1 flex-col rounded border border-mw-pink/30 bg-mw-pink/5 p-5">
-              <div className="display text-2xl">
+            <div className="rounded border border-mw-pink/30 bg-mw-pink/5 p-4">
+              <div className="display text-xl">
                 {dayLabelsFrFull[selectedDate.getDay()]} {selectedDate.getDate()} {monthsFr[selectedDate.getMonth()]}
               </div>
               {selectedHours ? (
                 <>
-                  <div className="mt-3 text-sm text-white/70">
-                    Ouverture&nbsp;: <span className="display text-xl text-mw-pink">{selectedHours.open} → {selectedHours.close}</span>
+                  <div className="mt-2 text-sm text-white/70">
+                    Ouverture&nbsp;: <span className="display text-lg text-mw-pink">{selectedHours.open} → {selectedHours.close}</span>
                   </div>
                   {selectedDate.getDay() === 3 && (
-                    <div className="mt-3 rounded bg-mw-pink/10 p-2 text-center text-sm font-bold text-mw-pink">
+                    <div className="mt-2 rounded bg-mw-pink/10 p-2 text-center text-sm font-bold text-mw-pink">
                       MERCREDI -50%
                     </div>
                   )}
                 </>
               ) : (
-                <div className="mt-3 text-sm text-mw-red">Fermé ce jour-là</div>
+                <div className="mt-2 text-sm text-mw-red">Fermé ce jour-là</div>
               )}
-              <div className="mt-auto pt-4 text-[11px] text-white/50">
+              <div className="mt-3 text-[11px] text-white/50">
                 Rue des Deux Provinces 1, 6900 Marche-en-Famenne<br />
                 +32 (0)84 770 222
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 items-center justify-center rounded border border-white/10 bg-white/[0.02] p-5 text-center text-sm text-white/50">
+            <div className="rounded border border-white/10 bg-white/[0.02] p-4 text-center text-sm text-white/50">
               ← Sélectionnez une date pour voir les horaires
             </div>
           )}

@@ -164,14 +164,16 @@ export default function StepSessions() {
   }
 
   // Normal mode (pas de formule)
+  const bookableActivityCount = bookable.filter((a) => a.id !== 'battlekart').length;
+  const useGrid = bookableActivityCount >= 2;
   return (
     <div>
       <h1 className="section-title mb-2">Vos joueurs</h1>
-      <p className="mb-6 text-white/60">
+      <p className="mb-4 text-white/60">
         Indiquez combien de joueurs participent à chaque créneau. Vous pouvez splitter votre groupe.
       </p>
 
-      <div className="space-y-3">
+      <div className={useGrid ? 'grid gap-3 md:grid-cols-2' : 'space-y-3'}>
         {bookable.map((a) => {
           if (a.id === 'battlekart') {
             return (

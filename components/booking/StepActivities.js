@@ -90,8 +90,78 @@ export default function StepActivities() {
         </div>
       )}
 
-      {/* Grille d'activités — BattleKart + Starcadium fusionnés en 1 cell pour avoir 8 cards propres */}
+      {/* Grille d'activités — BattleKart + Starcadium fusionnés en position 1 pour avoir 8 cards propres */}
       <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4 ${isFormula ? 'opacity-50 pointer-events-none' : ''}`}>
+        {/* Cell composite : BattleKart + Starcadium — position 1, même style qu'ActivityLogoCard */}
+        {(() => {
+          const bk = activities.find((a) => a.id === 'battlekart');
+          const sk = activities.find((a) => a.id === 'starcadium');
+          if (!bk && !sk) return null;
+          const bkSelected = bk && !!cart.items[bk.id];
+          const bkDisabled = bk && disabledActivities[bk.id]?.disabled;
+          const skDisabled = sk && disabledActivities[sk.id]?.disabled;
+          return (
+            <div
+              className={`relative flex overflow-hidden rounded-2xl border bg-gradient-to-br from-white/[0.06] to-white/[0.01] backdrop-blur-sm transition ${
+                bkSelected ? 'border-mw-pink shadow-neon-pink' : 'border-white/10'
+              }`}
+            >
+              {/* Sous-cell BattleKart */}
+              {bk && (
+                <button
+                  onClick={() => !isFormula && !bkDisabled && toggleActivity(bk.id)}
+                  disabled={bkDisabled}
+                  className={`group relative flex flex-1 flex-col border-r border-white/10 text-left transition hover:-translate-y-0.5 ${
+                    bkDisabled ? 'cursor-not-allowed opacity-40' : ''
+                  }`}
+                >
+                  {/* Image background + overlay */}
+                  <div className="absolute inset-0 opacity-30 transition group-hover:opacity-50">
+                    {bk.image && (
+                      <Image src={bk.image} alt="" fill sizes="(max-width: 640px) 25vw, 16vw" className="object-cover blur-[1px]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
+                  </div>
+                  {bkSelected && (
+                    <div className="absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[10px] font-black text-white shadow-neon-pink">
+                      ✓
+                    </div>
+                  )}
+                  {/* Logo + nom + badge */}
+                  <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
+                    <div className="relative h-10 w-full">
+                      <Image src={bk.logo} alt={bk.name} fill sizes="90px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(255,0,125,0.35))]" />
+                    </div>
+                  </div>
+                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-mw-yellow">
+                    {bkSelected ? '✓ Sélectionné' : '🏁 Résa séparée'}
+                  </div>
+                </button>
+              )}
+              {/* Sous-cell Starcadium */}
+              {sk && (
+                <div className={`relative flex flex-1 flex-col ${skDisabled ? 'opacity-40' : ''}`}>
+                  <div className="absolute inset-0 opacity-30">
+                    {sk.image && (
+                      <Image src={sk.image} alt="" fill sizes="(max-width: 640px) 25vw, 16vw" className="object-cover blur-[1px]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
+                  </div>
+                  <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
+                    <div className="relative h-10 w-full">
+                      <Image src={sk.logo} alt={sk.name} fill sizes="90px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(0,217,255,0.35))]" />
+                    </div>
+                  </div>
+                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-white/70">
+                    Sans réservation
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Activités normales (hors BK/SK) */}
         {activities
           .filter((a) => a.id !== 'battlekart' && a.id !== 'starcadium')
           .map((a) => {
@@ -121,50 +191,6 @@ export default function StepActivities() {
               />
             );
           })}
-
-        {/* Cell composite : BattleKart + Starcadium côte à côte */}
-        {(() => {
-          const bk = activities.find((a) => a.id === 'battlekart');
-          const sk = activities.find((a) => a.id === 'starcadium');
-          if (!bk && !sk) return null;
-          const bkSelected = bk && !!cart.items[bk.id];
-          const bkDisabled = bk && disabledActivities[bk.id]?.disabled;
-          const skDisabled = sk && disabledActivities[sk.id]?.disabled;
-          return (
-            <div className="grid grid-cols-2 overflow-hidden rounded border border-white/10 bg-mw-surface">
-              {bk && (
-                <button
-                  onClick={() => !isFormula && !bkDisabled && toggleActivity(bk.id)}
-                  disabled={bkDisabled}
-                  className={`group flex flex-col items-center justify-center gap-1 border-r border-white/10 p-2 transition ${
-                    bkDisabled
-                      ? 'cursor-not-allowed opacity-40'
-                      : bkSelected
-                      ? 'bg-mw-pink/15'
-                      : 'hover:bg-white/[0.03]'
-                  }`}
-                >
-                  <div className="relative h-10 w-10">
-                    <Image src={bk.logo} alt={bk.name} fill sizes="40px" className="object-contain" />
-                  </div>
-                  <div className="display text-[11px] leading-tight text-white">{bk.name}</div>
-                  <div className={`text-[9px] ${bkSelected ? 'text-mw-pink' : 'text-mw-yellow'}`}>
-                    {bkSelected ? '✓ Sélectionné' : '🏁 Résa séparée'}
-                  </div>
-                </button>
-              )}
-              {sk && (
-                <div className={`flex flex-col items-center justify-center gap-1 p-2 ${skDisabled ? 'opacity-40' : ''}`}>
-                  <div className="relative h-10 w-10">
-                    <Image src={sk.logo} alt={sk.name} fill sizes="40px" className="object-contain" />
-                  </div>
-                  <div className="display text-[11px] leading-tight text-white">{sk.name}</div>
-                  <div className="text-[9px] text-white/50">Sur place uniquement</div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
       </div>
 
       {/* Info sélection figée pour formules */}
