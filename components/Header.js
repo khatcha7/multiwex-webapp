@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useBooking } from '@/lib/store';
+import CartDrawer from '@/components/CartDrawer';
 
 const LANGUAGES = ['FR', 'EN', 'NL', 'DE'];
 
@@ -11,8 +12,10 @@ export default function Header() {
   const itemCount = Object.keys(cart.items || {}).length;
   const [lang, setLang] = useState('FR');
   const [langOpen, setLangOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-mw-bg/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
         <Link href="/booking" className="flex items-center gap-2 shrink-0">
@@ -20,8 +23,8 @@ export default function Header() {
         </Link>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/booking"
+          <button
+            onClick={() => setCartOpen(true)}
             className="relative flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
             aria-label="Panier"
             title="Panier"
@@ -34,7 +37,7 @@ export default function Header() {
                 {itemCount}
               </span>
             )}
-          </Link>
+          </button>
           <Link
             href="/account"
             className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
@@ -91,5 +94,7 @@ export default function Header() {
         </div>
       </div>
     </header>
+    <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+    </>
   );
 }

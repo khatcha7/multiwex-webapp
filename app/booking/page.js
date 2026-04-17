@@ -87,8 +87,15 @@ function BookingInner() {
     if (currentStep.id === 'activities') return bookable.length > 0;
     if (currentStep.id === 'sessions') {
       return bookable.every((a) => {
+        if (a.id === 'battlekart') return true;
         const item = cart.items[a.id];
-        return (item?.sessions || []).length > 0 && item.sessions.every((s) => s.players >= (a.minPlayers || 1));
+        if (!item?.sessions?.length) return false;
+        return item.sessions.every((s) => {
+          if (s.players < (a.minPlayers || 1)) return false;
+          // Si l'activité a des rooms, chaque session doit avoir un roomId choisi
+          if (a.rooms && a.rooms.length > 0 && !s.roomId) return false;
+          return true;
+        });
       });
     }
     if (currentStep.id === 'slots') {

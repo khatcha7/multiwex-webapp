@@ -326,7 +326,7 @@ export default function StepSlots() {
 
               let classes = '';
               if (isAssigned) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
-              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/20 text-white/40';
+              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
               else if (full) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
               else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/15 text-mw-red';
               else if (shared) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
@@ -359,7 +359,10 @@ export default function StepSlots() {
                   {!privative && !shared && !full && !blockedHere && !pastCutoff && (
                     <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{totalCap}</div>
                   )}
-                  {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">{blockedHere ? 'bloqué' : 'complet'}</div>}
+                  {shared && !wouldFit && (
+                    <div className="mt-0.5 text-[8px] font-normal">{totalCap - playersInSlot} place{totalCap - playersInSlot > 1 ? 's' : ''}</div>
+                  )}
+                  {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">complet</div>}
                 </button>
               );
             })}
