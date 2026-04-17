@@ -157,10 +157,74 @@ export default function StaffReportsPage() {
 
     const uniqueCustomers = new Set(inRange.map((b) => b.customer?.email).filter(Boolean)).size;
 
+    // --- PROMO CODES ---
+    const promoCodes = {};
+    inRange.forEach((b) => {
+      const code = b.promoCode || b.promo_code;
+      if (!code) return;
+      if (!promoCodes[code]) promoCodes[code] = { uses: 0, revenue: 0, activities: {} };
+      promoCodes[code].uses += 1;
+      promoCodes[code].revenue += (b.total || 0);
+      (b.items || []).forEach((i) => {
+        const name = i.activityName || i.activity_id || '?';
+        promoCodes[code].activities[name] = (promoCodes[code].activities[name] || 0) + 1;
+      });
+    });
+    const promoList = Object.entries(promoCodes).map(([code, data]) => ({
+      code,
+      uses: data.uses,
+      revenue: data.revenue,
+      avgBasket: data.uses > 0 ? data.revenue / data.uses : 0,
+      topActivity: Object.entries(data.activities).sort((a, b) => b[1] - a[1])[0]?.[0] || '—',
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    // --- LTV / RÉCURRENCE ---
+    const clientMap = {};
+    inRange.forEach((b) => {
+      const email = b.customer?.email;
+      if (!email) return;
+      if (!clientMap[email]) clientMap[email] = { name: b.customer?.name || b.customer?.firstName || email, visits: 0, spent: 0 };
+      clientMap[email].visits += 1;
+      clientMap[email].spent += (b.total || 0);
+    });
+    const clients = Object.values(clientMap).sort((a, b) => b.spent - a.spent);
+    const avgVisits = clients.length > 0 ? clients.reduce((s, c) => s + c.visits, 0) / clients.length : 0;
+    const avgLtv = clients.length > 0 ? clients.reduce((s, c) => s + c.spent, 0) / clients.length : 0;
+    const repeatRate = clients.length > 0 ? (clients.filter((c) => c.visits > 1).length / clients.length) * 100 : 0;
+
+    // --- CONVERSION FUNNEL (fake data for demo) ---
+    const funnelSeed = inRange.length || 1;
+    const funnel = {
+      visits: Math.round(funnelSeed * 8.5),
+      dateSelected: Math.round(funnelSeed * 6.2),
+      activitiesSelected: Math.round(funnelSeed * 4.8),
+      playersSet: Math.round(funnelSeed * 3.9),
+      slotsChosen: Math.round(funnelSeed * 3.2),
+      checkout: Math.round(funnelSeed * 2.1),
+      paid: funnelSeed,
+    };
+
+    // --- DEVICE BREAKDOWN (fake data for demo) ---
+    const devices = {
+      mobile: Math.round(funnelSeed * 0.58),
+      desktop: Math.round(funnelSeed * 0.35),
+      tablet: Math.round(funnelSeed * 0.07),
+    };
+
+    // --- SOURCE (fake data for demo) ---
+    const sources = {
+      direct: Math.round(funnelSeed * 0.32),
+      google: Math.round(funnelSeed * 0.41),
+      social: Math.round(funnelSeed * 0.18),
+      referral: Math.round(funnelSeed * 0.09),
+    };
+
     return {
       revenue, revenueDelta, totalPlayers, playersDelta, count, countDelta,
       avg, avgDelta, topActivities, occupancyRate, uniqueCustomers,
       inRange, daysInRange,
+      promoList, clients, avgVisits, avgLtv, repeatRate,
+      funnel, devices, sources,
     };
   }, [bookings, preset, customFrom, customTo]);
 
@@ -293,6 +357,174 @@ export default function StaffReportsPage() {
           {stats.topActivities.length === 0 && (
             <div className="py-6 text-center text-white/40">Aucune donnée sur cette période.</div>
           )}
+        </div>
+      </div>
+
+      {/* CONVERSION FUNNEL */}
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-4 text-2xl">Tunnel de conversion</h2>
+        <div className="space-y-2">
+          {[
+            ['Visites page', stats.funnel.visits],
+            ['Date sélectionnée', stats.funnel.dateSelected],
+            ['Activités choisies', stats.funnel.activitiesSelected],
+            ['Joueurs configurés', stats.funnel.playersSet],
+            ['Créneaux choisis', stats.funnel.slotsChosen],
+            ['Checkout (récap)', stats.funnel.checkout],
+            ['Paiement effectué', stats.funnel.paid],
+          ].map(([label, val], idx, arr) => {
+            const pct = arr[0][1] > 0 ? (val / arr[0][1] * 100) : 0;
+            const dropFromPrev = idx > 0 && arr[idx - 1][1] > 0 ? ((1 - val / arr[idx - 1][1]) * 100) : 0;
+            return (
+              <div key={label} className="flex items-center gap-3">
+                <div className="w-40 text-xs text-white/70 shrink-0">{label}</div>
+                <div className="flex-1">
+                  <div className="h-6 rounded bg-white/10 overflow-hidden">
+                    <div className="h-full rounded bg-gradient-to-r from-mw-pink to-mw-pink/60 flex items-center px-2 text-[10px] font-bold text-white" style={{ width: `${Math.max(pct, 5)}%` }}>
+                      {val}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-12 text-right text-xs text-white/60">{pct.toFixed(0)}%</div>
+                {idx > 0 && dropFromPrev > 0 && (
+                  <div className="w-16 text-right text-[10px] text-red-400">-{dropFromPrev.toFixed(0)}%</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Taux de conversion</div>
+            <div className="display text-2xl text-mw-pink">{stats.funnel.visits > 0 ? (stats.funnel.paid / stats.funnel.visits * 100).toFixed(1) : 0}%</div>
+          </div>
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Abandon moyen</div>
+            <div className="display text-2xl text-red-400">{stats.funnel.visits > 0 ? ((1 - stats.funnel.paid / stats.funnel.visits) * 100).toFixed(0) : 0}%</div>
+          </div>
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Panier moyen abandonné</div>
+            <div className="display text-2xl text-white">{stats.avg > 0 ? (stats.avg * 1.2).toFixed(0) : 0}€</div>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] text-white/30">Données de démonstration — en prod, tracking réel via événements.</p>
+      </div>
+
+      {/* CODES PROMOS */}
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-4 text-2xl">Codes promos</h2>
+        {stats.promoList.length === 0 ? (
+          <div className="py-6 text-center text-white/40">Aucun code promo utilisé sur cette période.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-white/50">
+                <tr>
+                  <th className="py-2 text-left">Code</th>
+                  <th className="py-2 text-right">Utilisations</th>
+                  <th className="py-2 text-right">CA généré</th>
+                  <th className="py-2 text-right">Panier moyen</th>
+                  <th className="py-2 text-left">Top activité</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.promoList.map((p) => (
+                  <tr key={p.code} className="border-b border-white/5">
+                    <td className="py-2 font-mono text-mw-pink">{p.code}</td>
+                    <td className="py-2 text-right">{p.uses}</td>
+                    <td className="py-2 text-right font-bold">{p.revenue.toFixed(0)}€</td>
+                    <td className="py-2 text-right">{p.avgBasket.toFixed(0)}€</td>
+                    <td className="py-2 text-white/60">{p.topActivity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* LTV / RÉCURRENCE */}
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-4 text-2xl">Clients & récurrence</h2>
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Clients uniques</div>
+            <div className="display text-2xl text-mw-pink">{stats.uniqueCustomers}</div>
+          </div>
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Visites moy. / client</div>
+            <div className="display text-2xl text-white">{stats.avgVisits.toFixed(1)}</div>
+          </div>
+          <div className="rounded bg-white/[0.02] p-3 text-center">
+            <div className="text-[10px] uppercase text-white/50">Taux de récurrence</div>
+            <div className="display text-2xl text-green-400">{stats.repeatRate.toFixed(0)}%</div>
+          </div>
+        </div>
+        <div className="mb-2 text-xs text-white/50">LTV moyenne : <span className="display text-mw-pink">{stats.avgLtv.toFixed(0)}€</span> par client</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="border-b border-white/10 text-[10px] uppercase tracking-wider text-white/50">
+              <tr>
+                <th className="py-2 text-left">Client</th>
+                <th className="py-2 text-right">Visites</th>
+                <th className="py-2 text-right">Total dépensé</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.clients.slice(0, 10).map((c, i) => (
+                <tr key={i} className="border-b border-white/5">
+                  <td className="py-1.5">{c.name}</td>
+                  <td className="py-1.5 text-right">{c.visits}</td>
+                  <td className="py-1.5 text-right font-bold text-mw-pink">{c.spent.toFixed(0)}€</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* DEVICE & SOURCE */}
+      <div className="mb-6 grid gap-6 md:grid-cols-2">
+        <div className="rounded border border-white/10 bg-mw-surface p-5">
+          <h2 className="display mb-4 text-xl">Appareils</h2>
+          {Object.entries(stats.devices).map(([device, count]) => {
+            const total = Object.values(stats.devices).reduce((s, v) => s + v, 0) || 1;
+            const pct = (count / total) * 100;
+            const labels = { mobile: 'Mobile', desktop: 'Desktop', tablet: 'Tablette' };
+            return (
+              <div key={device} className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-white/70">{labels[device] || device}</span>
+                  <span className="text-mw-pink">{pct.toFixed(0)}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-mw-pink" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          <p className="mt-2 text-[10px] text-white/30">Données de démonstration.</p>
+        </div>
+
+        <div className="rounded border border-white/10 bg-mw-surface p-5">
+          <h2 className="display mb-4 text-xl">Sources de trafic</h2>
+          {Object.entries(stats.sources).map(([source, count]) => {
+            const total = Object.values(stats.sources).reduce((s, v) => s + v, 0) || 1;
+            const pct = (count / total) * 100;
+            const labels = { direct: 'Direct', google: 'Google / SEO', social: 'Réseaux sociaux', referral: 'Recommandation' };
+            return (
+              <div key={source} className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-white/70">{labels[source] || source}</span>
+                  <span className="text-mw-pink">{pct.toFixed(0)}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-mw-pink to-[#7b00e0]" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          <p className="mt-2 text-[10px] text-white/30">Données de démonstration.</p>
         </div>
       </div>
     </div>
