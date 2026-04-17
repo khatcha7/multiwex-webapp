@@ -45,7 +45,7 @@ export default function Marquee() {
   const items = Array.from({ length: 12 }).map((_, i) => phrase).join('');
 
   return (
-    <div className="relative z-20 overflow-hidden" style={{ transform: 'rotate(-1.5deg)', marginTop: '-4px', marginBottom: '-4px' }}>
+    <div className="relative z-20 overflow-hidden" style={{ transform: 'rotate(0deg)', marginTop: '-4px', marginBottom: '-4px' }}>
       <div
         className="flex items-center whitespace-nowrap py-2 font-display uppercase text-sm tracking-wider text-white"
         style={{
