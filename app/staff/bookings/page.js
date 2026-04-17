@@ -1,12 +1,15 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { listBookings, subscribeBookings } from '@/lib/data';
 import { toDateStr } from '@/lib/hours';
 
 export default function StaffBookingsPage() {
+  const router = useRouter();
   const [all, setAll] = useState([]);
   const [q, setQ] = useState('');
   const [tick, setTick] = useState(0);
+  const [sourceFilter, setSourceFilter] = useState('all'); // all, online, on_site
 
   useEffect(() => {
     listBookings().then(setAll);
@@ -18,11 +21,16 @@ export default function StaffBookingsPage() {
   }, []);
 
   const filtered = all.filter((b) => {
+    // Source filter
+    if (sourceFilter === 'online' && b.source === 'on_site') return false;
+    if (sourceFilter === 'on_site' && b.source !== 'on_site') return false;
     if (!q) return true;
     const low = q.toLowerCase();
     return (
       (b.id || b.reference || '').toLowerCase().includes(low) ||
       (b.customer?.name || '').toLowerCase().includes(low) ||
+      (b.customer?.firstName || '').toLowerCase().includes(low) ||
+      (b.customer?.lastName || '').toLowerCase().includes(low) ||
       (b.customer?.email || '').toLowerCase().includes(low) ||
       (b.date || '').includes(low)
     );
@@ -30,20 +38,28 @@ export default function StaffBookingsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="section-title">Réservations</h1>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher ID, client, email, date…"
-          className="input max-w-sm"
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            {[['all', 'Tout'], ['online', '💻 En ligne'], ['on_site', '🏢 Sur place']].map(([v, l]) => (
+              <button key={v} onClick={() => setSourceFilter(v)} className={`display rounded px-3 py-1 text-xs ${sourceFilter === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+            ))}
+          </div>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher ID, nom, email…"
+            className="input !py-2 max-w-xs text-sm"
+          />
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02]">
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/50">
             <tr>
+              <th className="px-2 py-3 text-center w-8">📅</th>
               <th className="px-3 py-3 text-left">ID</th>
               <th className="px-3 py-3 text-left">Client</th>
               <th className="px-3 py-3 text-left">Date</th>
@@ -51,13 +67,27 @@ export default function StaffBookingsPage() {
               <th className="px-3 py-3 text-center">Joueurs</th>
               <th className="px-3 py-3 text-right">Total</th>
               <th className="px-3 py-3 text-center">Formule</th>
+              <th className="px-3 py-3 text-center">Paiement</th>
               <th className="px-3 py-3 text-center">Source</th>
               <th className="px-3 py-3 text-center">Statut</th>
+              <th className="px-3 py-3 text-center">+</th>
             </tr>
           </thead>
           <tbody>
             {filtered.slice(0, 100).map((b) => (
               <tr key={b.id || b.reference} className="border-b border-white/5 hover:bg-white/[0.02]">
+                <td className="px-2 py-2 text-center">
+                  <button
+                    onClick={() => {
+                      sessionStorage.setItem('mw_calendar_highlight', JSON.stringify({ bookingId: b.id || b.reference, date: b.date }));
+                      router.push(`/staff/calendar?date=${b.date}&highlight=${b.id || b.reference}`);
+                    }}
+                    className="text-white/50 hover:text-mw-pink"
+                    title="Voir dans le calendrier"
+                  >
+                    📅
+                  </button>
+                </td>
                 <td className="px-3 py-2 font-mono text-xs text-mw-pink">{b.id || b.reference}</td>
                 <td className="px-3 py-2">
                   <div className="display">{b.customer?.name || '—'}</div>
@@ -76,15 +106,26 @@ export default function StaffBookingsPage() {
                     <span className="text-white/30">—</span>
                   )}
                 </td>
+                <td className="px-3 py-2 text-center text-[10px] text-white/60">
+                  {b.paymentMethod === 'on_site_card' ? '💳 Carte' :
+                   b.paymentMethod === 'on_site_cash' ? '💵 Cash' :
+                   b.paymentMethod === 'card' ? '💳 CB' :
+                   b.paymentMethod === 'bancontact' ? '🇧🇪 Banc.' :
+                   b.paymentMethod === 'giftcard' ? '🎁 Cadeau' :
+                   b.paymentMethod === 'free' ? '🏷️ Promo' : '—'}
+                </td>
                 <td className="px-3 py-2 text-center">
                   <span className={`chip ${b.source === 'on_site' ? 'chip-yellow' : ''}`}>
-                    {b.source === 'on_site' ? '🏢 Sur place' : '💻 En ligne'}
+                    {b.source === 'on_site' ? `🏢 ${b.staffName || 'Staff'}` : '💻 En ligne'}
                   </span>
                 </td>
                 <td className="px-3 py-2 text-center">
                   <span className={`chip ${b.paid ? 'chip-pink' : 'chip-red'}`}>
                     {b.paid ? '✓ Payé' : 'Impayé'}
                   </span>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <button className="text-xs text-mw-pink hover:underline" title="Ajouter des joueurs">+</button>
                 </td>
               </tr>
             ))}
