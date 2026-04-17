@@ -38,13 +38,26 @@ function hashRoom(id) {
   return ['k7-record', 'k7-studio', 'k7-dancefloor'][h % 3];
 }
 
+function loadPref(key, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  try { const v = localStorage.getItem(`mw_cal_${key}`); return v !== null ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function savePref(key, value) {
+  if (typeof window !== 'undefined') localStorage.setItem(`mw_cal_${key}`, JSON.stringify(value));
+}
+
 export default function StaffCalendarPage() {
   const [date, setDate] = useState(toDateStr(new Date()));
-  const [view, setView] = useState('day');
-  const [dayLayout, setDayLayout] = useState('transposed'); // 'classic' or 'transposed'
-  const [zoom, setZoom] = useState('normal');
-  const [pxTime, setPxTime] = useState(64);   // px par heure (axe temps)
-  const [pxActivity, setPxActivity] = useState(160); // px par activité (axe activités)
+  const [view, _setView] = useState(() => loadPref('view', 'day'));
+  const setView = (v) => { _setView(v); savePref('view', v); };
+  const [dayLayout, _setDayLayout] = useState(() => loadPref('layout', 'transposed'));
+  const setDayLayout = (v) => { _setDayLayout(v); savePref('layout', v); };
+  const [zoom, _setZoom] = useState(() => loadPref('zoom', 'normal'));
+  const setZoom = (v) => { _setZoom(v); savePref('zoom', v); };
+  const [pxTime, _setPxTime] = useState(() => loadPref('pxTime', 64));
+  const setPxTime = (v) => { _setPxTime(v); savePref('pxTime', v); };
+  const [pxActivity, _setPxActivity] = useState(() => loadPref('pxActivity', 160));
+  const setPxActivity = (v) => { _setPxActivity(v); savePref('pxActivity', v); };
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
   const [k7Open, setK7Open] = useState(false);
   const [bookings, setBookings] = useState([]);
