@@ -102,13 +102,17 @@ export default function AccountPage() {
           {filteredBookings.slice().reverse().map((b) => {
             const isFormula = Boolean(b.packageId);
             const pkg = isFormula ? getPackage(b.packageId) : null;
+            const isPast = b.date < todayStr;
+            const isToday = b.date === todayStr;
             return (
-              <div key={b.id || b.reference} className={`rounded border p-4 ${isFormula ? 'border-mw-pink/40 bg-gradient-to-r from-mw-pink/5 to-mw-surface' : 'border-white/10 bg-mw-surface'}`}>
+              <div key={b.id || b.reference} className={`rounded border p-4 transition ${isPast ? 'opacity-50' : ''} ${isFormula ? 'border-mw-pink/40 bg-gradient-to-r from-mw-pink/5 to-mw-surface' : 'border-white/10 bg-mw-surface'}`}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="font-mono text-sm text-mw-pink">{b.id || b.reference}</div>
                       {isFormula && pkg && <span className="chip chip-pink text-[10px]">{pkg.name}</span>}
+                      {isPast && <span className="chip text-[10px] text-white/40">Passée</span>}
+                      {isToday && <span className="chip chip-pink text-[10px]">Aujourd'hui</span>}
                     </div>
                     <div className="display text-lg">
                       {new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -120,12 +124,12 @@ export default function AccountPage() {
                   </div>
                   <div className="text-right">
                     <span className={`chip ${b.paid ? 'chip-pink' : 'chip-red'}`}>{b.paid ? '✓ Payé' : 'Impayé'}</span>
-                    {canModify(b) && (
+                    {!isPast && canModify(b) && (
                       <button onClick={() => setEditing(b)} className="mt-2 block btn-outline !py-1.5 !px-3 text-xs">
                         + Joueurs
                       </button>
                     )}
-                    {!canModify(b) && (
+                    {!isPast && !canModify(b) && (
                       <div className="mt-2 text-[10px] text-white/40">Modif. fermée (&lt;24h)</div>
                     )}
                   </div>
@@ -141,11 +145,42 @@ export default function AccountPage() {
                           </div>
                         )}
                         <div className="display flex-1 truncate">{i.activityName || act?.name}</div>
-                        <div className="text-white/50">{i.players || '?'}j</div>
+                        <div className="text-white/50">{i.players || '?'} joueurs</div>
                         <div className="font-mono text-mw-pink">{i.start || i.slot_start}</div>
                       </div>
                     );
                   })}
+                </div>
+                {/* Boutons PDF + Partager */}
+                <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3">
+                  <button
+                    onClick={() => {
+                      const w = window.open('', '_blank');
+                      const items = (b.items || []).map((i) => `<tr><td style="padding:6px;border-bottom:1px solid #222;">${i.activityName || ''}</td><td style="padding:6px;border-bottom:1px solid #222;">${i.start || ''}</td><td style="padding:6px;border-bottom:1px solid #222;">${i.players || '?'} joueurs</td></tr>`).join('');
+                      w.document.write(`<!doctype html><html><head><title>Réservation ${b.id}</title><style>body{font-family:sans-serif;background:#fff;color:#000;padding:40px;max-width:600px;margin:0 auto}h1{color:#e8005a}table{width:100%;border-collapse:collapse}td{text-align:left}</style></head><body><h1>MULTIWEX</h1><h2>Réservation ${b.id || b.reference}</h2><p>${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p><p>${b.players || 0} joueurs · ${(b.total || 0).toFixed(2)}€</p><table>${items}</table><p style="margin-top:20px;font-size:12px;color:#888;">Multiwex · Rue des Deux Provinces 1, 6900 Marche-en-Famenne · +32 (0)84 770 222</p></body></html>`);
+                      w.document.close();
+                      w.print();
+                    }}
+                    className="flex items-center gap-1 text-xs text-white/50 hover:text-mw-pink"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      const text = `Réservation Multiwex ${b.id || b.reference}\n${new Date(b.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}\n${(b.items || []).map((i) => `${i.activityName} à ${i.start} (${i.players}j)`).join('\n')}\nTotal : ${(b.total || 0).toFixed(2)}€`;
+                      if (navigator.share) {
+                        navigator.share({ title: `Réservation Multiwex ${b.id}`, text });
+                      } else {
+                        navigator.clipboard.writeText(text);
+                        alert('Résumé copié dans le presse-papiers !');
+                      }
+                    }}
+                    className="flex items-center gap-1 text-xs text-white/50 hover:text-mw-pink"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    Partager
+                  </button>
                 </div>
               </div>
             );
