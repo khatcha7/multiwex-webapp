@@ -185,10 +185,10 @@ export default function StaffCalendarPage() {
   };
 
   // Block batch
-  const blockBatch = async (reason, note, label) => {
+  const blockBatch = async (reason, note, label, blockedSeats = 0) => {
     const bid = 'batch-' + Date.now();
     for (const s of multiSel) {
-      await blockSlot({ activityId: s.actDef.id, laneId: s.laneId, date, start: s.slot.start, end: s.slot.end, reason, note, label, batchId: bid });
+      await blockSlot({ activityId: s.actDef.id, laneId: s.laneId, date, start: s.slot.start, end: s.slot.end, reason, note, label, batchId: bid, blockedSeats });
     }
     await logAudit({ action: 'block_batch', entityType: 'slots', entityId: bid, notes: `${multiSel.length} slots — ${label || reason}` });
     setMultiSel([]); setSelAnchor(null); setSelected(null); setTick((t) => t + 1);
@@ -510,6 +510,8 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   if (isSel) cls += ' cal-slot-selected';
                   if (isHighlight) cls += ' cal-slot-highlight';
 
+                  const slotInOpen = openM >= 0 && slotM >= openM && slotM < closeM;
+
                   return (
                     <button
                       key={slot.start}
@@ -518,7 +520,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                       onMouseEnter={() => onHoverEnter(lane.laneId, lane, slot)}
                       onMouseLeave={onHoverLeave}
                       className={`absolute left-0.5 right-0.5 flex flex-col items-start justify-between overflow-hidden rounded border px-1 py-0.5 text-left transition ${cls}`}
-                      style={{ top: `${top}px`, height: `${height}px` }}
+                      style={{ top: `${top}px`, height: `${height}px`, opacity: slotInOpen ? 1 : 0.5 }}
                     >
                       <div className="flex w-full items-center justify-between">
                         <span className="cal-time display">{slot.start}</span>
@@ -565,23 +567,56 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [label, setLabel] = useState('');
+  const [blockedSeats, setBlockedSeats] = useState(0);
+  const [shiftMin, setShiftMin] = useState(5);
+  const [shiftMode, setShiftMode] = useState('single'); // 'single' or 'line'
   const isBatch = Boolean(slot.batch);
   const existingBlock = slot.block;
+  const maxPlayers = slot.activity?.maxPlayers || 12;
+
+  // Alerte si des joueurs sont déjà réservés sur les créneaux sélectionnés
+  const hasExistingBookings = isBatch
+    ? slot.batch.some((s) => s.slot?.players > 0 || (s.actDef?.items || []).length > 0)
+    : (slot.items || []).length > 0;
+  const existingPlayers = !isBatch && slot.items ? slot.items.reduce((s, i) => s + (i.players || 0), 0) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded border-2 border-mw-pink bg-mw-surface p-5">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded border-2 border-mw-pink bg-mw-surface p-5">
         <div className="mb-4 flex items-start justify-between">
-          <div className="display text-2xl">{isBatch ? `${slot.batch.length} créneaux` : 'Créneau'}</div>
+          <div>
+            <div className="display text-2xl">{isBatch ? `${slot.batch.length} créneaux` : slot.activity?.name || 'Créneau'}</div>
+            {!isBatch && <div className="text-xs text-white/60">{slot.start} → {slot.end}</div>}
+          </div>
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-mw-pink">✕</button>
         </div>
+
+        {/* Alerte si réservations existantes */}
+        {hasExistingBookings && (
+          <div className="mb-4 rounded border border-mw-yellow/50 bg-mw-yellow/10 p-3 text-xs text-mw-yellow">
+            ⚠ Attention : {isBatch ? 'certains créneaux ont' : 'ce créneau a'} déjà des réservations ({existingPlayers} joueurs). Le blocage n'annulera pas les réservations existantes.
+          </div>
+        )}
+
+        {/* Infos réservations existantes */}
+        {!isBatch && slot.items && slot.items.length > 0 && (
+          <div className="mb-4 rounded border border-white/10 bg-white/[0.02] p-3">
+            <div className="mb-1 text-[10px] uppercase text-white/50">Réservations sur ce créneau</div>
+            {slot.items.map((it, idx) => (
+              <div key={idx} className="text-xs text-white/70">
+                {it.booking?.customer?.name || it.booking?.customer?.firstName || 'Client'} — {it.players} joueurs — {it.booking?.id || it.booking?.reference}
+              </div>
+            ))}
+          </div>
+        )}
 
         {!isBatch && existingBlock ? (
           <div className="space-y-3">
             <div className="rounded border border-[#CC003C] bg-[#CC003C]/20 p-4">
               <div className="display mb-1 text-[#CC003C]">🔒 Bloqué</div>
+              {existingBlock.blockedSeats > 0 && <div className="text-xs text-white/60">{existingBlock.blockedSeats} places bloquées</div>}
               <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label visible" className="input mt-2 text-sm" />
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note" className="input mt-2 text-sm resize-none" />
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Notes (multi-lignes)" className="input mt-2 text-sm resize-none" style={{ whiteSpace: 'pre-wrap' }} />
               <div className="mt-3 flex gap-2">
                 <button onClick={() => onUpdateLabel(existingBlock, label, note)} className="btn-outline flex-1 !py-2 text-xs">Mettre à jour</button>
                 <button onClick={() => onUnblock(existingBlock)} className="btn-outline flex-1 !py-2 text-xs text-mw-red">Débloquer</button>
@@ -599,8 +634,55 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
               <option value="private">Privatisation</option>
               <option value="other">Autre</option>
             </select>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note détaillée" className="input mb-2 text-sm resize-none" />
-            <button onClick={() => onBlock(reason, note, label)} disabled={!reason || !label} className="btn-primary w-full !py-3 text-sm">Confirmer</button>
+            <div className="mb-2">
+              <label className="mb-1 block text-[10px] uppercase text-white/50">Places à bloquer (0 = créneau complet)</label>
+              <div className="flex items-center gap-2">
+                <input type="range" min="0" max={maxPlayers} value={blockedSeats} onChange={(e) => setBlockedSeats(Number(e.target.value))} className="flex-1 accent-mw-pink" />
+                <span className="w-10 text-center display text-mw-pink">{blockedSeats === 0 ? 'Tout' : blockedSeats}</span>
+              </div>
+            </div>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Notes détaillées (multi-lignes supportées)" className="input mb-2 text-sm resize-none" />
+            <button onClick={() => onBlock(reason, note, label, blockedSeats)} disabled={!reason || !label} className="btn-primary w-full !py-3 text-sm">Confirmer le blocage</button>
+          </div>
+        )}
+
+        {/* Décalage de créneau */}
+        {!isBatch && !existingBlock && (
+          <div className="mt-4 rounded border border-white/10 bg-white/[0.02] p-4">
+            <div className="display mb-2 text-sm text-white/70">Décaler ce créneau</div>
+            <div className="mb-2 flex items-center gap-2">
+              <select value={shiftMode} onChange={(e) => setShiftMode(e.target.value)} className="input !py-1 !w-auto text-xs">
+                <option value="single">Ce créneau seul</option>
+                <option value="line">Toute la ligne (après ce créneau)</option>
+              </select>
+              <div className="flex items-center gap-1">
+                {[-30, -15, -10, -5, 5, 10, 15, 30].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
+                        const key = `${slot.activityId}-${slot.date}`;
+                        if (!shifts[key]) shifts[key] = {};
+                        if (shiftMode === 'line') {
+                          // Décale tous les créneaux à partir de celui-ci
+                          shifts[key]._lineShift = (shifts[key]._lineShift || 0) + m;
+                          shifts[key]._lineFrom = slot.start;
+                        } else {
+                          shifts[key][slot.start] = (shifts[key][slot.start] || 0) + m;
+                        }
+                        localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
+                        alert(`Créneau décalé de ${m > 0 ? '+' : ''}${m} min (${shiftMode === 'line' ? 'toute la ligne' : 'ce créneau'}). Rechargez pour voir le changement.`);
+                      }
+                    }}
+                    className={`rounded border px-2 py-1 text-xs ${m > 0 ? 'border-green-500/40 text-green-400' : 'border-mw-red/40 text-mw-red'} hover:bg-white/10`}
+                  >
+                    {m > 0 ? '+' : ''}{m}'
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[10px] text-white/40">En prod, le décalage se synchronise avec le site en ligne via Supabase.</p>
           </div>
         )}
       </div>
