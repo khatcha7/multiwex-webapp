@@ -243,26 +243,14 @@ export default function TransposedDayView({
     return (
       <button
         key={`${lane.laneId}-${slot.start}`}
-        className={classes}
+        className={`${classes} flex flex-col items-center justify-center overflow-hidden rounded border px-0.5 py-0.5`}
         style={{
           position: 'absolute',
           left,
           top: rowTop,
           width: Math.max(width - 1, 2),
           height: rowHeight - 1,
-          border: '1px solid #000',
-          cursor: 'pointer',
           opacity: isOutside ? 0.5 : 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1px 2px',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-          fontSize: 12,
-          color: statusCls === 'cal-slot-full' || statusCls === 'cal-slot-blocked' ? '#fff' : '#000',
-          lineHeight: 1.2,
           zIndex: isSelected ? 5 : 1,
         }}
         onClick={(e) => onClick?.(lane.laneId, lane, slot, e)}
@@ -275,17 +263,13 @@ export default function TransposedDayView({
         title={`${lane.name} — ${slot.start}-${slot.end}`}
       >
         {isBlocked ? (
-          <span style={{ fontWeight: 700, fontSize: 12, textAlign: 'center', color: 'inherit' }}>
+          <span className="cal-time font-bold text-center">
             {blockLabel || 'Bloqué'}
           </span>
         ) : (
           <>
-            <span className="cal-time" style={{ fontSize: 12, color: 'inherit' }}>
-              {slot.start}
-            </span>
-            <span className="cal-players" style={{ fontSize: 12, color: 'inherit' }}>
-              {players}/{lane.maxPlayers || '?'}
-            </span>
+            <span className="cal-time display">{slot.start}</span>
+            <span className="cal-players">{players}/{lane.maxPlayers || '?'}</span>
           </>
         )}
       </button>
@@ -317,16 +301,13 @@ export default function TransposedDayView({
       return (
         <div
           key={`batch-${lane.laneId}-${bl.batchId}`}
-          className="cal-slot-blocked"
+          className="cal-slot-blocked flex items-center rounded border-2 border-[#CC003C] overflow-hidden px-1"
           style={{
             position: 'absolute',
             left,
             top: rowTop,
             width: Math.max(width - 1, 2),
             height: rowHeight - 1,
-            border: '2px solid #CC003C',
-            display: 'flex',
-            alignItems: 'center',
             justifyContent: 'center',
             zIndex: 4,
             pointerEvents: 'none',
@@ -398,14 +379,14 @@ export default function TransposedDayView({
                     left: i * pxPerHour,
                     width: pxPerHour,
                     height: 28,
-                    border: '1px solid #000',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderBottom: '2px solid #000',
-                    background: isOpen ? '#f8f8f8' : '#e0e0e0',
-                    opacity: isOpen ? 1 : 0.5,
+                    background: isOpen ? '#111111' : '#0a0a0a',
+                    opacity: isOpen ? 1 : 0.4,
                     cursor: 'pointer',
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 600,
-                    color: '#000',
+                    color: isOpen ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -431,8 +412,8 @@ export default function TransposedDayView({
             flexShrink: 0,
             overflowY: 'hidden',
             position: 'relative',
-            borderRight: '2px solid #000',
-            background: '#fff',
+            borderRight: '2px solid rgba(255,255,255,0.1)',
+            background: '#080808',
             zIndex: 10,
           }}
           ref={sidebarRef}
@@ -449,7 +430,7 @@ export default function TransposedDayView({
                       top: rowTop,
                       height: rowHeight,
                       width: '100%',
-                      borderBottom: '1px solid #000',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
@@ -469,11 +450,11 @@ export default function TransposedDayView({
                             alignItems: 'center',
                             gap: 6,
                             padding: '0 6px',
-                            borderBottom: si < 2 ? '1px solid #999' : 'none',
-                            background: si % 2 === 0 ? '#faf5ff' : '#f5f0ff',
+                            borderBottom: si < 2 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                            background: si % 2 === 0 ? '#111111' : '#0f0f0f',
                             fontSize: 12,
                             fontWeight: 500,
-                            color: '#000',
+                            color: '#fff',
                           }}
                         >
                           {firstK7.logo && (
@@ -499,7 +480,7 @@ export default function TransposedDayView({
                           alignItems: 'center',
                           gap: 6,
                           padding: '0 6px',
-                          background: '#faf5ff',
+                          background: '#111111',
                         }}
                       >
                         {firstK7.logo && (
@@ -535,12 +516,13 @@ export default function TransposedDayView({
                     top: rowTop,
                     height: rowHeight,
                     width: '100%',
-                    borderBottom: '1px solid #000',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
                     padding: '0 6px',
-                    background: idx % 2 === 0 ? '#fff' : '#f9f9f9',
+                    background: '#111111',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
                     overflow: 'hidden',
                   }}
                 >
@@ -548,23 +530,23 @@ export default function TransposedDayView({
                     <Image
                       src={lane.logo}
                       alt=""
-                      width={28}
-                      height={28}
-                      style={{ borderRadius: 4, flexShrink: 0 }}
+                      width={24}
+                      height={24}
+                      style={{ flexShrink: 0, objectFit: 'contain' }}
                     />
                   )}
                   <span
+                    className="display"
                     style={{
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: '#000',
+                      fontSize: 12,
+                      color: '#fff',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                     }}
                     title={lane.name}
                   >
-                    {lane.name || lane.laneLabel || lane.laneId}
+                    {lane.laneLabel || lane.name || lane.laneId}
                   </span>
                 </div>
               );
@@ -593,8 +575,8 @@ export default function TransposedDayView({
                   top: rowTop,
                   width: totalWidth,
                   height: rowHeight,
-                  borderBottom: '1px solid #000',
-                  background: idx % 2 === 0 ? '#fff' : '#f9f9f9',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  background: '#111111',
                   boxSizing: 'border-box',
                 }}
               />
@@ -610,7 +592,7 @@ export default function TransposedDayView({
                   top: 0,
                   width: 1,
                   height: gridHeight,
-                  background: i * 60 === openMin || i * 60 === closeMin ? '#000' : '#ddd',
+                  background: i * 60 === openMin || i * 60 === closeMin ? 'rgba(232,0,90,0.3)' : 'rgba(255,255,255,0.05)',
                   zIndex: 0,
                 }}
               />
@@ -624,7 +606,7 @@ export default function TransposedDayView({
                 top: 0,
                 width: ((closeMin - openMin) / 60) * pxPerHour,
                 height: gridHeight,
-                background: 'rgba(200, 240, 200, 0.12)',
+                background: 'rgba(157, 255, 255, 0.08)',
                 zIndex: 0,
                 pointerEvents: 'none',
               }}
@@ -696,7 +678,7 @@ export default function TransposedDayView({
                           top: rowTop + si * miniH,
                           width: Math.max(width - 1, 2),
                           height: Math.max(miniH - 1, 8),
-                          border: '1px solid #000',
+                          border: '1px solid rgba(255,255,255,0.1)',
                           cursor: 'pointer',
                           opacity: isOutside ? 0.5 : 1,
                           fontSize: 10,
