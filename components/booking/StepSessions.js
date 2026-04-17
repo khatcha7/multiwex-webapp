@@ -6,8 +6,13 @@ import { getActivity } from '@/lib/activities';
 import { getPackage } from '@/lib/packages';
 import { getRestrictions } from '@/lib/restrictions';
 
+function getRoomForSession(activity, sess) {
+  if (!activity.rooms || !sess.roomId) return null;
+  return activity.rooms.find((r) => r.id === sess.roomId) || null;
+}
+
 export default function StepSessions() {
-  const { cart, setSessionPlayers, setSessionCount } = useBooking();
+  const { cart, setSessionPlayers, setSessionCount, setSessionRoom } = useBooking();
   const activityIds = Object.keys(cart.items);
   const bookable = activityIds.map(getActivity).filter((a) => a && (a.bookable || a.selectable));
   const isFormula = Boolean(cart.packageId);
@@ -195,31 +200,77 @@ export default function StepSessions() {
 
               <div className="space-y-2">
                 {sessions.map((sess, idx) => {
-                  const atMin = sess.players <= (a.minPlayers || 1);
-                  const atMax = sess.players >= a.maxPlayers;
+                  const room = getRoomForSession(a, sess);
+                  const effectiveMin = room ? room.minPlayers : (a.minPlayers || 1);
+                  const effectiveMax = room ? room.maxPlayers : a.maxPlayers;
+                  const atMin = sess.players <= effectiveMin;
+                  const atMax = sess.players >= effectiveMax;
                   return (
-                    <div key={idx} className="flex items-center gap-3 rounded bg-white/[0.03] p-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mw-pink text-[11px] font-bold text-white">
-                        {idx + 1}
+                    <div key={idx} className="rounded bg-white/[0.03] p-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mw-pink text-[11px] font-bold text-white">
+                          {idx + 1}
+                        </div>
+                        <div className="display flex-1 text-sm text-white/70">Créneau {idx + 1}</div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setSessionPlayers(a.id, idx, sess.players - 1)}
+                            disabled={atMin}
+                            className="flex h-8 w-8 items-center justify-center rounded border border-white/20 text-lg disabled:opacity-30 hover:border-mw-pink hover:text-mw-pink"
+                          >
+                            −
+                          </button>
+                          <div className="w-8 text-center display text-lg text-mw-pink">{sess.players}</div>
+                          <button
+                            onClick={() => setSessionPlayers(a.id, idx, sess.players + 1)}
+                            disabled={atMax}
+                            className="flex h-8 w-8 items-center justify-center rounded border border-white/20 text-lg disabled:opacity-30 hover:border-mw-pink hover:text-mw-pink"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
-                      <div className="display flex-1 text-sm text-white/70">Créneau {idx + 1}</div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setSessionPlayers(a.id, idx, sess.players - 1)}
-                          disabled={atMin}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-white/20 text-lg disabled:opacity-30 hover:border-mw-pink hover:text-mw-pink"
-                        >
-                          −
-                        </button>
-                        <div className="w-8 text-center display text-lg text-mw-pink">{sess.players}</div>
-                        <button
-                          onClick={() => setSessionPlayers(a.id, idx, sess.players + 1)}
-                          disabled={atMax}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-white/20 text-lg disabled:opacity-30 hover:border-mw-pink hover:text-mw-pink"
-                        >
-                          +
-                        </button>
-                      </div>
+                      {/* Choix de salle/piste si l'activité a des rooms */}
+                      {a.rooms && a.rooms.length > 0 && (
+                        <div className="mt-2 pl-10">
+                          <div className="mb-1 text-[10px] text-white/50">Choisir la salle / piste :</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {a.rooms.map((rm) => {
+                              const selected = sess.roomId === rm.id;
+                              const tooMany = sess.players > rm.maxPlayers;
+                              const tooFew = sess.players < rm.minPlayers;
+                              return (
+                                <button
+                                  key={rm.id}
+                                  onClick={() => setSessionRoom(a.id, idx, rm.id)}
+                                  disabled={tooMany}
+                                  className={`rounded border px-3 py-1.5 text-xs transition ${
+                                    selected
+                                      ? 'border-mw-pink bg-mw-pink/20 text-mw-pink'
+                                      : tooMany
+                                      ? 'cursor-not-allowed border-white/10 text-white/20 opacity-50'
+                                      : 'border-white/20 text-white/70 hover:border-mw-pink'
+                                  }`}
+                                  title={tooMany ? `Max ${rm.maxPlayers} joueurs pour ${rm.name}` : tooFew ? `Min ${rm.minPlayers} joueurs pour ${rm.name}` : ''}
+                                >
+                                  <span className="display">{rm.name}</span>
+                                  <span className="ml-1 text-[9px] text-white/40">{rm.minPlayers}-{rm.maxPlayers}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {sess.roomId && room && sess.players < room.minPlayers && (
+                            <div className="mt-1 text-[10px] text-mw-yellow">
+                              ⚠ Min {room.minPlayers} joueurs pour {room.name} — le nombre sera ajusté automatiquement.
+                            </div>
+                          )}
+                          {!sess.roomId && (
+                            <div className="mt-1 text-[10px] text-mw-yellow">
+                              ⚠ Veuillez choisir une salle / piste.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
