@@ -62,29 +62,29 @@ export default function StepActivities() {
 
       {/* Bloc groupes / entreprises (si pas déjà en formule et pas bypass) */}
       {!bypassPackage && !isFormula && (
-        <div className="mb-3 grid gap-1.5 sm:grid-cols-2">
+        <div className="mb-5 grid gap-2 sm:grid-cols-2">
           <a
             href="https://www.multiwex.be/fr/groupes/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded border border-mw-pink/30 bg-mw-pink/5 px-3 py-2 text-xs transition hover:border-mw-pink"
+            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
           >
-            <span>🎉</span>
+            <div className="text-2xl">🎉</div>
             <div>
-              <div className="display text-xs">Groupe · Anniversaire · EVG</div>
-              <div className="text-[10px] text-white/50">Devis →</div>
+              <div className="display text-sm">Groupe · Anniversaire · EVG · EVJF</div>
+              <div className="text-[11px] text-white/60">Packages tout inclus — demandez un devis →</div>
             </div>
           </a>
           <a
             href="https://www.multiwex.be/fr/entreprises/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded border border-mw-pink/30 bg-mw-pink/5 px-3 py-2 text-xs transition hover:border-mw-pink"
+            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
           >
-            <span>🏢</span>
+            <div className="text-2xl">🏢</div>
             <div>
-              <div className="display text-xs">Team building · Entreprise</div>
-              <div className="text-[10px] text-white/50">Contact →</div>
+              <div className="display text-sm">Team building · Entreprise · Family day</div>
+              <div className="text-[11px] text-white/60">Événements sur mesure — contactez-nous →</div>
             </div>
           </a>
         </div>

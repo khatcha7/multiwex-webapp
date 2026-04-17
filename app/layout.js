@@ -26,7 +26,7 @@ export default function RootLayout({ children }) {
         <BookingProvider>
           <Marquee />
           <Header />
-          <main>{children}</main>
+          <main className="min-h-[calc(100vh-180px)]">{children}</main>
           <Footer />
         </BookingProvider>
       </body>

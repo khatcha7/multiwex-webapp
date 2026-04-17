@@ -17,15 +17,15 @@ export default function Header() {
   return (
     <>
     <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-mw-bg/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:py-4">
         <Link href="/booking" className="flex items-center gap-2 shrink-0">
-          <Image src="/images/brand/logo.png" alt="Multiwex" width={40} height={40} priority className="h-8 w-auto" />
+          <Image src="/images/brand/logo.png" alt="Multiwex" width={48} height={48} priority className="h-9 w-auto md:h-11" />
         </Link>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setCartOpen(true)}
-            className="relative flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2 transition hover:border-mw-pink hover:text-mw-pink"
+            className="relative flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
             aria-label="Panier"
             title="Panier"
           >
@@ -40,7 +40,7 @@ export default function Header() {
           </button>
           <Link
             href="/account"
-            className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2 transition hover:border-mw-pink hover:text-mw-pink"
+            className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
             aria-label="Mon compte"
             title="Mon compte"
           >
@@ -50,7 +50,7 @@ export default function Header() {
           </Link>
           <Link
             href="/giftcard"
-            className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2 transition hover:border-mw-pink hover:text-mw-pink"
+            className="flex items-center justify-center rounded border border-white/20 bg-white/[0.03] p-2.5 transition hover:border-mw-pink hover:text-mw-pink"
             aria-label="Carte cadeau"
             title="Carte cadeau"
           >
