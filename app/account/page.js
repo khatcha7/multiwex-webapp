@@ -43,8 +43,18 @@ export default function AccountPage() {
     );
   }
 
+  const [filter, setFilter] = useState('upcoming'); // 'all', 'past', 'today', 'upcoming'
   const totalSpent = bookings.reduce((s, b) => s + (b.total || 0), 0);
   const displayName = user.firstName ? `${user.firstName}` : user.name?.split(' ')[0] || '';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const filteredBookings = bookings.filter((b) => {
+    if (filter === 'all') return true;
+    if (filter === 'past') return b.date < todayStr;
+    if (filter === 'today') return b.date === todayStr;
+    if (filter === 'upcoming') return b.date >= todayStr;
+    return true;
+  });
 
   const canModify = (b) => {
     const items = b.items || [];
@@ -70,14 +80,26 @@ export default function AccountPage() {
         <Stat label="Membre depuis" value={new Date(user.createdAt).toLocaleDateString('fr-FR')} />
       </div>
 
-      <h2 className="display mb-4 text-2xl">Mes réservations</h2>
-      {bookings.length === 0 ? (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="display text-2xl">Mes réservations</h2>
+        <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          {[
+            ['upcoming', 'À venir'],
+            ['today', "Aujourd'hui"],
+            ['past', 'Passées'],
+            ['all', 'Tout'],
+          ].map(([v, l]) => (
+            <button key={v} onClick={() => setFilter(v)} className={`display rounded px-3 py-1 text-xs ${filter === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {filteredBookings.length === 0 ? (
         <div className="rounded border border-white/10 bg-white/[0.02] p-10 text-center text-white/50">
           Aucune réservation pour le moment.
         </div>
       ) : (
         <div className="space-y-3">
-          {bookings.slice().reverse().map((b) => {
+          {filteredBookings.slice().reverse().map((b) => {
             const isFormula = Boolean(b.packageId);
             const pkg = isFormula ? getPackage(b.packageId) : null;
             return (
