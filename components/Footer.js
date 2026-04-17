@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="mt-20 border-t border-white/10 bg-mw-darker/60">
-      <div className="mx-auto max-w-4xl px-4 py-8 text-sm text-white/60">
+      <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-white/60">
         <div className="grid gap-6 md:grid-cols-3">
           <div>
             <div className="mb-2 font-bold text-white">Multiwex</div>
