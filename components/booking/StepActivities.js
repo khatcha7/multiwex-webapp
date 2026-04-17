@@ -106,14 +106,13 @@ export default function StepActivities() {
                 bkSelected ? 'border-mw-pink shadow-neon-pink' : 'border-white/10'
               }`}
             >
-              {/* Sous-cell BattleKart */}
+              {/* Sous-cell BattleKart — lien externe direct */}
               {bk && (
-                <button
-                  onClick={() => !isFormula && !bkDisabled && toggleActivity(bk.id)}
-                  disabled={bkDisabled}
-                  className={`group relative flex flex-1 flex-col border-r border-white/10 text-left transition hover:-translate-y-0.5 ${
-                    bkDisabled ? 'cursor-not-allowed opacity-40' : ''
-                  }`}
+                <a
+                  href="https://www.battlekart.com/fr/wex/booking"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex flex-1 flex-col border-r border-white/10 text-left transition hover:-translate-y-0.5"
                 >
                   {/* Image background + overlay */}
                   <div className="absolute inset-0 opacity-30 transition group-hover:opacity-50">
@@ -122,23 +121,18 @@ export default function StepActivities() {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
                   </div>
-                  {bkSelected && (
-                    <div className="absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[10px] font-black text-white shadow-neon-pink">
-                      ✓
-                    </div>
-                  )}
-                  {/* Logo + nom + badge */}
+                  {/* Logo */}
                   <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
                     <div className="relative h-10 w-full">
                       <Image src={bk.logo} alt={bk.name} fill sizes="90px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(255,0,125,0.35))]" />
                     </div>
                   </div>
-                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-mw-yellow">
-                    {bkSelected ? '✓ Sélectionné' : '🏁 Résa séparée'}
+                  <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-white/70">
+                    Réservation externe ↗
                   </div>
-                </button>
+                </a>
               )}
-              {/* Sous-cell Starcadium */}
+              {/* Sous-cell Starcadium — info */}
               {sk && (
                 <div className={`relative flex flex-1 flex-col ${skDisabled ? 'opacity-40' : ''}`}>
                   <div className="absolute inset-0 opacity-30">
@@ -148,8 +142,8 @@ export default function StepActivities() {
                     <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/80 to-black/95" />
                   </div>
                   <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-4 pb-2">
-                    <div className="relative h-10 w-full">
-                      <Image src={sk.logo} alt={sk.name} fill sizes="90px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(0,217,255,0.35))]" />
+                    <div className="relative h-8 w-full">
+                      <Image src={sk.logo} alt={sk.name} fill sizes="70px" className="object-contain [filter:drop-shadow(0_0_6px_rgba(0,217,255,0.35))]" />
                     </div>
                   </div>
                   <div className="relative z-10 border-t border-white/10 bg-black/40 px-2 py-1.5 text-center text-[10px] font-bold text-white/70">
