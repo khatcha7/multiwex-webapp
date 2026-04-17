@@ -1,42 +1,18 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useBooking } from '@/lib/store';
 import { getActivity, getActivityPrice } from '@/lib/activities';
 
 export default function CartDrawer({ open, onClose }) {
   const { cart } = useBooking();
-  const router = useRouter();
   const activityIds = Object.keys(cart.items || {});
   const hasDate = Boolean(cart.date);
 
-  // Fallback d'inférence pour les carts legacy (localStorage pré-deploy sans reachedStep).
-  // Se base sur l'état réel du cart pour deviner l'étape atteinte la plus probable.
-  const inferStepFromState = () => {
-    if (!hasDate) return 'date';
-    if (activityIds.length === 0) return 'activities';
-    const hasAnySlot = activityIds.some((id) => {
-      const a = getActivity(id);
-      if (!a || a.id === 'battlekart') return false;
-      return (cart.slots[id] || []).some(Boolean);
-    });
-    if (hasAnySlot) return 'slots';
-    return 'sessions';
-  };
-
-  // Destination = étape la plus avancée réellement atteinte par le client. markReached est appelé
-  // à chaque clic Continuer, et assignSlot force 'slots' dès qu'un créneau est placé.
-  const reachedStep = cart.reachedStep || inferStepFromState();
+  // Destination = étape la plus avancée réellement atteinte par le client (mise à jour par markReached
+  // sur clic Continuer). Si cart vide ou reachedStep manquant, fallback 'date'.
+  const reachedStep = cart.reachedStep || 'date';
   const isFinalized = reachedStep === 'recap' || reachedStep === 'confirm';
-
-  const goToStep = (step) => {
-    onClose();
-    // router.push garantit la navigation même si l'URL cible est identique à l'actuelle
-    // (cas où l'user est déjà sur /booking?step=... et cliquait un Link qui devenait no-op).
-    router.push(`/booking?step=${step}`);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0 });
-  };
 
   if (!open) return null;
 
@@ -122,13 +98,21 @@ export default function CartDrawer({ open, onClose }) {
               Commencer une réservation
             </Link>
           ) : isFinalized ? (
-            <button onClick={() => goToStep('recap')} className="btn-primary w-full text-center block">
+            <Link
+              href="/booking?step=recap"
+              onClick={() => { onClose(); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
+              className="btn-primary w-full text-center block"
+            >
               Finaliser ma commande →
-            </button>
+            </Link>
           ) : (
-            <button onClick={() => goToStep(reachedStep)} className="btn-primary w-full text-center block">
+            <Link
+              href={`/booking?step=${reachedStep}`}
+              onClick={() => { onClose(); if (typeof window !== 'undefined') window.scrollTo({ top: 0 }); }}
+              className="btn-primary w-full text-center block"
+            >
               Continuer ma réservation →
-            </button>
+            </Link>
           )}
         </div>
       </div>
