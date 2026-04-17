@@ -20,7 +20,7 @@ const K7_SUB_LABELS = {
 };
 
 const TOTAL_HOURS = 24;
-const ROW_HEIGHT = 64; // 4em
+let ROW_HEIGHT = 64; // default, will be overridden by pxActivity prop
 
 /* ------------------------------------------------------------------ */
 /*  Slot status helpers                                                */
@@ -75,6 +75,7 @@ export default function TransposedDayView({
   bookings = [],
   blocks = [],
   pxPerHour = 120,
+  pxActivity = 64,
   hours,
   multiSel = [],
   highlightIds = new Set(),
@@ -86,6 +87,7 @@ export default function TransposedDayView({
   k7Open = false,
   onToggleK7,
 }) {
+  ROW_HEIGHT = pxActivity; // Override with prop
   const scrollRef = useRef(null);
   const headerRef = useRef(null);
   const sidebarRef = useRef(null);

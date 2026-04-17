@@ -42,6 +42,8 @@ export default function StaffCalendarPage() {
   const [view, setView] = useState('day');
   const [dayLayout, setDayLayout] = useState('transposed'); // 'classic' or 'transposed'
   const [zoom, setZoom] = useState('normal');
+  const [pxTime, setPxTime] = useState(64);   // px par heure (axe temps)
+  const [pxActivity, setPxActivity] = useState(160); // px par activité (axe activités)
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
   const [k7Open, setK7Open] = useState(false);
   const [bookings, setBookings] = useState([]);
@@ -66,7 +68,7 @@ export default function StaffCalendarPage() {
     return unsub;
   }, []);
 
-  const pxH = ZOOM_PRESETS.find((p) => p.id === zoom).px;
+  const pxH = pxTime; // Contrôlé par le slider (les presets mettent à jour pxTime)
   const hours = getHoursForDate(date);
 
   // Lanes
@@ -234,7 +236,7 @@ export default function StaffCalendarPage() {
           {view === 'day' && (
             <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
               {ZOOM_PRESETS.map((p) => (
-                <button key={p.id} onClick={() => setZoom(p.id)} className={`display rounded px-2 py-1 text-xs ${zoom === p.id ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{p.label}</button>
+                <button key={p.id} onClick={() => { setZoom(p.id); setPxTime(p.px); }} className={`display rounded px-2 py-1 text-xs ${zoom === p.id ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{p.label}</button>
               ))}
             </div>
           )}
@@ -269,12 +271,22 @@ export default function StaffCalendarPage() {
         </div>
       )}
 
-      {/* Day layout toggle */}
+      {/* Day layout toggle + sliders */}
       {view === 'day' && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Classique ↕</button>
             <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Transposée ↔</button>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <span className="text-[10px]">Heures</span>
+            <input type="range" min="24" max="200" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-20 accent-mw-pink" />
+            <span className="w-8 text-[10px] text-white/40">{pxTime}px</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <span className="text-[10px]">Activités</span>
+            <input type="range" min="80" max="300" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-20 accent-mw-pink" />
+            <span className="w-8 text-[10px] text-white/40">{pxActivity}px</span>
           </div>
         </div>
       )}
@@ -283,7 +295,7 @@ export default function StaffCalendarPage() {
       {view === 'day' && hours && dayLayout === 'transposed' && (
         <TransposedDayView
           date={date} lanes={lanes} bookings={bookings} blocks={blocks}
-          pxPerHour={pxH} hours={hours}
+          pxPerHour={pxH} pxActivity={pxActivity} hours={hours}
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
@@ -293,7 +305,7 @@ export default function StaffCalendarPage() {
       {view === 'day' && hours && dayLayout === 'classic' && (
         <DayViewV2
           date={date} lanes={lanes} bookings={bookings} blocks={blocks}
-          pxH={pxH} hours={hours}
+          pxH={pxH} pxActivity={pxActivity} hours={hours}
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
@@ -397,7 +409,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7 }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7 }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -426,7 +438,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, hours, multiSel, highli
         {/* Lanes */}
         {lanes.map((lane) => {
           const slots = generateSlotsForActivity(lane, date, { fullDay: true });
-          const laneW = lane.compact ? 'w-28' : 'w-40';
+          const laneW = lane.compact ? Math.round(pxActivity / 3) : pxActivity;
           const laneBookings = bookings.flatMap((b) =>
             (b.items || []).filter((i) => i.activityId === lane.id).filter((i) => {
               if (!lane.isRoom) return true;
@@ -444,7 +456,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, hours, multiSel, highli
           });
 
           return (
-            <div key={lane.laneId} className={`${laneW} shrink-0 border-r border-white/10`}>
+            <div key={lane.laneId} className="shrink-0 border-r border-white/10" style={{ width: `${laneW}px` }}>
               <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : undefined}>
                 <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
                 <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>
