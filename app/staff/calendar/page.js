@@ -393,6 +393,49 @@ export default function StaffCalendarPage() {
             >
               📝 Effectuer une réservation
             </button>
+            <div className="border-t border-white/10 mt-1 pt-1">
+              <div className="px-3 py-1 text-[10px] text-white/40">Décaler ce créneau</div>
+              <div className="flex flex-wrap gap-1 px-2 pb-1">
+                {[-30, -15, -10, -5, 5, 10, 15, 30].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
+                      const key = `${ctxMenu.actDef.id}-${date}`;
+                      if (!shifts[key]) shifts[key] = {};
+                      shifts[key][ctxMenu.slot.start] = (shifts[key][ctxMenu.slot.start] || 0) + m;
+                      localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
+                      setCtxMenu(null);
+                      setTick((t) => t + 1);
+                      alert(`Créneau ${ctxMenu.slot.start} décalé de ${m > 0 ? '+' : ''}${m} min`);
+                    }}
+                    className={`rounded border px-1.5 py-0.5 text-[10px] ${m > 0 ? 'border-green-500/40 text-green-400' : 'border-mw-red/40 text-mw-red'} hover:bg-white/10`}
+                  >
+                    {m > 0 ? '+' : ''}{m}'
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
+                  const key = `${ctxMenu.actDef.id}-${date}`;
+                  if (!shifts[key]) shifts[key] = {};
+                  // Décaler toute la ligne (tous les créneaux après celui-ci)
+                  const val = prompt('Décaler toute la ligne de combien de minutes ? (ex: 5, -10)');
+                  if (val && !isNaN(Number(val))) {
+                    shifts[key]._lineShift = (shifts[key]._lineShift || 0) + Number(val);
+                    shifts[key]._lineFrom = ctxMenu.slot.start;
+                    localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
+                    setCtxMenu(null);
+                    setTick((t) => t + 1);
+                    alert(`Toute la ligne ${ctxMenu.actDef.name} décalée de ${val} min à partir de ${ctxMenu.slot.start}`);
+                  }
+                }}
+                className="block w-full rounded px-3 py-1.5 text-left text-[10px] text-white/60 hover:bg-white/10"
+              >
+                ↔ Décaler toute la ligne…
+              </button>
+            </div>
           </div>
         </div>
       )}
