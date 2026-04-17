@@ -72,20 +72,25 @@ export default function StaffCalendarPage() {
   const hours = getHoursForDate(date);
 
   // Lanes
+  const [slashOpen, setSlashOpen] = useState(false);
+
   const lanes = useMemo(() => {
     const out = [];
     activities.filter((a) => a.bookable && visible.has(a.id)).forEach((a) => {
-      if (a.id === 'k7' && k7Open && a.rooms) {
-        a.rooms.forEach((r) => out.push({ ...a, laneId: r.id, laneLabel: `K7 ${r.name}`, isRoom: true, roomId: r.id, maxPlayers: r.maxPlayers, minPlayers: r.minPlayers }));
-      } else if (a.id === 'k7' && !k7Open && a.rooms) {
-        // 3 colonnes compactes
-        a.rooms.forEach((r) => out.push({ ...a, laneId: r.id, laneLabel: r.name, isRoom: true, roomId: r.id, maxPlayers: r.maxPlayers, minPlayers: r.minPlayers, compact: true }));
+      // K7 et Slash : afficher les sous-lanes (rooms/pistes)
+      const hasRooms = a.rooms && a.rooms.length > 0;
+      const isExpanded = (a.id === 'k7' && k7Open) || (a.id === 'slashhit' && slashOpen);
+      if (hasRooms && isExpanded) {
+        a.rooms.forEach((r) => out.push({ ...a, laneId: r.id, laneLabel: `${a.name} ${r.name}`, isRoom: true, roomId: r.id, maxPlayers: r.maxPlayers, minPlayers: r.minPlayers || a.minPlayers }));
+      } else if (hasRooms && !isExpanded) {
+        // Compacté : 1 colonne par room mais largeur réduite
+        a.rooms.forEach((r) => out.push({ ...a, laneId: r.id, laneLabel: r.name, isRoom: true, roomId: r.id, maxPlayers: r.maxPlayers, minPlayers: r.minPlayers || a.minPlayers, compact: true }));
       } else {
         out.push({ ...a, laneId: a.id, laneLabel: a.name });
       }
     });
     return out;
-  }, [visible, k7Open]);
+  }, [visible, k7Open, slashOpen]);
 
   // Search highlight
   const highlightIds = useMemo(() => {
@@ -228,6 +233,11 @@ export default function StaffCalendarPage() {
             className="input !py-2 max-w-xs text-sm"
           />
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button onClick={goToday} className="display px-3 py-1 text-xs text-white/70 hover:text-mw-pink">Auj</button>
             <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
@@ -258,6 +268,16 @@ export default function StaffCalendarPage() {
             <span className="display">{a.name}</span>
           </button>
         ))}
+        {visible.has('k7') && (
+          <button onClick={() => setK7Open(!k7Open)} className={`rounded border px-3 py-1 text-xs transition ${k7Open ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
+            {k7Open ? '−' : '+'} Salles K7
+          </button>
+        )}
+        {visible.has('slashhit') && (
+          <button onClick={() => setSlashOpen(!slashOpen)} className={`rounded border px-3 py-1 text-xs transition ${slashOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
+            {slashOpen ? '−' : '+'} Pistes Slash
+          </button>
+        )}
       </div>
 
       {/* Multi-sel banner */}
@@ -280,13 +300,13 @@ export default function StaffCalendarPage() {
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
-            <input type="range" min="24" max="200" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-20 accent-mw-pink" />
-            <span className="w-8 text-[10px] text-white/40">{pxTime}px</span>
+            <input type="range" min="24" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
+            <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Activités</span>
-            <input type="range" min="80" max="300" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-20 accent-mw-pink" />
-            <span className="w-8 text-[10px] text-white/40">{pxActivity}px</span>
+            <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-24 accent-mw-pink" />
+            <span className="w-10 text-[10px] text-white/40">{pxActivity}px</span>
           </div>
         </div>
       )}

@@ -576,8 +576,9 @@ export default function TransposedDayView({
                   width: totalWidth,
                   height: rowHeight,
                   borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  background: '#111111',
+                  background: idx % 2 === 0 ? '#111111' : '#0f0f12',
                   boxSizing: 'border-box',
+                  overflow: 'hidden',
                 }}
               />
             ))}
