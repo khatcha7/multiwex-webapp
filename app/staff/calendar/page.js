@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { activities } from '@/lib/activities';
+import TransposedDayView from '@/components/staff/TransposedDayView';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -39,6 +40,7 @@ function hashRoom(id) {
 export default function StaffCalendarPage() {
   const [date, setDate] = useState(toDateStr(new Date()));
   const [view, setView] = useState('day');
+  const [dayLayout, setDayLayout] = useState('transposed'); // 'classic' or 'transposed'
   const [zoom, setZoom] = useState('normal');
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
   const [k7Open, setK7Open] = useState(false);
@@ -267,8 +269,28 @@ export default function StaffCalendarPage() {
         </div>
       )}
 
+      {/* Day layout toggle */}
+      {view === 'day' && (
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Classique ↕</button>
+            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Transposée ↔</button>
+          </div>
+        </div>
+      )}
+
       {/* Calendar view */}
-      {view === 'day' && hours && (
+      {view === 'day' && hours && dayLayout === 'transposed' && (
+        <TransposedDayView
+          date={date} lanes={lanes} bookings={bookings} blocks={blocks}
+          pxPerHour={pxH} hours={hours}
+          multiSel={multiSel} highlightIds={highlightIds}
+          onClick={handleClick} onRightClick={handleRightClick}
+          onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
+          onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+        />
+      )}
+      {view === 'day' && hours && dayLayout === 'classic' && (
         <DayViewV2
           date={date} lanes={lanes} bookings={bookings} blocks={blocks}
           pxH={pxH} hours={hours}
@@ -280,6 +302,16 @@ export default function StaffCalendarPage() {
       )}
       {view === 'day' && !hours && (
         <div className="rounded border border-white/10 bg-white/[0.02] p-10 text-center text-white/50">Fermé.</div>
+      )}
+
+      {/* Week view */}
+      {view === 'week' && (
+        <WeekView date={date} lanes={lanes} bookings={bookings} />
+      )}
+
+      {/* Month view */}
+      {view === 'month' && (
+        <MonthView date={date} bookings={bookings} onChangeDate={setDate} />
       )}
 
       {/* Context menu */}
@@ -539,6 +571,129 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
             <button onClick={() => onBlock(reason, note, label)} disabled={!reason || !label} className="btn-primary w-full !py-3 text-sm">Confirmer</button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// WEEK VIEW
+// ============================================================
+function WeekView({ date, lanes, bookings }) {
+  const start = parseDate(date);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Start Monday
+  const days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return toDateStr(d);
+  });
+
+  return (
+    <div className="overflow-x-auto rounded border border-white/10 bg-white/[0.02]">
+      <table className="w-full min-w-max text-xs">
+        <thead>
+          <tr className="border-b border-white/10">
+            <th className="display sticky left-0 z-10 w-40 bg-mw-bg px-2 py-2 text-left">Activité</th>
+            {days.map((d) => {
+              const dt = parseDate(d);
+              const isToday = toDateStr(new Date()) === d;
+              return (
+                <th key={d} className={`px-2 py-2 text-center ${isToday ? 'text-mw-pink' : ''}`}>
+                  <div className="text-[10px] text-white/50">{dayLabelsFrFull[dt.getDay()].slice(0, 3)}</div>
+                  <div className="display text-base">{dt.getDate()}</div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {lanes.map((a) => (
+            <tr key={a.laneId} className="border-b border-white/5">
+              <td className="sticky left-0 z-10 bg-mw-bg px-2 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="relative h-6 w-6"><Image src={a.logo} alt="" fill sizes="24px" className="object-contain" /></div>
+                  <span className="display text-[12px]">{a.laneLabel}</span>
+                </div>
+              </td>
+              {days.map((d) => {
+                const dayBookings = bookings.filter((b) => b.date === d);
+                const items = dayBookings.flatMap((b) => (b.items || []).filter((i) => i.activityId === a.id));
+                const players = items.reduce((s, i) => s + (i.players || 0), 0);
+                const slotsForDay = generateSlotsForActivity(a, d).length;
+                const capacityTotal = slotsForDay * a.maxPlayers;
+                const rate = capacityTotal > 0 ? players / capacityTotal : 0;
+                let color = 'bg-white/5';
+                if (rate > 0.7) color = 'cal-slot-full';
+                else if (rate > 0.3) color = 'cal-slot-partial';
+                else if (rate > 0) color = 'cal-slot-free';
+                return (
+                  <td key={d} className="px-1 py-2">
+                    <div className={`rounded border p-2 text-center ${color}`}>
+                      <div className="display text-sm">{players}</div>
+                      <div className="text-[9px]">/{capacityTotal}</div>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ============================================================
+// MONTH VIEW
+// ============================================================
+function MonthView({ date, bookings, onChangeDate }) {
+  const current = parseDate(date);
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const mondayOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Monday-first
+  const daysInMonth = lastDay.getDate();
+
+  const cells = [];
+  for (let i = 0; i < mondayOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(toDateStr(new Date(year, month, d)));
+
+  return (
+    <div className="overflow-hidden rounded border border-white/10 bg-white/[0.02]">
+      <div className="grid grid-cols-7 border-b border-white/10 bg-mw-bg">
+        {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((d) => (
+          <div key={d} className="display py-2 text-center text-[10px] text-white/40">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((cell, idx) => {
+          if (!cell) return <div key={idx} className="aspect-square border-b border-r border-white/5" />;
+          const dayBookings = bookings.filter((b) => b.date === cell);
+          const totalPlayers = dayBookings.reduce((s, b) => s + (b.players || 0), 0);
+          const totalRevenue = dayBookings.reduce((s, b) => s + (b.total || 0), 0);
+          const isToday = toDateStr(new Date()) === cell;
+          const rate = totalPlayers / 40;
+          let color = '';
+          if (rate > 1) color = 'bg-[#CC003C]/25';
+          else if (rate > 0.5) color = 'bg-[#EBC800]/20';
+          else if (rate > 0) color = 'bg-mw-pink/15';
+          return (
+            <button
+              key={cell}
+              onClick={() => onChangeDate(cell)}
+              className={`relative aspect-square border-b border-r border-white/5 p-2 text-left transition hover:bg-white/5 ${color}`}
+            >
+              <div className={`display text-sm ${isToday ? 'text-mw-pink' : 'text-white'}`}>{parseDate(cell).getDate()}</div>
+              {dayBookings.length > 0 && (
+                <div className="mt-1 text-[9px] text-white/60">
+                  <div>{dayBookings.length} résas</div>
+                  <div>{totalPlayers} joueurs</div>
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

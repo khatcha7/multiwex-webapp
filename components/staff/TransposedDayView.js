@@ -377,54 +377,45 @@ export default function TransposedDayView({
         {/* Sticky label spacer */}
         <div style={{ minWidth: 160, maxWidth: 160, flexShrink: 0 }} />
         <div
+          ref={headerRef}
           style={{
             overflowX: 'hidden',
-            position: 'relative',
-            width: totalWidth,
+            flex: 1,
             height: 28,
-            flexShrink: 0,
-          }}
-          ref={(el) => {
-            // sync scroll position with body
-            if (el && scrollRef.current) {
-              const body = scrollRef.current;
-              const header = el;
-              body.addEventListener('scroll', () => {
-                header.scrollLeft = body.scrollLeft;
-              });
-            }
           }}
         >
-          {Array.from({ length: TOTAL_HOURS }, (_, i) => {
-            const isOpen = i * 60 >= openMin && i * 60 < closeMin;
-            return (
-              <button
-                key={i}
-                onClick={() => onBlockHour?.(fromMinutes(i * 60))}
-                style={{
-                  position: 'absolute',
-                  left: i * pxPerHour,
-                  width: pxPerHour,
-                  height: 28,
-                  border: '1px solid #000',
-                  borderBottom: '2px solid #000',
-                  background: isOpen ? '#f8f8f8' : '#e0e0e0',
-                  opacity: isOpen ? 1 : 0.5,
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0,
-                  boxSizing: 'border-box',
-                }}
-              >
-                {i}h
-              </button>
-            );
-          })}
+          <div style={{ position: 'relative', width: totalWidth, height: 28 }}>
+            {Array.from({ length: TOTAL_HOURS }, (_, i) => {
+              const isOpen = i * 60 >= openMin && i * 60 < closeMin;
+              return (
+                <button
+                  key={i}
+                  onClick={() => onBlockHour?.(fromMinutes(i * 60))}
+                  style={{
+                    position: 'absolute',
+                    left: i * pxPerHour,
+                    width: pxPerHour,
+                    height: 28,
+                    border: '1px solid #000',
+                    borderBottom: '2px solid #000',
+                    background: isOpen ? '#f8f8f8' : '#e0e0e0',
+                    opacity: isOpen ? 1 : 0.5,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {i}h
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -442,15 +433,7 @@ export default function TransposedDayView({
             background: '#fff',
             zIndex: 10,
           }}
-          ref={(el) => {
-            if (el && scrollRef.current) {
-              const body = scrollRef.current;
-              const sidebar = el;
-              body.addEventListener('scroll', () => {
-                sidebar.scrollTop = body.scrollTop;
-              });
-            }
-          }}
+          ref={sidebarRef}
         >
           <div style={{ position: 'relative', height: gridHeight }}>
             {rowMeta.map(({ rowTop, rowHeight, row }, idx) => {

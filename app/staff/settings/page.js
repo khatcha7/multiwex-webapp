@@ -85,19 +85,34 @@ export default function StaffSettingsPage() {
 
       <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Règles métier</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <NumField label="Cutoff rejoindre groupe (min)" value={cfg['booking.join_cutoff_min']} onSave={(v) => save('booking.join_cutoff_min', v)} />
-          <NumField label="Cutoff modification (h)" value={cfg['booking.cancel_cutoff_hours']} onSave={(v) => save('booking.cancel_cutoff_hours', v)} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <NumField label="Fermeture auto en ligne (min avant)" value={cfg['booking.closure_min_online']} onSave={(v) => save('booking.closure_min_online', v)} />
+          <NumField label="Cutoff modification client (h)" value={cfg['booking.cancel_cutoff_hours']} onSave={(v) => save('booking.cancel_cutoff_hours', v)} />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-white/80">
-          <input
-            type="checkbox"
-            checked={cfg['booking.bypass_package_toggle'] === true || cfg['booking.bypass_package_toggle'] === 'true'}
-            onChange={(e) => save('booking.bypass_package_toggle', e.target.checked)}
-            className="h-4 w-4 accent-mw-pink"
-          />
+          <input type="checkbox" checked={cfg['booking.bypass_package_toggle'] === true || cfg['booking.bypass_package_toggle'] === 'true'} onChange={(e) => save('booking.bypass_package_toggle', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
           Masquer le bloc "Packages de groupe" dans l'étape Activités
         </label>
+      </div>
+
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Affichage (on/off)</h2>
+        <p className="mb-3 text-xs text-white/50">Activez ou désactivez les fonctionnalités visuelles.</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            ['display.calendar_stats_bar', 'Stats rapides en bas du calendrier'],
+            ['display.formula_badges', 'Badges formule sur les créneaux'],
+            ['display.checkin_presence', 'Check-in / présence par groupe'],
+            ['display.share_button', 'Bouton "Partager" après réservation'],
+            ['display.promo_report_bloc', 'Bloc codes promos dans les reports'],
+            ['display.funnel_analytics', 'Funnel analytics dans les reports'],
+          ].map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 rounded bg-white/[0.02] p-2 text-sm text-white/80">
+              <input type="checkbox" checked={cfg[key] === true || cfg[key] === 'true' || cfg[key] === undefined} onChange={(e) => save(key, e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+              {label}
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
@@ -141,6 +156,26 @@ export default function StaffSettingsPage() {
           {popups.length === 0 && (
             <div className="py-6 text-center text-sm text-white/40">Aucune pop-up configurée.</div>
           )}
+        </div>
+      </div>
+
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Packs — mode de réservation</h2>
+        <p className="mb-3 text-xs text-white/50">Pour chaque pack, choisissez si le client réserve directement via la webapp ("interne") ou s'il est redirigé vers le site Multiwex pour un devis ("redirect").</p>
+        <div className="space-y-2">
+          {require('@/lib/packages').packages.filter((p) => !p.requiresQuote).map((p) => {
+            const key = `pack.mode.${p.id}`;
+            const mode = cfg[key] || 'internal';
+            return (
+              <div key={p.id} className="flex items-center justify-between rounded bg-white/[0.02] p-2 text-sm">
+                <span className="display">{p.name} <span className="text-xs text-white/50">{p.tagline}</span></span>
+                <select value={mode} onChange={(e) => save(key, e.target.value)} className="input !w-auto !py-1 text-xs">
+                  <option value="internal">Interne (webapp)</option>
+                  <option value="redirect">Redirect (site Multiwex)</option>
+                </select>
+              </div>
+            );
+          })}
         </div>
       </div>
 
