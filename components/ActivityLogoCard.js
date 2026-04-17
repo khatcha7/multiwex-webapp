@@ -31,8 +31,8 @@ export default function ActivityLogoCard({ activity, selected, onClick, badge, p
         </div>
       )}
 
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-3 pt-5 pb-3">
-        <div className="relative h-16 w-full">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-2 pt-3 pb-2">
+        <div className="relative h-10 w-full">
           <Image
             src={activity.logo}
             alt={activity.name}
