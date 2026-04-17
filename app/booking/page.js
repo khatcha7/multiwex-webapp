@@ -122,13 +122,13 @@ function BookingInner() {
   const goPrev = () => setStepIndex((i) => Math.max(0, i - 1));
 
   return (
-    <div ref={topRef} className="mx-auto max-w-4xl px-4 py-6 md:py-10">
+    <div ref={topRef} className="mx-auto max-w-4xl px-4 py-4 md:py-6">
       <Stepper steps={STEPS} activeIndex={stepIndex} />
-      <div className="mt-6 md:mt-10">
+      <div className="mt-4 md:mt-6">
         <StepComponent onNext={goNext} onConfirm={() => setStepIndex(STEPS.length - 1)} onRestart={() => setStepIndex(0)} />
       </div>
       {currentStep.id !== 'confirm' && currentStep.id !== 'recap' && (
-        <div className="sticky bottom-3 mt-8 flex items-center justify-between gap-3 rounded border border-white/10 bg-black/70 p-2 backdrop-blur-md md:static md:bg-transparent md:p-0 md:backdrop-blur-0">
+        <div className="sticky bottom-3 mt-6 mb-2 flex items-center justify-between gap-3 rounded border border-white/10 bg-black/70 p-2 backdrop-blur-md md:static md:mb-6 md:bg-transparent md:p-0 md:backdrop-blur-0">
           <button
             onClick={goPrev}
             disabled={stepIndex === 0}
@@ -142,7 +142,7 @@ function BookingInner() {
         </div>
       )}
       {currentStep.id === 'recap' && (
-        <div className="sticky bottom-3 mt-4 flex items-center justify-start gap-3 md:static">
+        <div className="sticky bottom-3 mt-4 mb-2 flex items-center justify-start gap-3 md:static md:mb-6">
           <button onClick={goPrev} className="btn-outline !py-2.5 !px-5 text-sm">
             ← Retour
           </button>
@@ -161,30 +161,47 @@ export default function BookingPage() {
 }
 
 function Stepper({ steps, activeIndex }) {
+  const current = steps[activeIndex];
+  const progress = ((activeIndex + 1) / steps.length) * 100;
   return (
-    <div className="flex items-center justify-between gap-1">
-      {steps.map((s, i) => (
-        <div key={s.id} className="flex flex-1 min-w-0 items-center gap-1 last:flex-none">
-          <div
-            className={`flex h-7 w-7 md:h-8 md:w-8 shrink-0 items-center justify-center rounded border text-[10px] md:text-xs font-bold transition ${
-              i === activeIndex
-                ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
-                : i < activeIndex
-                ? 'border-mw-pink/60 bg-mw-pink/20 text-mw-pink'
-                : 'border-white/20 text-white/40'
-            }`}
-          >
-            {i < activeIndex ? '✓' : i + 1}
+    <>
+      {/* Desktop : stepper classique */}
+      <div className="hidden md:flex items-center justify-between gap-1">
+        {steps.map((s, i) => (
+          <div key={s.id} className="flex flex-1 min-w-0 items-center gap-1.5 last:flex-none">
+            <div
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border text-xs font-bold transition ${
+                i === activeIndex
+                  ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink'
+                  : i < activeIndex
+                  ? 'border-mw-pink/60 bg-mw-pink/20 text-mw-pink'
+                  : 'border-white/20 text-white/40'
+              }`}
+            >
+              {i < activeIndex ? '✓' : i + 1}
+            </div>
+            <span className={`display truncate text-xs ${i === activeIndex ? 'text-white' : 'text-white/40'}`}>
+              {s.short}
+            </span>
+            {i < steps.length - 1 && <div className="h-px flex-1 min-w-[8px] bg-white/15" />}
           </div>
-          <span className={`display hidden truncate text-[11px] md:inline md:text-sm ${i === activeIndex ? 'text-white' : 'text-white/40'}`}>
-            {s.short}
+        ))}
+      </div>
+      {/* Mobile : étape courante + barre de progression */}
+      <div className="md:hidden">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] uppercase tracking-wider text-white/50">
+            Étape {activeIndex + 1}/{steps.length}
           </span>
-          <span className={`display truncate text-[10px] md:hidden ${i === activeIndex ? 'text-white' : 'text-white/40'}`}>
-            {s.short}
-          </span>
-          {i < steps.length - 1 && <div className="h-px flex-1 min-w-[6px] bg-white/20" />}
+          <span className="display text-sm text-white">{current.label}</span>
         </div>
-      ))}
-    </div>
+        <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-mw-pink to-[#ff0068] transition-[width] duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+    </>
   );
 }
