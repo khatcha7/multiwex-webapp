@@ -111,13 +111,14 @@ export default function StepSlots() {
     setViewMonth({ year: nm.getFullYear(), month: nm.getMonth() });
   };
 
-  // Liste des jours du mois view
+  // Liste des jours du mois — uniquement aujourd'hui et après (pas de dates passées)
   const today = new Date();
-  const firstDay = new Date(viewMonth.year, viewMonth.month, 1);
+  const todayStr = toDateStr(today);
   const lastDay = new Date(viewMonth.year, viewMonth.month + 1, 0);
   const monthDays = [];
   for (let d = 1; d <= lastDay.getDate(); d++) {
-    monthDays.push(toDateStr(new Date(viewMonth.year, viewMonth.month, d)));
+    const ds = toDateStr(new Date(viewMonth.year, viewMonth.month, d));
+    if (ds >= todayStr) monthDays.push(ds);
   }
 
   return (
