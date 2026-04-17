@@ -36,7 +36,10 @@ function BookingInner() {
   useEffect(() => {
     if (hydrated && stepParam && !packageId && !upsellFlag) {
       const idx = ALL_STEPS.findIndex((s) => s.id === stepParam);
-      if (idx >= 0) setStepIndex(idx);
+      if (idx >= 0) {
+        setStepIndex(idx);
+        markReached(ALL_STEPS[idx].id);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, stepParam]);
@@ -126,7 +129,11 @@ function BookingInner() {
     setStepIndex(nextIdx);
     markReached(STEPS[nextIdx].id);
   };
-  const goPrev = () => setStepIndex((i) => Math.max(0, i - 1));
+  const goPrev = () => {
+    const prevIdx = Math.max(0, stepIndex - 1);
+    setStepIndex(prevIdx);
+    markReached(STEPS[prevIdx].id);
+  };
 
   return (
     <div ref={topRef} className="mx-auto max-w-4xl px-4 py-4 md:py-6">
