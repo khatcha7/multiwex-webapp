@@ -70,20 +70,22 @@ export default function StepSlots() {
     return currentSessions.length - 1;
   };
 
-  const handleSlotClick = (slot) => {
-    // Si ce slot est déjà dans currentSlots, on le désassigne
-    const existingIdx = currentSlots.findIndex((s) => s && s.start === slot.start);
-    if (existingIdx >= 0) {
+  const handleSlotClickForGroup = (slot, groupIndices) => {
+    // Si ce slot est déjà assigné dans CE groupe, on le désassigne
+    const existingIdx = groupIndices.find((i) => currentSlots[i] && currentSlots[i].start === slot.start);
+    if (existingIdx != null) {
       clearSlot(currentActivityId, existingIdx);
       return;
     }
 
-    // Sinon, on l'assigne au prochain slot non assigné
-    const idx = nextUnassignedIndex();
-    assignSlot(currentActivityId, idx, slot);
+    // Prochain index non assigné dans CE groupe
+    const nextIdx = groupIndices.find((i) => !currentSlots[i]);
+    if (nextIdx == null) return; // tout est déjà assigné dans ce groupe
 
-    // Auto-advance : si cette activité est maintenant complète, passer à la suivante
-    const willBeComplete = currentSessions.every((_, i) => i === idx || currentSlots[i]);
+    assignSlot(currentActivityId, nextIdx, slot);
+
+    // Auto-advance : si TOUTE l'activité est maintenant complète, passer à la suivante
+    const willBeComplete = currentSessions.every((_, i) => i === nextIdx || currentSlots[i]);
     if (willBeComplete) {
       setTimeout(() => {
         const currentIdx = bookable.findIndex((a) => a.id === currentActivityId);
@@ -221,6 +223,9 @@ export default function StepSlots() {
           <div className="mb-4 flex flex-wrap gap-2">
             {currentSessions.map((sess, idx) => {
               const assigned = currentSlots[idx];
+              const roomName = sess.roomId && currentActivity.rooms
+                ? currentActivity.rooms.find((r) => r.id === sess.roomId)?.name
+                : null;
               return (
                 <div
                   key={idx}
@@ -231,7 +236,8 @@ export default function StepSlots() {
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white">
                     {idx + 1}
                   </div>
-                  <span className="display">{sess.players} joueur{sess.players > 1 ? 's' : ''}</span>
+                  <span className="display">{sess.players}j</span>
+                  {roomName && <span className="text-[9px] text-white/40">{roomName}</span>}
                   {assigned ? (
                     <>
                       <span className="font-mono">{assigned.start}</span>
@@ -254,23 +260,49 @@ export default function StepSlots() {
             <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-mw-pink border border-mw-pink"></span>Sélectionné</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-            {allSlots.map((slot) => {
+          {/* Groupes par salle/piste — si rooms différentes, afficher un calendrier par room */}
+          {(() => {
+            const hasRooms = currentActivity.rooms && currentActivity.rooms.length > 0;
+            const uniqueRoomIds = hasRooms
+              ? [...new Set(currentSessions.map((s) => s.roomId).filter(Boolean))]
+              : [null];
+            // Si pas de rooms ou toutes les sessions ont le même roomId → 1 calendrier
+            // Sinon → un calendrier par roomId
+            return uniqueRoomIds.map((roomId) => {
+              const roomDef = roomId ? currentActivity.rooms.find((r) => r.id === roomId) : null;
+              // Indices des sessions qui appartiennent à ce groupe
+              const sessionIndices = currentSessions.map((s, i) => i).filter((i) => {
+                if (!hasRooms || uniqueRoomIds.length <= 1) return true;
+                return currentSessions[i].roomId === roomId;
+              });
+              const roomCap = roomDef ? roomDef.maxPlayers : currentActivity.maxPlayers;
+
+              return (
+                <div key={roomId || 'default'} className="mb-4">
+                  {roomDef && uniqueRoomIds.length > 1 && (
+                    <div className="mb-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs">
+                      <span className="display text-mw-pink">{roomDef.name}</span>
+                      <span className="ml-2 text-white/50">{roomDef.minPlayers}-{roomDef.maxPlayers} joueurs</span>
+                      <span className="ml-2 text-white/40">
+                        — {sessionIndices.filter((i) => currentSlots[i]).length}/{sessionIndices.length} créneau(x) placé(s)
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+          {allSlots.map((slot) => {
               const occ = occupancy[slot.start];
               const blockedHere = blocks.find(
                 (b) => (b.activity_id || b.activityId) === currentActivity.id && (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start)
               );
 
-              const totalCap = currentActivity.maxPlayers;
+              const totalCap = roomCap;
               const playersInSlot = occ?.players || 0;
               const groupsInSlot = occ?.groups || 0;
 
-              // Privative : dès 1 groupe, complet
               const privative = currentActivity.privative;
               const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
               const shared = !privative && playersInSlot > 0 && !full;
 
-              // Fermeture auto 30 min avant le créneau en ligne
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
               if (isToday) {
@@ -280,14 +312,14 @@ export default function StepSlots() {
                 if (slotM - nowM < CLOSURE_MIN_ONLINE) pastCutoff = true;
               }
 
-              // Capacité de cette session spécifique qu'on ajouterait
-              const currentSessionIdx = nextUnassignedIndex();
-              const currentSessionPlayers = currentSessions[currentSessionIdx]?.players || 0;
-              const wouldFit = shared ? playersInSlot + currentSessionPlayers <= totalCap : true;
+              // Prochain index non assigné DANS CE GROUPE de room
+              const nextInGroup = sessionIndices.find((i) => !currentSlots[i]);
+              const nextPlayers = nextInGroup != null ? currentSessions[nextInGroup]?.players || 0 : 0;
+              const wouldFit = shared ? playersInSlot + nextPlayers <= totalCap : true;
 
-              // Est-ce que ce slot est assigné à une session de notre panier ?
-              const assignedSessionIdx = currentSlots.findIndex((s) => s && s.start === slot.start);
-              const isAssigned = assignedSessionIdx >= 0;
+              // Est-ce que ce slot est assigné à une session de CE GROUPE ?
+              const assignedSessionIdx = sessionIndices.find((i) => currentSlots[i] && currentSlots[i].start === slot.start);
+              const isAssigned = assignedSessionIdx != null;
 
               const disabled = Boolean(blockedHere) || full || pastCutoff || (shared && !wouldFit);
 
@@ -302,8 +334,8 @@ export default function StepSlots() {
 
               return (
                 <button
-                  key={slot.start}
-                  onClick={() => !disabled && handleSlotClick(slot)}
+                  key={`${roomId || 'x'}-${slot.start}`}
+                  onClick={() => !disabled && handleSlotClickForGroup(slot, sessionIndices)}
                   disabled={disabled}
                   className={`relative rounded border py-2.5 text-sm font-bold transition ${classes}`}
                   title={
@@ -332,10 +364,14 @@ export default function StepSlots() {
             })}
             {allSlots.length === 0 && (
               <div className="col-span-full rounded border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-white/50">
-                Aucun créneau disponible pour cette activité ce jour-là.
+                Aucun créneau disponible.
               </div>
             )}
           </div>
+                </div>
+              );
+            });
+          })()}
 
           {currentSlots.filter(Boolean).length > 0 && (
             <div className="mt-4 rounded border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-[11px] text-mw-yellow">

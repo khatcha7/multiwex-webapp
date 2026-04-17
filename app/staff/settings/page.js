@@ -179,6 +179,50 @@ export default function StaffSettingsPage() {
         </div>
       </div>
 
+      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Disponibilité des activités</h2>
+        <p className="mb-3 text-xs text-white/50">Désactivez temporairement une activité (maintenance, panne, etc.). Elle apparaîtra grisée et non cliquable côté client.</p>
+        <div className="space-y-2">
+          {activities.filter((a) => a.bookable || a.selectable).map((a) => {
+            const disabled = (cfg['activities.disabled'] || {})[a.id];
+            const isOff = disabled?.disabled;
+            return (
+              <div key={a.id} className="flex items-center gap-3 rounded bg-white/[0.02] p-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!isOff}
+                    onChange={(e) => {
+                      const current = cfg['activities.disabled'] || {};
+                      if (e.target.checked) {
+                        const next = { ...current };
+                        delete next[a.id];
+                        save('activities.disabled', next);
+                      } else {
+                        save('activities.disabled', { ...current, [a.id]: { disabled: true, reason: '' } });
+                      }
+                    }}
+                    className="h-4 w-4 accent-mw-pink"
+                  />
+                  <span className={`display text-sm ${isOff ? 'text-mw-red line-through' : ''}`}>{a.name}</span>
+                </label>
+                {isOff && (
+                  <input
+                    value={disabled.reason || ''}
+                    onChange={(e) => {
+                      const current = cfg['activities.disabled'] || {};
+                      save('activities.disabled', { ...current, [a.id]: { disabled: true, reason: e.target.value } });
+                    }}
+                    placeholder="Raison (ex: maintenance)"
+                    className="input !py-1 flex-1 text-xs"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-1 text-xl">Tarifs & capacités</h2>
         <p className="mb-4 text-xs text-white/50">

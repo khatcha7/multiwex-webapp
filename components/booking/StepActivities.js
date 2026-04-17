@@ -15,6 +15,7 @@ export default function StepActivities() {
 
   const bypassPackage = typeof window !== 'undefined' && (getConfig('booking.bypass_package_toggle') === true || getConfig('booking.bypass_package_toggle') === 'true');
   const isWed = isWednesdayDiscount(cart.date);
+  const disabledActivities = (typeof window !== 'undefined' ? getConfig('activities.disabled') : {}) || {};
   const isFormula = Boolean(cart.packageId);
   const currentPkg = isFormula ? getPackage(cart.packageId) : null;
 
@@ -94,6 +95,16 @@ export default function StepActivities() {
         {activities.map((a) => {
           const selected = !!cart.items[a.id];
           const external = !a.bookable && !a.selectable && !a.walkIn;
+
+          // Activité désactivée par le staff
+          const actDisabled = disabledActivities[a.id];
+          if (actDisabled?.disabled) {
+            return (
+              <div key={a.id} className="relative opacity-40 cursor-not-allowed" onClick={() => alert(`${a.name} n'est pas disponible actuellement.\n${actDisabled.reason || ''}`)}>
+                <ActivityLogoCard activity={a} as="div" date={cart.date} badge="Indisponible" />
+              </div>
+            );
+          }
 
           // BattleKart : sélectionnable mais pas réservable chez nous
           if (a.id === 'battlekart') {
