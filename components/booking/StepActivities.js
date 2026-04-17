@@ -59,38 +59,33 @@ export default function StepActivities() {
         </div>
       )}
 
-      {/* Toggle packages (si pas déjà en formule et pas bypass) */}
+      {/* Bloc groupes / entreprises (si pas déjà en formule et pas bypass) */}
       {!bypassPackage && !isFormula && (
-        <div className="mb-5 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-3">
-          <button
-            onClick={() => setShowPackages(!showPackages)}
-            className="flex w-full items-center justify-between gap-2 text-left"
+        <div className="mb-5 grid gap-2 sm:grid-cols-2">
+          <a
+            href="https://www.multiwex.be/fr/groupes/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
           >
+            <div className="text-2xl">🎉</div>
             <div>
-              <div className="display text-sm">Venez en groupe&nbsp;? Anniversaire, EVG, team building ?</div>
-              <div className="text-xs text-white/60">Packages tout inclus pré-configurés</div>
+              <div className="display text-sm">Groupe · Anniversaire · EVG · EVJF</div>
+              <div className="text-[11px] text-white/60">Packages tout inclus — demandez un devis →</div>
             </div>
-            <span className="display text-xs text-mw-pink">{showPackages ? '−' : '+'}</span>
-          </button>
-          {showPackages && (
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {packages.filter((p) => !p.requiresQuote).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => { applyPackage(p); setShowPackages(false); }}
-                  className="rounded border border-white/10 bg-mw-surface p-3 text-left transition hover:border-mw-pink"
-                >
-                  <div className="display text-sm">{p.name}</div>
-                  <div className="text-[10px] text-white/60">{p.tagline}</div>
-                  <div className="mt-1 display text-lg text-mw-pink">{p.pricePerPerson}€<span className="text-[10px] text-white/40"> /pers</span></div>
-                  <div className="mt-1 text-[10px] text-white/50">min {p.minPlayers} pers</div>
-                </button>
-              ))}
-              <Link href="/packages" className="flex items-center justify-center rounded border border-white/15 bg-white/[0.02] p-3 text-xs text-white/60 hover:border-mw-pink hover:text-mw-pink">
-                Voir tous les packages →
-              </Link>
+          </a>
+          <a
+            href="https://www.multiwex.be/fr/entreprises/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded border border-mw-pink/30 bg-gradient-to-r from-mw-pink/10 to-transparent p-4 transition hover:border-mw-pink"
+          >
+            <div className="text-2xl">🏢</div>
+            <div>
+              <div className="display text-sm">Team building · Entreprise · Family day</div>
+              <div className="text-[11px] text-white/60">Événements sur mesure — contactez-nous →</div>
             </div>
-          )}
+          </a>
         </div>
       )}
 

@@ -54,9 +54,16 @@ export default function ActivityLogoCard({ activity, selected, onClick, badge, p
         <div className="relative z-10 flex items-center justify-center gap-2 border-t border-white/10 bg-black/40 px-3 py-2 text-center">
           {dayPrice != null ? (
             <>
-              <div className="display text-base text-white">{dayPrice}€</div>
-              {isWed && <span className="text-[9px] font-bold text-mw-pink">-50%</span>}
-              <span className="text-[9px] text-white/40">· {activity.minPlayers}-{activity.maxPlayers}j</span>
+              {isWed ? (
+                <>
+                  <div className="text-[10px] text-white/50 line-through">{activity.priceRegular}€</div>
+                  <div className="display text-base text-white">{dayPrice}€</div>
+                  <span className="text-[9px] font-bold text-mw-pink">-50%</span>
+                </>
+              ) : (
+                <div className="display text-base text-white">{dayPrice}€</div>
+              )}
+              <span className="text-[9px] text-white/40">· {activity.minPlayers}-{activity.maxPlayers} joueurs</span>
             </>
           ) : (
             <>
@@ -69,7 +76,7 @@ export default function ActivityLogoCard({ activity, selected, onClick, badge, p
       )}
       {!activity.bookable && (
         <div className="relative z-10 border-t border-white/10 bg-black/40 px-3 py-2 text-center text-[11px] font-bold text-white/70">
-          {activity.walkIn ? 'Sans réservation' : 'Réserver externe ↗'}
+          {activity.walkIn ? 'Sans réservation' : 'Réservation externe ↗'}
         </div>
       )}
     </Tag>
