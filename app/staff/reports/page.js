@@ -79,7 +79,7 @@ export default function StaffReportsPage() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [kpiVisible, setKpiVisible] = useState({
-    revenue: true, bookings: true, avgBasket: true, players: true, occupancy: true, newCustomers: true,
+    revenue: true, bookings: true, avgBasket: true, players: true, occupancy: true, newCustomers: true, conversion: true, ltv: true,
   });
   const [tick, setTick] = useState(0);
 
@@ -323,6 +323,12 @@ export default function StaffReportsPage() {
         )}
         {kpiVisible.newCustomers && (
           <KPI label="Clients uniques" value={stats.uniqueCustomers} />
+        )}
+        {kpiVisible.conversion && (
+          <KPI label="Taux de conversion" value={`${stats.funnel.visits > 0 ? (stats.funnel.paid / stats.funnel.visits * 100).toFixed(1) : 0}%`} />
+        )}
+        {kpiVisible.ltv && (
+          <KPI label="LTV moyenne" value={`${stats.avgLtv.toFixed(0)}€`} />
         )}
       </div>
 
