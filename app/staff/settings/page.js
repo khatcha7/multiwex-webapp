@@ -3,10 +3,22 @@ import { useEffect, useState } from 'react';
 import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup } from '@/lib/data';
 import { activities } from '@/lib/activities';
 
+const TABS = [
+  { id: 'general', label: 'Général' },
+  { id: 'rules', label: 'Règles métier' },
+  { id: 'display', label: 'Affichage' },
+  { id: 'activities', label: 'Activités' },
+  { id: 'packs', label: 'Packs' },
+  { id: 'popups', label: 'Pop-ups' },
+  { id: 'pdf', label: 'PDF / Invitation' },
+  { id: 'pricing', label: 'Tarifs' },
+];
+
 export default function StaffSettingsPage() {
   const [cfg, setCfg] = useState({});
   const [popups, setPopups] = useState([]);
   const [editingPopup, setEditingPopup] = useState(null);
+  const [tab, setTab] = useState('general');
 
   useEffect(() => {
     setCfg(getAllConfig());
@@ -73,7 +85,15 @@ export default function StaffSettingsPage() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="section-title mb-4">Réglages</h1>
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      <div className="mb-6 flex flex-wrap gap-1 rounded border border-white/15 bg-white/5 p-1">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`display rounded px-3 py-1.5 text-xs transition ${tab === t.id ? 'bg-mw-pink text-white' : 'text-white/60 hover:text-white'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'general' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Contenu éditable</h2>
         <div className="space-y-4">
           <Field label="Tagline homepage" value={cfg['site.tagline']} onSave={(v) => save('site.tagline', v)} />
@@ -81,9 +101,9 @@ export default function StaffSettingsPage() {
           <Field label="Téléphone contact" value={cfg['contact.phone']} onSave={(v) => save('contact.phone', v)} />
           <Field label="Email contact" value={cfg['contact.email']} onSave={(v) => save('contact.email', v)} />
         </div>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'rules' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Règles métier</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           <NumField label="Fermeture auto en ligne (min avant)" value={cfg['booking.closure_min_online']} onSave={(v) => save('booking.closure_min_online', v)} />
@@ -94,9 +114,9 @@ export default function StaffSettingsPage() {
           <input type="checkbox" checked={cfg['booking.bypass_package_toggle'] === true || cfg['booking.bypass_package_toggle'] === 'true'} onChange={(e) => save('booking.bypass_package_toggle', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
           Masquer le bloc "Packages de groupe" dans l'étape Activités
         </label>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'display' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Affichage (on/off)</h2>
         <p className="mb-3 text-xs text-white/50">Activez ou désactivez les fonctionnalités visuelles.</p>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -114,9 +134,9 @@ export default function StaffSettingsPage() {
             </label>
           ))}
         </div>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'popups' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="display text-xl">Pop-ups post-confirmation</h2>
           <button onClick={addNewPopup} className="btn-outline !py-2 !px-4 text-xs">+ Ajouter</button>
@@ -158,9 +178,9 @@ export default function StaffSettingsPage() {
             <div className="py-6 text-center text-sm text-white/40">Aucune pop-up configurée.</div>
           )}
         </div>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'packs' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Packs — mode de réservation</h2>
         <p className="mb-3 text-xs text-white/50">Pour chaque pack, choisissez si le client réserve directement via la webapp ("interne") ou s'il est redirigé vers le site Multiwex pour un devis ("redirect").</p>
         <div className="space-y-2">
@@ -178,18 +198,18 @@ export default function StaffSettingsPage() {
             );
           })}
         </div>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'pdf' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Template PDF / Invitation</h2>
         <div className="space-y-3">
           <Field label="Nom entreprise (header PDF)" value={cfg['pdf.company_name']} onSave={(v) => save('pdf.company_name', v)} />
           <Field label="Footer PDF" value={cfg['pdf.footer']} onSave={(v) => save('pdf.footer', v)} />
           <Field label="Couleur accent (hex)" value={cfg['pdf.accent_color']} onSave={(v) => save('pdf.accent_color', v)} />
         </div>
-      </div>
+      </div>)}
 
-      <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'activities' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Disponibilité des activités</h2>
         <p className="mb-3 text-xs text-white/50">Désactivez temporairement une activité (maintenance, panne, etc.). Elle apparaîtra grisée et non cliquable côté client.</p>
         <div className="space-y-2">
@@ -231,9 +251,9 @@ export default function StaffSettingsPage() {
             );
           })}
         </div>
-      </div>
+      </div>)}
 
-      <div className="rounded border border-white/10 bg-mw-surface p-5">
+      {tab === 'pricing' && (<div className="rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-1 text-xl">Tarifs & capacités</h2>
         <p className="mb-4 text-xs text-white/50">
           ⚠ Synchro Odoo à venir. En prod, ces valeurs sont lues depuis la table <code className="text-mw-pink">product.template</code> via API.
@@ -266,7 +286,7 @@ export default function StaffSettingsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>)}
 
       {editingPopup && <PopupEditor popup={editingPopup} onSave={savePopup} onCancel={() => setEditingPopup(null)} />}
     </div>
