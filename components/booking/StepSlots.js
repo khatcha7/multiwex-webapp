@@ -6,7 +6,6 @@ import { getActivity } from '@/lib/activities';
 import { getSlotOccupancy, getSlotBlocks, subscribeBookings } from '@/lib/data';
 import {
   generateSlotsForActivity,
-  applySlotShifts,
   dayLabelsFrMondayFirst,
   dayLabelsFr,
   dayLabelsFrFull,
@@ -61,8 +60,7 @@ export default function StepSlots() {
     return unsub;
   }, []);
 
-  const allSlotsRaw = cart.date && currentActivity ? generateSlotsForActivity(currentActivity, cart.date) : [];
-  const allSlots = currentActivity ? applySlotShifts(allSlotsRaw, currentActivity.id, cart.date) : allSlotsRaw;
+  const allSlots = cart.date && currentActivity ? generateSlotsForActivity(currentActivity, cart.date) : [];
 
   // Trouve le prochain index de session non assigné
   const nextUnassignedIndex = () => {
