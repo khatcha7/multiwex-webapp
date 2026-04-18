@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { generateSlotsForActivity, applySlotShifts, toMinutes, fromMinutes, toDateStr, isToday } from '@/lib/hours';
+import { generateSlotsForActivity, toMinutes, fromMinutes, toDateStr, isToday } from '@/lib/hours';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -173,12 +173,11 @@ export default function TransposedDayView({
   const laneSlots = useMemo(() => {
     const result = {};
     for (const lane of lanes) {
-      const raw = generateSlotsForActivity(
+      result[lane.laneId] = generateSlotsForActivity(
         { ...lane, bookable: true, selectable: true },
         date,
         { fullDay: true }
       );
-      result[lane.laneId] = applySlotShifts(raw, lane.id, date);
     }
     return result;
   }, [lanes, date]);

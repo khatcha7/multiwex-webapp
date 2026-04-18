@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
+import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
 import {
   generateSlotsForActivity,
-  applySlotShifts,
   getHoursForDate,
   toMinutes,
   fromMinutes,
@@ -58,6 +58,7 @@ export default function StaffCalendarPage() {
   const [multiSel, setMultiSel] = useState([]);
   const [selAnchor, setSelAnchor] = useState(null);
   const [ctxMenu, setCtxMenu] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [search, setSearch] = useState('');
   const [hoverSlot, setHoverSlot] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
@@ -432,17 +433,31 @@ export default function StaffCalendarPage() {
             <div className="border-b border-white/10 px-3 py-2">
               <div className="mb-1 text-[10px] uppercase text-white/40">Réservations</div>
               {ctxMenu.items.map((it, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
-                    setCtxMenu(null);
-                  }}
-                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-white/10"
-                >
-                  <span className="text-mw-pink">{it.booking?.customer?.name || 'Client'}</span>
-                  <span className="ml-2 text-white/50">{it.players}j · {it.booking?.id || it.booking?.reference}</span>
-                </button>
+                <div key={i} className="flex w-full items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
+                      setCtxMenu(null);
+                    }}
+                    className="flex-1 rounded px-2 py-1 text-left text-xs hover:bg-white/10"
+                  >
+                    <span className="text-mw-pink">{it.booking?.customer?.name || 'Client'}</span>
+                    <span className="ml-2 text-white/50">{it.players}j · {it.booking?.id || it.booking?.reference}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingItem({ booking: it.booking, item: it });
+                      setCtxMenu(null);
+                    }}
+                    title="Modifier (déplacer ou splitter)"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/60 hover:bg-mw-pink/20 hover:text-mw-pink"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15 14" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -470,49 +485,6 @@ export default function StaffCalendarPage() {
             >
               📝 Réserver sur ce(s) créneau(x)
             </button>
-            <div className="border-t border-white/10 mt-1 pt-1">
-              <div className="px-3 py-1 text-[10px] text-white/40">Décaler ce créneau</div>
-              <div className="flex flex-wrap gap-1 px-2 pb-1">
-                {[-30, -15, -10, -5, 5, 10, 15, 30].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
-                      const key = `${ctxMenu.actDef.id}-${date}`;
-                      if (!shifts[key]) shifts[key] = {};
-                      shifts[key][ctxMenu.slot.start] = (shifts[key][ctxMenu.slot.start] || 0) + m;
-                      localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
-                      setCtxMenu(null);
-                      setTick((t) => t + 1);
-                      alert(`Créneau ${ctxMenu.slot.start} décalé de ${m > 0 ? '+' : ''}${m} min`);
-                    }}
-                    className={`rounded border px-1.5 py-0.5 text-[10px] ${m > 0 ? 'border-green-500/40 text-green-400' : 'border-mw-red/40 text-mw-red'} hover:bg-white/10`}
-                  >
-                    {m > 0 ? '+' : ''}{m}'
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
-                  const key = `${ctxMenu.actDef.id}-${date}`;
-                  if (!shifts[key]) shifts[key] = {};
-                  // Décaler toute la ligne (tous les créneaux après celui-ci)
-                  const val = prompt('Décaler toute la ligne de combien de minutes ? (ex: 5, -10)');
-                  if (val && !isNaN(Number(val))) {
-                    shifts[key]._lineShift = (shifts[key]._lineShift || 0) + Number(val);
-                    shifts[key]._lineFrom = ctxMenu.slot.start;
-                    localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
-                    setCtxMenu(null);
-                    setTick((t) => t + 1);
-                    alert(`${ctxMenu.actDef.name} décalé(e) de ${val} min à partir de ${ctxMenu.slot.start}`);
-                  }
-                }}
-                className="block w-full rounded px-3 py-1.5 text-left text-[10px] text-white/60 hover:bg-white/10"
-              >
-                ↔ Décaler toute l'activité…
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -528,6 +500,14 @@ export default function StaffCalendarPage() {
           ))}
         </div>
       )}
+
+      <EditBookingItemModal
+        open={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        booking={editingItem?.booking}
+        item={editingItem?.item}
+        onSaved={() => { setTick((t) => t + 1); setEditingItem(null); }}
+      />
 
       {/* Block dialog */}
       {selected && (
@@ -579,8 +559,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
         {/* Lanes */}
         {lanes.map((lane) => {
-          const slotsRaw = generateSlotsForActivity(lane, date, { fullDay: true });
-          const slots = applySlotShifts(slotsRaw, lane.id, date);
+          const slots = generateSlotsForActivity(lane, date, { fullDay: true });
           const laneW = lane.compact ? Math.round(pxActivity / 3) : pxActivity;
           const laneBookings = bookings.flatMap((b) =>
             (b.items || []).filter((i) => i.activityId === lane.id).filter((i) => {
@@ -696,8 +675,6 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
   const [note, setNote] = useState('');
   const [label, setLabel] = useState('');
   const [blockedSeats, setBlockedSeats] = useState(0);
-  const [shiftMin, setShiftMin] = useState(5);
-  const [shiftMode, setShiftMode] = useState('single'); // 'single' or 'line'
   const isBatch = Boolean(slot.batch);
   const existingBlock = slot.block;
   const maxPlayers = slot.activity?.maxPlayers || 12;
@@ -774,45 +751,6 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
           </div>
         )}
 
-        {/* Décalage de créneau */}
-        {!isBatch && !existingBlock && (
-          <div className="mt-4 rounded border border-white/10 bg-white/[0.02] p-4">
-            <div className="display mb-2 text-sm text-white/70">Décaler ce créneau</div>
-            <div className="mb-2 flex items-center gap-2">
-              <select value={shiftMode} onChange={(e) => setShiftMode(e.target.value)} className="input !py-1 !w-auto text-xs">
-                <option value="single">Ce créneau seul</option>
-                <option value="line">Toute la ligne (après ce créneau)</option>
-              </select>
-              <div className="flex items-center gap-1">
-                {[-30, -15, -10, -5, 5, 10, 15, 30].map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        const shifts = JSON.parse(localStorage.getItem('mw_slot_shifts') || '{}');
-                        const key = `${slot.activityId}-${slot.date}`;
-                        if (!shifts[key]) shifts[key] = {};
-                        if (shiftMode === 'line') {
-                          // Décale tous les créneaux à partir de celui-ci
-                          shifts[key]._lineShift = (shifts[key]._lineShift || 0) + m;
-                          shifts[key]._lineFrom = slot.start;
-                        } else {
-                          shifts[key][slot.start] = (shifts[key][slot.start] || 0) + m;
-                        }
-                        localStorage.setItem('mw_slot_shifts', JSON.stringify(shifts));
-                        alert(`Créneau décalé de ${m > 0 ? '+' : ''}${m} min (${shiftMode === 'line' ? 'toute la ligne' : 'ce créneau'}). Rechargez pour voir le changement.`);
-                      }
-                    }}
-                    className={`rounded border px-2 py-1 text-xs ${m > 0 ? 'border-green-500/40 text-green-400' : 'border-mw-red/40 text-mw-red'} hover:bg-white/10`}
-                  >
-                    {m > 0 ? '+' : ''}{m}'
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="text-[10px] text-white/40">En prod, le décalage se synchronise avec le site en ligne via Supabase.</p>
-          </div>
-        )}
       </div>
     </div>
   );

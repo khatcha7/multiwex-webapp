@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { activities, getActivityPrice } from '@/lib/activities';
-import { generateSlotsForActivity, applySlotShifts, toDateStr } from '@/lib/hours';
+import { generateSlotsForActivity, toDateStr } from '@/lib/hours';
 import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
 
 export default function OnSiteBookingPage() {
@@ -283,8 +283,7 @@ export default function OnSiteBookingPage() {
           <div className="mb-2 display text-sm">3. Créneaux & joueurs</div>
           {Object.entries(items).map(([id, arr]) => {
             const a = activities.find((x) => x.id === id);
-            const allSlotsRaw = generateSlotsForActivity(a, date);
-            const allSlots = applySlotShifts(allSlotsRaw, a.id, date);
+            const allSlots = generateSlotsForActivity(a, date);
             const occ = occupancy[id] || {};
             return (
               <div key={id} className="mb-4 rounded bg-white/[0.02] p-3">
