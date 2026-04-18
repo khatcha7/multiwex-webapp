@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { listBookings, subscribeBookings } from '@/lib/data';
 import { toDateStr } from '@/lib/hours';
 import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
+import AddPlayersModal from '@/components/booking/AddPlayersModal';
 
 export default function StaffBookingsPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function StaffBookingsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [editingItem, setEditingItem] = useState(null);
+  const [addPlayersBooking, setAddPlayersBooking] = useState(null);
 
   useEffect(() => {
     listBookings().then(setAll);
@@ -185,7 +187,13 @@ export default function StaffBookingsPage() {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-center">
-                  <button className="text-xs text-mw-pink hover:underline" title="Ajouter des joueurs">+</button>
+                  <button
+                    onClick={() => setAddPlayersBooking(b)}
+                    className="text-xs text-mw-pink hover:underline"
+                    title="Ajouter des joueurs"
+                  >
+                    +
+                  </button>
                 </td>
               </tr>
             ))}
@@ -203,6 +211,14 @@ export default function StaffBookingsPage() {
         item={editingItem?.item}
         onSaved={() => { setTick((t) => t + 1); setEditingItem(null); }}
       />
+
+      {addPlayersBooking && (
+        <AddPlayersModal
+          booking={addPlayersBooking}
+          onClose={() => setAddPlayersBooking(null)}
+          onUpdated={() => { setTick((t) => t + 1); setAddPlayersBooking(null); }}
+        />
+      )}
     </div>
   );
 }
