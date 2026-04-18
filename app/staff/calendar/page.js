@@ -351,7 +351,7 @@ export default function StaffCalendarPage() {
 
         <div className="ml-auto flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
           {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+            <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
           ))}
         </div>
 
