@@ -119,7 +119,11 @@ export default function StaffCalendarPage() {
       if (root) {
         const target = root.querySelector(`[data-time="${targetTime}"]`);
         if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          const rect = target.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          // Aussi gérer le scroll horizontal interne si présent
+          target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
           return;
         }
       }
