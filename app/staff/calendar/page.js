@@ -328,7 +328,7 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
-      <div className={view === 'day' ? 'sticky top-[52px] z-30 bg-mw-bg/95 pt-3 pb-1 backdrop-blur-md' : ''}>
+      <div className={view === 'day' ? 'sticky top-[60px] z-40 bg-mw-bg pt-3 pb-2' : ''}>
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="section-title shrink-0">Calendrier</h1>
