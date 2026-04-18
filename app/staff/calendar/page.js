@@ -51,6 +51,7 @@ export default function StaffCalendarPage() {
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
   const [k7Open, setK7Open] = useState(false);
   const [bookings, setBookings] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [tick, setTick] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -67,6 +68,10 @@ export default function StaffCalendarPage() {
     listBookings({ from: date, to: date }).then(setBookings);
     getSlotBlocks(date).then(setBlocks);
   }, [date, tick]);
+
+  useEffect(() => {
+    listBookings().then(setAllBookings);
+  }, [tick]);
 
   useEffect(() => {
     const unsub = subscribeBookings(() => setTick((t) => t + 1));
@@ -97,20 +102,47 @@ export default function StaffCalendarPage() {
     return out;
   }, [visible, k7Open, slashOpen]);
 
-  // Search highlight
+  // Selected search result → highlight slots (cyan)
+  const [highlightBookingId, setHighlightBookingId] = useState(null);
   const highlightIds = useMemo(() => {
-    if (!search.trim()) return new Set();
+    const s = new Set();
+    if (highlightBookingId) s.add(highlightBookingId);
+    return s;
+  }, [highlightBookingId]);
+
+  // Search dropdown results — current day first, then upcoming, then past
+  const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const ids = new Set();
-    bookings.forEach((b) => {
-      const match =
+    if (!q) return [];
+    const matched = allBookings.filter((b) => {
+      return (
         (b.id || b.reference || '').toLowerCase().includes(q) ||
         (b.customer?.name || '').toLowerCase().includes(q) ||
-        (b.customer?.email || '').toLowerCase().includes(q);
-      if (match) ids.add(b.id || b.reference);
+        (b.customer?.firstName || '').toLowerCase().includes(q) ||
+        (b.customer?.lastName || '').toLowerCase().includes(q) ||
+        (b.customer?.email || '').toLowerCase().includes(q)
+      );
     });
-    return ids;
-  }, [search, bookings]);
+    const today = date;
+    return matched.sort((a, b) => {
+      const aIsDay = a.date === today ? 0 : 1;
+      const bIsDay = b.date === today ? 0 : 1;
+      if (aIsDay !== bIsDay) return aIsDay - bIsDay;
+      // Then sort by absolute distance to displayed date
+      const da = Math.abs(new Date(a.date) - new Date(today));
+      const db = Math.abs(new Date(b.date) - new Date(today));
+      return da - db;
+    }).slice(0, 30);
+  }, [search, allBookings, date]);
+
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  const onPickSearchResult = (b) => {
+    if (b.date !== date) setDate(b.date);
+    setHighlightBookingId(b.id || b.reference);
+    setSearch('');
+    setSearchFocused(false);
+  };
 
   const toggleVis = (id) => { const n = new Set(visible); if (n.has(id)) n.delete(id); else n.add(id); setVisible(n); };
   const goPrev = () => { const d = parseDate(date); d.setDate(d.getDate() - (view === 'month' ? 30 : view === 'week' ? 7 : 1)); setDate(toDateStr(d)); };
@@ -228,13 +260,44 @@ export default function StaffCalendarPage() {
           <h1 className="section-title">Calendrier</h1>
         </div>
         <div className="relative flex flex-wrap items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher ID, nom, email…"
-            className="input !py-2 text-sm"
-            style={{ width: '490px' }}
-          />
+          <div className="relative" style={{ width: '490px' }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="Rechercher ID, nom, email…"
+              className="input !py-2 text-sm w-full"
+            />
+            {searchFocused && search.trim() && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded border border-white/10 bg-mw-surface shadow-xl">
+                {searchResults.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-white/40">Aucun résultat</div>
+                )}
+                {searchResults.map((b) => {
+                  const isOtherDay = b.date !== date;
+                  return (
+                    <button
+                      key={b.id || b.reference}
+                      onMouseDown={(e) => { e.preventDefault(); onPickSearchResult(b); }}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-white/5"
+                    >
+                      <span className="font-mono text-mw-pink shrink-0">{b.id || b.reference}</span>
+                      <span className="flex-1 truncate text-white/80">
+                        {b.customer?.name || `${b.customer?.firstName || ''} ${b.customer?.lastName || ''}`.trim() || '—'}
+                        <span className="ml-2 text-white/40">{b.customer?.email}</span>
+                      </span>
+                      {isOtherDay && (
+                        <span className="shrink-0 rounded bg-mw-yellow/20 px-2 py-0.5 text-[10px] text-mw-yellow">
+                          {new Date(b.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -367,8 +430,7 @@ export default function StaffCalendarPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    // Highlight all slots from this customer
-                    setSearch(it.booking?.customer?.name || it.booking?.id || '');
+                    setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
                     setCtxMenu(null);
                   }}
                   className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-white/10"

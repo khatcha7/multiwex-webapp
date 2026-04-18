@@ -149,8 +149,9 @@ body {
   z-index: 5;
 }
 .cal-slot-highlight {
-  outline: 3px solid #F3D10B !important;
+  outline: 3px solid #00d9ff !important;
   outline-offset: -1px;
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.7);
   z-index: 5;
 }
 .cal-closed-hour {

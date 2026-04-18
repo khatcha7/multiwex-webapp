@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useMemo, useCallback, useEffect } from 'react';
+import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { generateSlotsForActivity, applySlotShifts, toMinutes, fromMinutes } from '@/lib/hours';
+import { generateSlotsForActivity, applySlotShifts, toMinutes, fromMinutes, toDateStr, isToday } from '@/lib/hours';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -117,6 +117,23 @@ export default function TransposedDayView({
   const openMin = hours ? toMinutes(hours.open) : 0;
   const closeMin = hours ? toMinutes(hours.close) : 1440;
   const totalWidth = TOTAL_HOURS * pxPerHour;
+
+  /* ---------- now line (tick every minute) ---------- */
+  const [nowMinutes, setNowMinutes] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const update = () => {
+      const n = new Date();
+      setNowMinutes(n.getHours() * 60 + n.getMinutes());
+    };
+    update();
+    const id = setInterval(update, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const showNowLine = isToday(date);
+  const nowLeft = (nowMinutes / 60) * pxPerHour;
 
   /* ---------- batch-block merging ---------- */
   const mergedBlocksByLane = useMemo(() => {
@@ -723,6 +740,22 @@ export default function TransposedDayView({
                 cursor: 'pointer',
               }}
             />
+
+            {/* Now line (today only) */}
+            {showNowLine && (
+              <div
+                className="pointer-events-none"
+                style={{
+                  position: 'absolute',
+                  left: nowLeft,
+                  top: 0,
+                  bottom: 0,
+                  width: 2,
+                  background: '#00ff66',
+                  zIndex: 10,
+                }}
+              />
+            )}
 
             {/* Slots per row */}
             {rowMeta.map(({ rowTop, rowHeight, row }) => {
