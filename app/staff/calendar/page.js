@@ -338,7 +338,7 @@ export default function StaffCalendarPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
 
         <h1 className="section-title shrink-0 hidden md:block">Calendrier</h1>
-        <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
+        <div className="flex flex-1 items-center justify-start gap-1.5 flex-wrap md:justify-center">
           {activities.filter((a) => a.bookable).map((a) => (
             <button
               key={a.id}
@@ -356,7 +356,7 @@ export default function StaffCalendarPage() {
           <button
             onClick={() => setMobileSearchOpen((v) => !v)}
             title="Rechercher"
-            className={`md:hidden relative flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
+            className={`md:hidden relative ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
               mobileSearchOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 bg-white/5 text-white/70'
             }`}
           >
