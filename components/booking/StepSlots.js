@@ -16,6 +16,7 @@ import {
   toMinutes,
   dayToMondayIndex,
   CLOSURE_MIN_ONLINE,
+  nowMinutesBrussels,
 } from '@/lib/hours';
 
 export default function StepSlots() {
@@ -316,8 +317,7 @@ export default function StepSlots() {
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
               if (isToday) {
-                const now = new Date();
-                const nowM = now.getHours() * 60 + now.getMinutes();
+                const nowM = nowMinutesBrussels();
                 const slotM = toMinutes(slot.start);
                 if (slotM - nowM < CLOSURE_MIN_ONLINE) pastCutoff = true;
               }

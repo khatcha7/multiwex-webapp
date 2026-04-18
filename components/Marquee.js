@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { openingHours, dayLabelsFrFull } from '@/lib/hours';
+import { openingHours, dayLabelsFrFull, nowMinutesBrussels } from '@/lib/hours';
 
 function getCurrentStatus() {
-  const now = new Date();
-  const today = openingHours[now.getDay()];
-  const minutes = now.getHours() * 60 + now.getMinutes();
+  // Jour & heure en fuseau Bruxelles (le centre est en Belgique)
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Brussels', weekday: 'short' });
+  const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const today = openingHours[dayMap[fmt.format(new Date())]];
+  const minutes = nowMinutesBrussels();
   const toMin = (hhmm) => {
     const [h, m] = hhmm.split(':').map(Number);
     return h * 60 + m;
