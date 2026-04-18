@@ -438,7 +438,7 @@ export default function StaffCalendarPage() {
           </button>
 
           <div className="flex h-9 shrink-0 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
-            {[['day', 'Jour', 'J'], ['week', 'Semaine', 'S'], ['month', 'Mois', 'M']].map(([v, l, s]) => (
+            {[['day', 'Jour', 'J'], ['week', 'Sem', 'S'], ['month', 'Mois', 'M']].map(([v, l, s]) => (
               <button key={v} onClick={() => setView(v)} className={`display flex h-full min-w-[28px] items-center justify-center rounded px-2 text-[11px] md:px-1.5 md:text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>
                 <span className="hidden md:inline">{l}</span>
                 <span className="md:hidden">{s}</span>
@@ -446,13 +446,13 @@ export default function StaffCalendarPage() {
             ))}
           </div>
 
-          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[300px] md:flex-none">
+          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[300px]">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
               className="display flex-1 whitespace-nowrap px-2 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
             >
-              <span className="hidden md:inline">{parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
+              <span className="hidden md:inline">{parseDate(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
               <span className="md:hidden">{parseDate(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()}</span>
             </button>
             <button onClick={goNext} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
