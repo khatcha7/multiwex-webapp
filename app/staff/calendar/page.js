@@ -67,6 +67,23 @@ export default function StaffCalendarPage() {
   const hoverTimer = useRef(null);
   const dateInputRef = useRef(null);
   const calRef = useRef(null);
+  const stickyHeaderRef = useRef(null);
+
+  // Mesure dynamique de la hauteur du sticky header → publie une CSS var
+  // utilisée par les en-têtes de colonnes d'activités (sticky bar séparée au-dessus de la grille).
+  useEffect(() => {
+    if (!stickyHeaderRef.current || !calRef.current) return;
+    const STAFF_NAV = 44;
+    const update = () => {
+      const h = stickyHeaderRef.current?.offsetHeight || 0;
+      calRef.current?.style.setProperty('--cal-lane-top', `${STAFF_NAV + h}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(stickyHeaderRef.current);
+    window.addEventListener('resize', update);
+    return () => { ro.disconnect(); window.removeEventListener('resize', update); };
+  }, [view]);
   const [highlightBookingId, setHighlightBookingId] = useState(null);
 
   useEffect(() => {
@@ -353,7 +370,7 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
-      <div className={view === 'day' ? 'sticky top-[44px] z-30 bg-mw-bg pt-3 pb-2' : ''}>
+      <div ref={stickyHeaderRef} className={view === 'day' ? 'sticky top-[44px] z-30 bg-mw-bg pt-3 pb-2' : ''}>
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
 
@@ -658,12 +675,50 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
   const openM = hours ? toMinutes(hours.open) : -1;
   const closeM = hours ? toMinutes(hours.close) : -1;
 
+  const gridScrollRef = useRef(null);
+  const headerInnerRef = useRef(null);
+
+  useEffect(() => {
+    const grid = gridScrollRef.current;
+    const inner = headerInnerRef.current;
+    if (!grid || !inner) return;
+    const sync = () => { inner.style.transform = `translateX(${-grid.scrollLeft}px)`; };
+    grid.addEventListener('scroll', sync, { passive: true });
+    sync();
+    return () => grid.removeEventListener('scroll', sync);
+  }, []);
+
   return (
-    <div className="overflow-x-auto rounded border border-white/10 bg-mw-bg">
+    <>
+      {/* Sticky activity headers — sous la toolbar, scroll horizontal synchro avec la grille */}
+      <div className="sticky z-20 flex overflow-hidden border border-b-0 border-white/10 bg-mw-bg" style={{ top: 'var(--cal-lane-top, 44px)' }}>
+        <div className="w-14 shrink-0 border-r border-white/10 bg-mw-bg" />
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div ref={headerInnerRef} className="flex" style={{ willChange: 'transform' }}>
+            {lanes.map((lane) => {
+              const laneW = lane.compact ? Math.round(pxActivity / 3) : pxActivity;
+              return (
+                <div
+                  key={lane.laneId}
+                  className="flex h-12 shrink-0 items-center gap-1 border-r border-white/10 px-1.5 cursor-pointer"
+                  style={{ width: `${laneW}px`, minWidth: `${laneW}px` }}
+                  onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}
+                >
+                  <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
+                  <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>
+                  {lane.id === 'k7' && <span className="text-[10px] text-white/40">{k7Open ? '−' : '+'}</span>}
+                  {lane.id === 'slashhit' && <span className="text-[10px] text-white/40">{slashOpen ? '−' : '+'}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+    <div ref={gridScrollRef} className="overflow-x-auto rounded-b border border-white/10 bg-mw-bg">
       <div className="flex min-w-full">
         {/* Time column */}
         <div className="sticky left-0 z-10 w-14 shrink-0 border-r border-white/10 bg-mw-bg">
-          <div className="h-12 border-b border-white/10" />
           {Array.from({ length: hourCount }).map((_, i) => {
             const h = fromMinutes(i * 60);
             const inOpen = openM >= 0 && i * 60 >= openM && i * 60 < closeM;
@@ -700,12 +755,6 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
           return (
             <div key={lane.laneId} className="shrink-0 grow border-r border-white/10" style={{ width: `${laneW}px`, minWidth: `${laneW}px` }}>
-              <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}>
-                <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
-                <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>
-                {lane.id === 'k7' && <span className="text-[10px] text-white/40">{k7Open ? '−' : '+'}</span>}
-                {lane.id === 'slashhit' && <span className="text-[10px] text-white/40">{slashOpen ? '−' : '+'}</span>}
-              </div>
               <div className="relative" style={{ height: `${hourCount * pxH}px` }}>
                 {Array.from({ length: hourCount }).map((_, i) => {
                   const inOpen = openM >= 0 && i * 60 >= openM && i * 60 < closeM;
@@ -789,6 +838,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
         })}
       </div>
     </div>
+    </>
   );
 }
 
