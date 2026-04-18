@@ -45,8 +45,8 @@ export default function StaffCalendarPage() {
   const setView = (v) => { _setView(v); savePref('view', v); };
   const [dayLayout, _setDayLayout] = useState(() => loadPref('layout', 'transposed'));
   const setDayLayout = (v) => { _setDayLayout(v); savePref('layout', v); };
-  const [pxTime, _setPxTime] = useState(() => loadPref('pxTime', 64));
-  const setPxTime = (v) => { _setPxTime(v); savePref('pxTime', v); };
+  const [pxTime, _setPxTime] = useState(() => Math.max(100, loadPref('pxTime', 100)));
+  const setPxTime = (v) => { const clamped = Math.max(100, Number(v) || 100); _setPxTime(clamped); savePref('pxTime', clamped); };
   const [pxActivity, _setPxActivity] = useState(() => loadPref('pxActivity', 160));
   const setPxActivity = (v) => { _setPxActivity(v); savePref('pxActivity', v); };
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
@@ -289,7 +289,7 @@ export default function StaffCalendarPage() {
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
-            <input type="range" min="24" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
+            <input type="range" min="100" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
@@ -482,7 +482,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
   return (
     <div className="overflow-x-auto rounded border border-white/10 bg-mw-bg">
-      <div className="flex min-w-max">
+      <div className="flex min-w-full">
         {/* Time column */}
         <div className="sticky left-0 z-10 w-14 shrink-0 border-r border-white/10 bg-mw-bg">
           <div className="h-12 border-b border-white/10" />
@@ -522,7 +522,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
           });
 
           return (
-            <div key={lane.laneId} className="shrink-0 border-r border-white/10" style={{ width: `${laneW}px` }}>
+            <div key={lane.laneId} className="shrink-0 grow border-r border-white/10" style={{ width: `${laneW}px`, minWidth: `${laneW}px` }}>
               <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}>
                 <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
                 <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>

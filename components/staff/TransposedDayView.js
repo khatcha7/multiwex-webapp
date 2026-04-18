@@ -377,7 +377,7 @@ export default function TransposedDayView({
 
   return (
     <div
-      style={{ position: 'relative', width: '100%', overflow: 'hidden' }}
+      style={{ position: 'relative', width: '100%', overflow: 'hidden', minHeight: '100vh' }}
     >
       {/* Time header */}
       <div style={{ display: 'flex' }}>
@@ -427,7 +427,7 @@ export default function TransposedDayView({
       </div>
 
       {/* Body: sticky row headers + scrollable grid */}
-      <div style={{ display: 'flex', maxHeight: 'calc(100vh - 200px)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', overflow: 'hidden' }}>
         {/* Row headers — sticky left, vertical scroll synced */}
         <div
           style={{
