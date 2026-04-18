@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
@@ -39,6 +40,7 @@ function savePref(key, value) {
 }
 
 export default function StaffCalendarPage() {
+  const searchParams = useSearchParams();
   const [date, setDate] = useState(toDateStr(new Date()));
   const [view, _setView] = useState(() => loadPref('view', 'day'));
   const setView = (v) => { _setView(v); savePref('view', v); };
@@ -64,6 +66,8 @@ export default function StaffCalendarPage() {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const hoverTimer = useRef(null);
   const dateInputRef = useRef(null);
+  const calRef = useRef(null);
+  const [highlightBookingId, setHighlightBookingId] = useState(null);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -78,6 +82,42 @@ export default function StaffCalendarPage() {
     const unsub = subscribeBookings(() => setTick((t) => t + 1));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const d = searchParams.get('date');
+    if (d) setDate(d);
+  }, [searchParams]);
+
+  const autoScrolledRef = useRef(null);
+  useEffect(() => {
+    if (!searchParams) return;
+    const hl = searchParams.get('highlight');
+    if (!hl) return;
+    setHighlightBookingId(hl);
+    if (autoScrolledRef.current === hl) return;
+    if (!bookings || bookings.length === 0) return;
+    const target = bookings.find((b) => (b.id || b.reference) === hl);
+    if (!target) return;
+    const firstItem = (target.items || [])[0];
+    if (!firstItem) return;
+    const startMin = toMinutes(firstItem.start || firstItem.slot_start || '00:00');
+    const top = (startMin / 60) * pxTime;
+    autoScrolledRef.current = hl;
+    setTimeout(() => {
+      const root = calRef.current;
+      if (!root) return;
+      const scrollables = root.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
+      scrollables.forEach((el) => {
+        if (el.scrollHeight > el.clientHeight) {
+          el.scrollTo({ top: Math.max(0, top - 80), behavior: 'smooth' });
+        }
+        if (el.scrollWidth > el.clientWidth) {
+          el.scrollTo({ left: Math.max(0, top - 80), behavior: 'smooth' });
+        }
+      });
+    }, 150);
+  }, [bookings, searchParams, pxTime]);
 
   const pxH = pxTime; // Contrôlé par le slider (les presets mettent à jour pxTime)
   const hours = getHoursForDate(date);
@@ -104,7 +144,6 @@ export default function StaffCalendarPage() {
   }, [visible, k7Open, slashOpen]);
 
   // Selected search result → highlight slots (cyan)
-  const [highlightBookingId, setHighlightBookingId] = useState(null);
   const highlightIds = useMemo(() => {
     const s = new Set();
     if (highlightBookingId) s.add(highlightBookingId);
@@ -244,7 +283,6 @@ export default function StaffCalendarPage() {
   };
 
   // Disable native context menu on calendar
-  const calRef = useRef(null);
   useEffect(() => {
     const el = calRef.current;
     if (!el) return;
