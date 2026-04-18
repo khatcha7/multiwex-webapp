@@ -446,7 +446,7 @@ export default function StaffCalendarPage() {
             ))}
           </div>
 
-          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[330px] md:flex-none">
+          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[300px] md:flex-none">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
