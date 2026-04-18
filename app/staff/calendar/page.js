@@ -87,6 +87,9 @@ export default function StaffCalendarPage() {
     if (!searchParams) return;
     const d = searchParams.get('date');
     if (d) setDate(d);
+    // Si on arrive avec un highlight (depuis /staff/bookings), forcer la vue classique
+    // car l'autoscroll vertical y fonctionne mieux qu'en transposée.
+    if (searchParams.get('highlight')) setDayLayout('classic');
   }, [searchParams]);
 
   const autoScrolledRef = useRef(null);
