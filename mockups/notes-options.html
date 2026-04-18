@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Multiwex — Maquettes système de notes calendrier</title>
+<style>
+  :root {
+    --bg: #080808;
+    --surface: #141414;
+    --surface-2: #1a1a1a;
+    --border: rgba(255,255,255,0.1);
+    --border-strong: rgba(255,255,255,0.2);
+    --text: #fff;
+    --text-dim: rgba(255,255,255,0.5);
+    --pink: #e8005a;
+    --yellow: #f3d10b;
+    --cyan: #00d9ff;
+    --green: #00ff66;
+    --purple: #b400ff;
+    --orange: #ff8c00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+    font-size: 13px;
+    padding: 32px 24px;
+  }
+  h1 {
+    font-size: 24px;
+    margin: 0 0 8px;
+  }
+  .intro {
+    color: var(--text-dim);
+    margin-bottom: 32px;
+    max-width: 800px;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+  .mockup {
+    margin-bottom: 56px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .mockup-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--pink);
+  }
+  .mockup-desc {
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .mockup-pros {
+    color: var(--green);
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .mockup-cons {
+    color: #ff5566;
+    font-size: 11px;
+    margin-bottom: 16px;
+  }
+
+  /* ---------- Calendar base ---------- */
+  .cal {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface-2);
+    position: relative;
+  }
+  .cal-header {
+    display: grid;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    height: 44px;
+  }
+  .cal-grid {
+    display: grid;
+  }
+  .cal-cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 6px 8px;
+    min-height: 56px;
+    position: relative;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .cal-cell:last-child { border-right: none; }
+  .cal-time {
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    color: var(--text-dim);
+    text-align: right;
+    padding: 4px 8px 0;
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .cal-head-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .cal-head-cell:last-child { border-right: none; }
+  .booking {
+    display: block;
+    background: rgba(0, 217, 255, 0.15);
+    border: 1px solid rgba(0, 217, 255, 0.5);
+    border-radius: 3px;
+    padding: 3px 6px;
+    color: #cdf3ff;
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .booking.full {
+    background: rgba(232, 0, 90, 0.18);
+    border-color: rgba(232, 0, 90, 0.6);
+    color: #ffc8d8;
+  }
+
+  /* ---------- Note variants ---------- */
+  .note-pill {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    margin: 1px;
+  }
+  .note-team    { background: rgba(180,0,255,0.2); color: #d68fff; border: 1px solid rgba(180,0,255,0.5); }
+  .note-absent  { background: rgba(255,140,0,0.2); color: #ffc080; border: 1px solid rgba(255,140,0,0.5); }
+  .note-gift    { background: rgba(243,209,11,0.2); color: var(--yellow); border: 1px solid rgba(243,209,11,0.5); }
+  .note-clean   { background: rgba(100,100,100,0.3); color: #ccc; border: 1px solid rgba(100,100,100,0.6); }
+  .note-bday    { background: rgba(232,0,90,0.18); color: #ff7aa8; border: 1px solid rgba(232,0,90,0.5); }
+
+  /* === Option 1 : Colonne dédiée === */
+  .opt1 .cal-grid,
+  .opt1 .cal-header { grid-template-columns: 60px 200px 1fr 1fr 1fr 1fr 1fr 1fr; }
+  .notes-col {
+    background: rgba(255,255,255,0.02);
+    border-right: 2px solid var(--pink);
+  }
+  .notes-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 10px;
+    line-height: 1.3;
+    overflow: hidden;
+  }
+
+  /* === Option 2 : Bandeau au-dessus === */
+  .opt2 .cal-grid,
+  .opt2 .cal-header { grid-template-columns: 60px 1fr 1fr 1fr 1fr 1fr 1fr; }
+  .top-band {
+    background: var(--bg);
+    border-bottom: 2px solid var(--pink);
+    padding: 8px 12px;
+  }
+  .top-band-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+  .top-band-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-weight: 700;
+    padding-top: 4px;
+  }
+  .top-band-tracks {
+    position: relative;
+    height: 26px;
+  }
+  .top-band-tracks.row2 { height: 56px; }
+  .top-track-block {
+    position: absolute;
+    height: 22px;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .scale {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-bottom: 1px solid var(--border);
+    height: 18px;
+    color: var(--text-dim);
+    font-size: 10px;
+    background: var(--bg);
+  }
+  .scale > div {
+    border-right: 1px solid rgba(255,255,255,0.04);
+    padding: 2px 6px;
+  }
+
+  /* === Option 3 : Markers + side panel === */
+  .opt3 .layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 12px;
+  }
+  .opt3 .cal-grid,
+  .opt3 .cal-header { grid-template-columns: 60px 1fr 1fr 1fr 1fr 1fr 1fr; }
+  .marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 4px;
+    cursor: pointer;
+  }
+  .side-panel {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .side-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .side-note {
+    background: var(--surface);
+    border-left: 3px solid var(--pink);
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+  .side-note .h {
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .side-note .t {
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+  .side-note.team    { border-left-color: var(--purple); }
+  .side-note.absent  { border-left-color: var(--orange); }
+  .side-note.gift    { border-left-color: var(--yellow); }
+  .side-note.clean   { border-left-color: #888; }
+  .side-note.bday    { border-left-color: var(--pink); }
+
+  /* === Option 4 : Overlay transparent sur la grille === */
+  .opt4 .cal-grid,
+  .opt4 .cal-header { grid-template-columns: 60px 1fr 1fr 1fr 1fr 1fr 1fr; }
+  .overlay-band {
+    position: absolute;
+    left: 60px;
+    right: 0;
+    border-top: 1px dashed currentColor;
+    border-bottom: 1px dashed currentColor;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .overlay-band-team    { background: rgba(180,0,255,0.07);  color: #d68fff; }
+  .overlay-band-bday    { background: rgba(232,0,90,0.07);   color: #ff7aa8; }
+  .overlay-band-clean   { background: rgba(100,100,100,0.15); color: #ccc; }
+
+  /* === Option 5 : Hybride === */
+  .opt5 .cal-grid,
+  .opt5 .cal-header { grid-template-columns: 60px 200px 1fr 1fr 1fr 1fr 1fr 1fr; }
+
+  /* === Option 6 : Inline dans cellule === */
+  .opt6 .cal-grid,
+  .opt6 .cal-header { grid-template-columns: 60px 1fr 1fr 1fr 1fr 1fr 1fr; }
+  .inline-note-icon {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--purple);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .inline-note-icon.absent { background: var(--orange); }
+  .inline-note-icon.gift   { background: var(--yellow); color: #000; }
+  .inline-note-icon.clean  { background: #888; }
+  .inline-note-icon.bday   { background: var(--pink); }
+
+  .summary {
+    background: var(--surface);
+    border: 2px solid var(--pink);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 32px;
+  }
+  .summary h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+  }
+  .summary p {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin: 0 0 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>📋 Système de notes calendrier — 6 maquettes comparées</h1>
+<p class="intro">
+Toutes les maquettes utilisent les mêmes données fictives : un samedi 18 avril 2026, 14h–19h, 6 activités, et 5 notes de types variés.<br>
+Objectif : visualiser comment chaque approche gère la lisibilité, le chevauchement et la densité.
+</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#b400ff;"></div>Team building (long, transversal)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#ff8c00;"></div>Joueurs absents (court, ciblé)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f3d10b;"></div>Cartes cadeaux (court)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#888;"></div>Fermeture/Nettoyage</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e8005a;"></div>Anniversaire / Événement</div>
+</div>
+
+<!-- ============== OPTION 1 ============== -->
+<div class="mockup opt1">
+  <div class="mockup-title">Option 1 — Colonne "Notes" dédiée à gauche</div>
+  <div class="mockup-desc">Une colonne fixe entre la colonne heures et les activités. Chaque note = bloc temporel comme un slot.</div>
+  <div class="mockup-pros">✅ Alignement temporel parfait, pattern proche des slots existants</div>
+  <div class="mockup-cons">❌ Prend de l'espace permanent ; chevauchement compliqué si beaucoup de notes</div>
+
+  <div class="cal">
+    <div class="cal-header">
+      <div></div>
+      <div class="cal-head-cell" style="color:var(--pink);">📝 NOTES</div>
+      <div class="cal-head-cell">EYESTART</div>
+      <div class="cal-head-cell">DARKDRIFT</div>
+      <div class="cal-head-cell">K7 RECORD</div>
+      <div class="cal-head-cell">K7 STUDIO</div>
+      <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+      <div class="cal-head-cell">CUBE3</div>
+    </div>
+    <div class="cal-grid" style="position:relative;">
+      <!-- 14h -->
+      <div class="cal-time">14:00</div>
+      <div class="cal-cell notes-col" style="position:relative; min-height:336px; grid-row: span 6;">
+        <div class="notes-block" style="top:0; height:168px; background:rgba(180,0,255,0.18); border:1px solid rgba(180,0,255,0.6); color:#d68fff;">
+          <strong>14:00 → 17:00</strong><br>
+          <em>Team building Carrefour</em><br>
+          25 personnes, brief à 13h45
+        </div>
+        <div class="notes-block" style="top:38px; left:auto; width:calc(50% - 4px); right:4px; height:30px; background:rgba(255,140,0,0.18); border:1px solid rgba(255,140,0,0.6); color:#ffc080;">
+          <strong>14:20</strong> Dupont absent
+        </div>
+        <div class="notes-block" style="top:170px; height:28px; background:rgba(232,0,90,0.15); border:1px solid rgba(232,0,90,0.5); color:#ff7aa8;">
+          <strong>15:00 → 16:00</strong> 🎂 Anniv Léa
+        </div>
+        <div class="notes-block" style="top:200px; height:28px; background:rgba(243,209,11,0.18); border:1px solid rgba(243,209,11,0.6); color:var(--yellow);">
+          <strong>16:00</strong> 🎁 Cartes cadeaux x3
+        </div>
+        <div class="notes-block" style="top:280px; height:56px; background:rgba(100,100,100,0.3); border:1px solid rgba(100,100,100,0.6); color:#ccc;">
+          <strong>18:00 → 19:00</strong><br>Fermeture / nettoyage
+        </div>
+      </div>
+      <div class="cal-cell"><div class="booking">14:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking full">14:00 (12)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+      <div class="cal-time">15:00</div>
+      <div class="cal-cell"><div class="booking">15:00 (4)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking full">15:00 (12)</div></div>
+      <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+      <div class="cal-time">16:00</div>
+      <div class="cal-cell"><div class="booking">16:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">17:00</div>
+      <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+      <div class="cal-time">18:00</div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">19:00</div>
+      <div class="cal-cell"><div class="booking">19:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">19:00 (6)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION 2 ============== -->
+<div class="mockup opt2">
+  <div class="mockup-title">Option 2 — Bandeau "events" au-dessus de la timeline</div>
+  <div class="mockup-desc">Une rangée fixe en haut, type "all-day events" Google Calendar, avec multi-tracks pour chevauchements.</div>
+  <div class="mockup-pros">✅ N'occupe pas d'espace par activité ; multi-notes empilent proprement</div>
+  <div class="mockup-cons">❌ Notes courtes (20min) deviennent des micro-blocs illisibles ; pas attaché à une activité spécifique</div>
+
+  <div class="cal">
+    <div class="top-band">
+      <div class="top-band-row">
+        <div class="top-band-label">📝 NOTES</div>
+        <div class="top-band-tracks row2">
+          <div class="top-track-block" style="background:rgba(180,0,255,0.25); border:1px solid rgba(180,0,255,0.7); color:#d68fff; left:0%; width:60%; top:0;">
+            🏢 Team building Carrefour (25p) — brief 13h45
+          </div>
+          <div class="top-track-block" style="background:rgba(232,0,90,0.2); border:1px solid rgba(232,0,90,0.6); color:#ff7aa8; left:20%; width:20%; top:28px;">
+            🎂 Anniv Léa
+          </div>
+          <div class="top-track-block" style="background:rgba(255,140,0,0.25); border:1px solid rgba(255,140,0,0.7); color:#ffc080; left:8%; width:6%; top:28px;">
+            ⚠ Dupont
+          </div>
+          <div class="top-track-block" style="background:rgba(243,209,11,0.25); border:1px solid rgba(243,209,11,0.7); color:var(--yellow); left:40%; width:5%; top:0;">
+            🎁
+          </div>
+          <div class="top-track-block" style="background:rgba(100,100,100,0.4); border:1px solid rgba(100,100,100,0.7); color:#ccc; left:80%; width:20%; top:0;">
+            🧹 Fermeture nettoyage
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scale">
+      <div>14:00</div><div>15:00</div><div>16:00</div><div>17:00</div><div>18:00</div>
+    </div>
+    <div class="cal-header">
+      <div></div>
+      <div class="cal-head-cell">EYESTART</div>
+      <div class="cal-head-cell">DARKDRIFT</div>
+      <div class="cal-head-cell">K7 RECORD</div>
+      <div class="cal-head-cell">K7 STUDIO</div>
+      <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+      <div class="cal-head-cell">CUBE3</div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-time">14:00</div>
+      <div class="cal-cell"><div class="booking">14:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking full">14:00 (12)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+      <div class="cal-time">15:00</div>
+      <div class="cal-cell"><div class="booking">15:00 (4)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking full">15:00 (12)</div></div>
+      <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+      <div class="cal-time">16:00</div>
+      <div class="cal-cell"><div class="booking">16:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">17:00</div>
+      <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+      <div class="cal-time">18:00</div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION 3 ============== -->
+<div class="mockup opt3">
+  <div class="mockup-title">Option 3 — Markers sur la timeline + panneau latéral</div>
+  <div class="mockup-desc">Indicateurs colorés discrets sur la colonne des heures. Liste exhaustive et lisible dans un panneau à droite.</div>
+  <div class="mockup-pros">✅ Liste complète/searchable ; encombrement mini sur la grille</div>
+  <div class="mockup-cons">❌ Split attention timeline ↔ panneau ; pas de contenu visible sans cliquer/lire le panneau</div>
+
+  <div class="layout">
+    <div class="cal">
+      <div class="cal-header">
+        <div></div>
+        <div class="cal-head-cell">EYESTART</div>
+        <div class="cal-head-cell">DARKDRIFT</div>
+        <div class="cal-head-cell">K7 RECORD</div>
+        <div class="cal-head-cell">K7 STUDIO</div>
+        <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+        <div class="cal-head-cell">CUBE3</div>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-time">14:00<span class="marker" style="background:var(--purple);" title="Team building">3</span></div>
+        <div class="cal-cell"><div class="booking">14:00 (4)</div></div>
+        <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+        <div class="cal-cell"><div class="booking full">14:00 (12)</div></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+        <div class="cal-time">15:00<span class="marker" style="background:var(--pink);" title="Anniv Léa">1</span></div>
+        <div class="cal-cell"><div class="booking">15:00 (4)</div></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"><div class="booking full">15:00 (12)</div></div>
+        <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+        <div class="cal-time">16:00<span class="marker" style="background:var(--yellow); color:#000;" title="Cartes cadeaux">1</span></div>
+        <div class="cal-cell"><div class="booking">16:00 (4)</div></div>
+        <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+        <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+        <div class="cal-cell"></div>
+
+        <div class="cal-time">17:00</div>
+        <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+        <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+        <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+        <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+        <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+        <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+        <div class="cal-time">18:00<span class="marker" style="background:#888;" title="Fermeture">1</span></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+        <div class="cal-cell"></div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="side-title">📝 Notes du jour (5)</div>
+
+      <div class="side-note team">
+        <div class="h">🏢 Team building Carrefour</div>
+        <div class="t">14:00 → 17:00 · 25 personnes</div>
+        <div class="t" style="margin-top:4px; color:#aaa;">Brief sécurité à 13h45 — apporter casques XL</div>
+      </div>
+
+      <div class="side-note absent">
+        <div class="h">⚠ Joueur absent (Dupont)</div>
+        <div class="t">14:20 · groupe Eyestart</div>
+      </div>
+
+      <div class="side-note bday">
+        <div class="h">🎂 Anniversaire Léa</div>
+        <div class="t">15:00 → 16:00 · décor rose à installer</div>
+      </div>
+
+      <div class="side-note gift">
+        <div class="h">🎁 Cartes cadeaux × 3</div>
+        <div class="t">16:00 · à préparer pour la famille Martin</div>
+      </div>
+
+      <div class="side-note clean">
+        <div class="h">🧹 Fermeture nettoyage</div>
+        <div class="t">18:00 → 19:00 · pas de résa possible</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION 4 ============== -->
+<div class="mockup opt4">
+  <div class="mockup-title">Option 4 — Overlay semi-transparent par-dessus la grille</div>
+  <div class="mockup-desc">Bandes colorées semi-opaques traversant toutes les activités sur la plage horaire de la note.</div>
+  <div class="mockup-pros">✅ Communique immédiatement "cette plage est spéciale" sur tout le calendrier</div>
+  <div class="mockup-cons">❌ Si 5+ notes se chevauchent → calendrier illisible (couches superposées)</div>
+
+  <div class="cal">
+    <div class="cal-header">
+      <div></div>
+      <div class="cal-head-cell">EYESTART</div>
+      <div class="cal-head-cell">DARKDRIFT</div>
+      <div class="cal-head-cell">K7 RECORD</div>
+      <div class="cal-head-cell">K7 STUDIO</div>
+      <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+      <div class="cal-head-cell">CUBE3</div>
+    </div>
+    <div class="cal-grid" style="position:relative;">
+      <!-- Overlay bands -->
+      <div class="overlay-band overlay-band-team" style="top:0; height:170px;">🏢 TEAM BUILDING CARREFOUR (25P)</div>
+      <div class="overlay-band overlay-band-bday" style="top:57px; height:56px;">🎂 ANNIV LÉA</div>
+      <div class="overlay-band overlay-band-clean" style="top:228px; height:56px;">🧹 FERMETURE NETTOYAGE</div>
+
+      <div class="cal-time">14:00</div>
+      <div class="cal-cell"><div class="booking">14:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking full">14:00 (12)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+      <div class="cal-time">15:00</div>
+      <div class="cal-cell"><div class="booking">15:00 (4)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking full">15:00 (12)</div></div>
+      <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+      <div class="cal-time">16:00</div>
+      <div class="cal-cell"><div class="booking">16:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">17:00</div>
+      <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+      <div class="cal-time">18:00</div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION 5 ============== -->
+<div class="mockup opt5">
+  <div class="mockup-title">Option 5 — Hybride : bandeau top + colonne notes courtes (✨ ma reco)</div>
+  <div class="mockup-desc">Bandeau top pour les "gros" événements transversaux (team building, fermeture). Colonne notes pour les notes courtes/spécifiques (joueur absent, carte cadeau).</div>
+  <div class="mockup-pros">✅ Chaque type de note dans son meilleur canal ; chevauchements limités ; lisibilité max</div>
+  <div class="mockup-cons">❌ L'utilisateur doit choisir où mettre quoi à la création (overhead léger)</div>
+
+  <div class="cal">
+    <!-- Bandeau gros events -->
+    <div class="top-band">
+      <div class="top-band-row">
+        <div class="top-band-label">🏢 ÉVÉNEMENTS</div>
+        <div class="top-band-tracks">
+          <div class="top-track-block" style="background:rgba(180,0,255,0.25); border:1px solid rgba(180,0,255,0.7); color:#d68fff; left:0%; width:60%;">
+            🏢 Team building Carrefour (25p) — brief 13h45
+          </div>
+          <div class="top-track-block" style="background:rgba(100,100,100,0.4); border:1px solid rgba(100,100,100,0.7); color:#ccc; left:80%; width:20%;">
+            🧹 Fermeture nettoyage
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cal-header">
+      <div></div>
+      <div class="cal-head-cell" style="color:var(--pink);">📝 NOTES</div>
+      <div class="cal-head-cell">EYESTART</div>
+      <div class="cal-head-cell">DARKDRIFT</div>
+      <div class="cal-head-cell">K7 RECORD</div>
+      <div class="cal-head-cell">K7 STUDIO</div>
+      <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+      <div class="cal-head-cell">CUBE3</div>
+    </div>
+    <div class="cal-grid" style="position:relative;">
+      <div class="cal-time">14:00</div>
+      <div class="cal-cell notes-col" style="position:relative; min-height:336px; grid-row: span 6;">
+        <div class="notes-block" style="top:30px; height:24px; background:rgba(255,140,0,0.18); border:1px solid rgba(255,140,0,0.6); color:#ffc080;">
+          <strong>14:20</strong> ⚠ Dupont absent
+        </div>
+        <div class="notes-block" style="top:60px; height:48px; background:rgba(232,0,90,0.15); border:1px solid rgba(232,0,90,0.5); color:#ff7aa8;">
+          <strong>15:00 → 16:00</strong><br>🎂 Anniv Léa — décor rose
+        </div>
+        <div class="notes-block" style="top:115px; height:24px; background:rgba(243,209,11,0.18); border:1px solid rgba(243,209,11,0.6); color:var(--yellow);">
+          <strong>16:00</strong> 🎁 Cartes cadeaux ×3
+        </div>
+      </div>
+      <div class="cal-cell"><div class="booking">14:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking full">14:00 (12)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+      <div class="cal-time">15:00</div>
+      <div class="cal-cell"><div class="booking">15:00 (4)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking full">15:00 (12)</div></div>
+      <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+      <div class="cal-time">16:00</div>
+      <div class="cal-cell"><div class="booking">16:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">17:00</div>
+      <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+      <div class="cal-time">18:00</div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">19:00</div>
+      <div class="cal-cell"><div class="booking">19:00 (4)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">19:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">19:00 (6)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== OPTION 6 ============== -->
+<div class="mockup opt6">
+  <div class="mockup-title">Option 6 — Pastilles d'icône inline sur les slots concernés</div>
+  <div class="mockup-desc">Une note attachée à un slot affiche une petite pastille colorée dans le coin du slot. Hover/click → tooltip ou modal avec contenu.</div>
+  <div class="mockup-pros">✅ Zéro espace volé ; note collée à son contexte (booking concerné)</div>
+  <div class="mockup-cons">❌ Notes "transversales" (team building, fermeture) sans home naturel ; petites pastilles peu lisibles à distance</div>
+
+  <div class="cal">
+    <div class="cal-header">
+      <div></div>
+      <div class="cal-head-cell">EYESTART</div>
+      <div class="cal-head-cell">DARKDRIFT</div>
+      <div class="cal-head-cell">K7 RECORD</div>
+      <div class="cal-head-cell">K7 STUDIO</div>
+      <div class="cal-head-cell">BUZZ-E-QUIZ</div>
+      <div class="cal-head-cell">CUBE3</div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-time">14:00</div>
+      <div class="cal-cell"><div class="booking">14:00 (4)</div><div class="inline-note-icon" title="Team building">T</div></div>
+      <div class="cal-cell"><div class="booking">14:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking full">14:00 (12)</div><div class="inline-note-icon" title="Team building">T</div></div>
+      <div class="cal-cell"><div class="inline-note-icon" title="Team building">T</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">14:00 (6)</div></div>
+
+      <div class="cal-time">15:00</div>
+      <div class="cal-cell"><div class="booking">15:00 (4)</div><div class="inline-note-icon absent" title="Dupont absent">!</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking full">15:00 (12)</div><div class="inline-note-icon bday" title="Anniv Léa">🎂</div></div>
+      <div class="cal-cell"><div class="booking">15:30 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">15:00 (6)</div></div>
+
+      <div class="cal-time">16:00</div>
+      <div class="cal-cell"><div class="booking">16:00 (4)</div><div class="inline-note-icon gift" title="Cartes cadeaux">🎁</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">16:00 (8)</div></div>
+      <div class="cal-cell"></div>
+      <div class="cal-cell"><div class="booking">16:00 (10)</div></div>
+      <div class="cal-cell"></div>
+
+      <div class="cal-time">17:00</div>
+      <div class="cal-cell"><div class="booking full">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (3)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:30 (8)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (10)</div></div>
+      <div class="cal-cell"><div class="booking">17:00 (6)</div></div>
+
+      <div class="cal-time">18:00</div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+      <div class="cal-cell"><div class="inline-note-icon clean" title="Fermeture">🧹</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="summary">
+  <h2>🎯 Résumé pour décision</h2>
+  <p><strong>Option 1 (colonne notes)</strong> — proche de votre ancien système, sécurisant. Limite : verticalité figée.</p>
+  <p><strong>Option 2 (bandeau top)</strong> — bon pour gros events, mauvais pour micro-notes.</p>
+  <p><strong>Option 3 (markers + panneau)</strong> — meilleur pour "j'ai 30 notes aujourd'hui, donne-moi la liste".</p>
+  <p><strong>Option 4 (overlay)</strong> — visuel impactant pour 1-2 events, catastrophe au-dessus.</p>
+  <p><strong>Option 5 (hybride) — ma reco</strong>. Couvre vos 2 cas d'usage réels.</p>
+  <p><strong>Option 6 (pastilles inline)</strong> — bon complément, mauvais standalone (pas de home pour notes transversales).</p>
+</div>
+
+</body>
+</html>

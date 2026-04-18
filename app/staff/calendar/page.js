@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
 import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
+import NoteEditorModal from '@/components/staff/NoteEditorModal';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -24,6 +25,12 @@ import {
   updateSlotBlockBatch,
   subscribeBookings,
   logAudit,
+  listNotes,
+  listNoteCategories,
+  ensureDefaultNoteCategories,
+  createNote,
+  updateNote,
+  deleteNote,
 } from '@/lib/data';
 
 function hashRoom(id) {
@@ -85,6 +92,18 @@ export default function StaffCalendarPage() {
     return () => { ro.disconnect(); window.removeEventListener('resize', update); };
   }, [view]);
   const [highlightBookingId, setHighlightBookingId] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [noteCategories, setNoteCategories] = useState([]);
+  const [noteEditor, setNoteEditor] = useState(null);
+  const [notesTick, setNotesTick] = useState(0);
+
+  useEffect(() => {
+    ensureDefaultNoteCategories().then(setNoteCategories);
+  }, []);
+
+  useEffect(() => {
+    listNotes({ from: date, to: date }).then(setNotes);
+  }, [date, notesTick]);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -541,6 +560,9 @@ export default function StaffCalendarPage() {
           k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
           slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
           onOpenBlock={setSelected}
+          notes={notes} noteCategories={noteCategories}
+          onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
+          onAddNoteToSlot={(actDef, slot) => setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: actDef.id, slotStart: slot.start, slotEnd: slot.end })}
         />
       )}
       {view === 'day' && !hours && (
@@ -623,8 +645,33 @@ export default function StaffCalendarPage() {
             >
               📝 Réserver sur ce(s) créneau(x)
             </button>
+            <button
+              onClick={() => {
+                setNoteEditor({
+                  mode: 'create',
+                  scope: 'slot',
+                  date,
+                  activityId: ctxMenu.actDef.id,
+                  slotStart: ctxMenu.slot.start,
+                  slotEnd: ctxMenu.slot.end,
+                });
+                setCtxMenu(null);
+              }}
+              className="block w-full rounded px-3 py-2 text-left text-xs hover:bg-white/10"
+            >
+              🗒 Ajouter une note
+            </button>
           </div>
         </div>
+      )}
+
+      {noteEditor && (
+        <NoteEditorModal
+          editor={noteEditor}
+          activities={activities}
+          onClose={() => setNoteEditor(null)}
+          onSaved={() => { setNoteEditor(null); setNotesTick((t) => t + 1); }}
+        />
       )}
 
       {/* Hover tooltip */}
@@ -669,7 +716,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock, notes = [], noteCategories = [], onEditNote, onAddNoteToSlot }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -785,6 +832,19 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
                   const slotInOpen = openM >= 0 && slotM >= openM && slotM < closeM;
 
+                  // Notes attachées à ce slot (slot exact, range qui le couvre, ou day)
+                  const slotNotes = notes.filter((n) => {
+                    if (n.scope === 'day') return false; // affichées ailleurs (Phase 3)
+                    if (n.activity_id !== lane.id) return false;
+                    if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
+                    if (n.scope === 'range') {
+                      const ns = toMinutes((n.slot_start || '').slice(0, 5));
+                      const ne = toMinutes((n.slot_end || '').slice(0, 5));
+                      return slotM >= ns && slotM < ne;
+                    }
+                    return false;
+                  });
+
                   return (
                     <button
                       key={slot.start}
@@ -801,6 +861,27 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                         {sBlock ? <span className="text-[10px]">🔒</span> : <span className="cal-players">{players}/{lane.maxPlayers}</span>}
                       </div>
                       {sBlock?.label && <div className="truncate text-[10px] font-bold">{sBlock.label}</div>}
+                      {slotNotes.length > 0 && (
+                        <div className="flex w-full flex-col gap-0.5 mt-0.5">
+                          {slotNotes.map((n) => {
+                            const cat = noteCategories.find((c) => c.id === n.category_id);
+                            const color = cat?.color || '#888';
+                            return (
+                              <div
+                                key={n.id}
+                                onClick={(e) => { e.stopPropagation(); onEditNote && onEditNote(n); }}
+                                title={`${cat?.name || 'Note'} — ${n.content}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                                className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
+                              >
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+                                {height >= 40 && (
+                                  <span className="truncate text-white/80">{n.content}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1055,3 +1136,4 @@ function MonthView({ date, bookings, onChangeDate, visibleActivityIds }) {
     </div>
   );
 }
+
