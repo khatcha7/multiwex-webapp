@@ -349,30 +349,32 @@ export default function StaffCalendarPage() {
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-          {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
-          ))}
-        </div>
+        <div className="ml-auto flex items-center justify-between gap-3" style={{ width: '490px' }}>
+          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+            ))}
+          </div>
 
-        <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-          <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
-          <button
-            onClick={() => dateInputRef.current?.showPicker?.()}
-            className="display px-3 py-1 text-xs font-bold text-white hover:text-mw-pink"
-          >
-            {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
-          </button>
-          <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
-            aria-hidden="true"
-            tabIndex={-1}
-          />
+          <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
+            <button
+              onClick={() => dateInputRef.current?.showPicker?.()}
+              className="display px-3 py-1 text-xs font-bold text-white hover:text-mw-pink"
+            >
+              {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+            </button>
+            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+          </div>
         </div>
       </div>
 
