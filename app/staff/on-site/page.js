@@ -14,7 +14,7 @@ export default function OnSiteBookingPage() {
   const [isCompany, setIsCompany] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [vatNumber, setVatNumber] = useState('');
-  const date = today;
+  const [date, setDate] = useState(today);
   // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
   const [occupancy, setOccupancy] = useState({});
@@ -29,8 +29,11 @@ export default function OnSiteBookingPage() {
     try {
       const raw = sessionStorage.getItem('mw_onsite_prefill');
       if (raw) {
-        const slotsToBook = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
         sessionStorage.removeItem('mw_onsite_prefill');
+        // Compat : ancien format = array de slots, nouveau = { date, slots }
+        const slotsToBook = Array.isArray(parsed) ? parsed : (parsed.slots || []);
+        if (parsed && parsed.date) setDate(parsed.date);
         const newItems = {};
         slotsToBook.forEach((s) => {
           const a = activities.find((x) => x.id === s.activityId);
@@ -248,8 +251,21 @@ export default function OnSiteBookingPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="section-title mb-1">Réservation sur place</h1>
-      <p className="mb-6 text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="section-title mb-1">Réservation sur place</h1>
+          <p className="text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-white/70">
+          <span className="display">Date :</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="input !py-1.5 text-xs"
+          />
+        </label>
+      </div>
 
       {/* Customer */}
       <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
