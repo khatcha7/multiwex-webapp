@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { activities, getActivityPrice } from '@/lib/activities';
 import { generateSlotsForActivity, toDateStr, parseDate, isOpenOn, monthsFr, dayLabelsFr } from '@/lib/hours';
-import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
+import { createBooking, logAudit, getActiveStaff, getSlotOccupancy, getSlotBlocks } from '@/lib/data';
 
 export default function OnSiteBookingPage() {
   const today = toDateStr(new Date());
@@ -22,6 +22,11 @@ export default function OnSiteBookingPage() {
   // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
   const [occupancy, setOccupancy] = useState({});
+  const [blocks, setBlocks] = useState([]);
+
+  useEffect(() => {
+    getSlotBlocks(date).then(setBlocks);
+  }, [date]);
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const [prefilled, setPrefilled] = useState(false);
@@ -444,7 +449,14 @@ export default function OnSiteBookingPage() {
                         const occInfo = occ[slot.start];
                         const playersInSlot = occInfo?.players || 0;
                         const privative = a.privative;
-                        const full = privative ? playersInSlot > 0 : playersInSlot >= a.maxPlayers;
+                        // Blocs sur ce slot
+                        const blocksHere = (blocks || []).filter((b) => b.activityId === a.id && b.start === slot.start);
+                        const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+                        const seatsBlockedTotal = hasFullBlock
+                          ? a.maxPlayers
+                          : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+                        const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+                        const full = effectiveMax === 0 || (privative ? playersInSlot > 0 : playersInSlot >= effectiveMax);
                         const shared = !privative && playersInSlot > 0 && !full;
                         let cls = 'border-white/15 text-white/70 hover:border-white/40';
                         if (chosen) cls = 'border-mw-pink bg-mw-pink text-white';

@@ -369,14 +369,31 @@ export default function StaffCalendarPage() {
     setHoverSlot(null);
   };
 
-  // Block batch
+  // Block batch — selected.batch est un tableau de slots à bloquer, blockedSeats=0 → total
   const blockBatch = async (reason, note, label, blockedSeats = 0) => {
-    const bid = 'batch-' + Date.now();
-    for (const s of multiSel) {
-      await blockSlot({ activityId: s.actDef.id, laneId: s.laneId, date, start: s.slot.start, end: s.slot.end, reason, note, label, batchId: bid, blockedSeats });
+    const targets = selected?.batch || multiSel;
+    if (!targets || targets.length === 0) return;
+    const bid = targets.length > 1 ? 'batch-' + Date.now() : null;
+    try {
+      for (const s of targets) {
+        await blockSlot({
+          activityId: s.actDef.id,
+          roomId: s.actDef.isRoom ? s.actDef.roomId : null,
+          date,
+          start: s.slot.start,
+          end: s.slot.end,
+          seatsBlocked: blockedSeats > 0 ? blockedSeats : null,
+          label,
+          reason,
+          batchId: bid,
+        });
+      }
+      await logAudit({ action: 'block_batch', entityType: 'slots', entityId: bid || 'single', notes: `${targets.length} slots — ${label || reason}` });
+      setMultiSel([]); setSelAnchor(null); setSelected(null); setTick((t) => t + 1);
+    } catch (e) {
+      console.error('blockBatch', e);
+      alert('Erreur blocage : ' + (e?.message || 'inconnue'));
     }
-    await logAudit({ action: 'block_batch', entityType: 'slots', entityId: bid, notes: `${multiSel.length} slots — ${label || reason}` });
-    setMultiSel([]); setSelAnchor(null); setSelected(null); setTick((t) => t + 1);
   };
 
   const blockHour = async (hour) => {
@@ -385,7 +402,12 @@ export default function StaffCalendarPage() {
     for (const l of lanes) {
       const slots = generateSlotsForActivity(l, date, { fullDay: true });
       const s = slots.find((sl) => sl.start === hour);
-      if (s) await blockSlot({ activityId: l.id, laneId: l.laneId, date, start: s.start, end: s.end, reason: 'b2b', batchId: bid });
+      if (s) await blockSlot({
+        activityId: l.id,
+        roomId: l.isRoom ? l.roomId : null,
+        date, start: s.start, end: s.end,
+        reason: 'b2b', batchId: bid,
+      });
     }
     setTick((t) => t + 1);
   };
@@ -949,7 +971,17 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                     <button
                       key={slot.start}
                       data-time={slot.start}
-                      onClick={(e) => onClick(lane.laneId, lane, slot, e)}
+                      onClick={(e) => {
+                        if (sBlock && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                          e.stopPropagation();
+                          onOpenBlock && onOpenBlock({
+                            start: slot.start, end: slot.end, laneId: lane.laneId, activityId: lane.id, activity: lane, date,
+                            block: sBlock, items: laneBookings.filter((it) => (it.start || '').slice(0, 5) === slot.start),
+                          });
+                          return;
+                        }
+                        onClick(lane.laneId, lane, slot, e);
+                      }}
                       onContextMenu={(e) => onRightClick(e, lane.laneId, lane, slot)}
                       onMouseEnter={() => onHoverEnter(lane.laneId, lane, slot)}
                       onMouseLeave={onHoverLeave}
@@ -1079,13 +1111,14 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
         {!isBatch && existingBlock ? (
           <div className="space-y-3">
             <div className="rounded border border-[#CC003C] bg-[#CC003C]/20 p-4">
-              <div className="display mb-1 text-[#CC003C]">🔒 Bloqué</div>
-              {existingBlock.blockedSeats > 0 && <div className="text-xs text-white/60">{existingBlock.blockedSeats} places bloquées</div>}
-              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label visible" className="input mt-2 text-sm" />
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Notes (multi-lignes)" className="input mt-2 text-sm resize-none" style={{ whiteSpace: 'pre-wrap' }} />
+              <div className="display mb-1 text-[#CC003C]">🔒 {existingBlock.seatsBlocked == null ? 'Bloqué (créneau complet)' : `${existingBlock.seatsBlocked} places bloquées`}</div>
+              {existingBlock.label && <div className="text-xs text-white/70 mt-1">{existingBlock.label}</div>}
+              {existingBlock.reason && <div className="text-[10px] text-white/50">{existingBlock.reason}</div>}
+              {existingBlock.createdByName && <div className="text-[10px] text-white/40 mt-1">par {existingBlock.createdByName}</div>}
+              <input value={label || existingBlock.label || ''} onChange={(e) => setLabel(e.target.value)} placeholder="Label visible" className="input mt-3 text-sm" />
               <div className="mt-3 flex gap-2">
-                <button onClick={() => onUpdateLabel(existingBlock, label, note)} className="btn-outline flex-1 !py-2 text-xs">Mettre à jour</button>
-                <button onClick={() => onUnblock(existingBlock)} className="btn-outline flex-1 !py-2 text-xs text-mw-red">Débloquer</button>
+                <button onClick={() => onUpdateLabel(existingBlock, label || existingBlock.label, note)} className="btn-outline flex-1 !py-2 text-xs">Mettre à jour</button>
+                <button onClick={() => onUnblock(existingBlock)} className="btn-outline flex-1 !py-2 text-xs text-mw-red">🔓 Débloquer entièrement</button>
               </div>
             </div>
           </div>
