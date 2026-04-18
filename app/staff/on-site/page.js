@@ -258,7 +258,7 @@ export default function OnSiteBookingPage() {
   if (payment) return <PaymentSimulation payment={payment} total={subtotal} onCancel={() => setPayment(null)} />;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <h1 className="section-title mb-1">Réservation sur place</h1>
       <p className="mb-6 text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
 
