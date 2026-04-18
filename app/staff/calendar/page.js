@@ -694,13 +694,13 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
       <div className="sticky z-20 flex overflow-hidden border border-b-0 border-white/10 bg-mw-bg" style={{ top: 'var(--cal-lane-top, 44px)' }}>
         <div className="w-14 shrink-0 border-r border-white/10 bg-mw-bg" />
         <div className="min-w-0 flex-1 overflow-hidden">
-          <div ref={headerInnerRef} className="flex" style={{ willChange: 'transform' }}>
+          <div ref={headerInnerRef} className="flex min-w-full" style={{ willChange: 'transform' }}>
             {lanes.map((lane) => {
               const laneW = lane.compact ? Math.round(pxActivity / 3) : pxActivity;
               return (
                 <div
                   key={lane.laneId}
-                  className="flex h-12 shrink-0 items-center gap-1 border-r border-white/10 px-1.5 cursor-pointer"
+                  className="flex h-12 shrink-0 grow items-center gap-1 border-r border-white/10 px-1.5 cursor-pointer"
                   style={{ width: `${laneW}px`, minWidth: `${laneW}px` }}
                   onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}
                 >
