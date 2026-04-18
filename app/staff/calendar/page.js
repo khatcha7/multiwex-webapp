@@ -102,21 +102,23 @@ export default function StaffCalendarPage() {
     const firstItem = (target.items || [])[0];
     if (!firstItem) return;
     const startMin = toMinutes(firstItem.start || firstItem.slot_start || '00:00');
-    const top = (startMin / 60) * pxTime;
+    const dayStartMin = (typeof hours !== 'undefined' && hours && hours.length) ? toMinutes(hours[0]) : 0;
+    const offsetMin = Math.max(0, startMin - dayStartMin);
+    const offsetPx = (offsetMin / 60) * pxTime;
     autoScrolledRef.current = hl;
     setTimeout(() => {
       const root = calRef.current;
       if (!root) return;
       const scrollables = root.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
       scrollables.forEach((el) => {
-        if (el.scrollHeight > el.clientHeight) {
-          el.scrollTo({ top: Math.max(0, top - 80), behavior: 'smooth' });
+        if (el.scrollHeight > el.clientHeight + 4) {
+          el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' });
         }
-        if (el.scrollWidth > el.clientWidth) {
-          el.scrollTo({ left: Math.max(0, top - 80), behavior: 'smooth' });
+        if (el.scrollWidth > el.clientWidth + 4) {
+          el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' });
         }
       });
-    }, 150);
+    }, 250);
   }, [bookings, searchParams, pxTime]);
 
   const pxH = pxTime; // Contrôlé par le slider (les presets mettent à jour pxTime)
