@@ -370,12 +370,20 @@ export default function StaffCalendarPage() {
   };
 
   // Block batch — selected.batch est un tableau de slots à bloquer, blockedSeats=0 → total
+  // Fusion intelligente : batch_id seulement si tous slots sont consécutifs ET même activité
   const blockBatch = async (reason, note, label, blockedSeats = 0) => {
     const targets = selected?.batch || multiSel;
     if (!targets || targets.length === 0) return;
-    const bid = targets.length > 1 ? 'batch-' + Date.now() : null;
+
+    // Détection consécutif + même activité
+    const sorted = [...targets].sort((a, b) => (a.slot.start || '').localeCompare(b.slot.start || ''));
+    const sameActivity = sorted.every((s) => s.actDef.id === sorted[0].actDef.id && s.laneId === sorted[0].laneId);
+    const consecutive = sameActivity && sorted.every((s, i) => i === 0 || sorted[i - 1].slot.end === s.slot.start);
+    const shouldFuse = sorted.length > 1 && sameActivity && consecutive;
+    const bid = shouldFuse ? 'batch-' + Date.now() : null;
+
     try {
-      for (const s of targets) {
+      for (const s of sorted) {
         await blockSlot({
           activityId: s.actDef.id,
           roomId: s.actDef.isRoom ? s.actDef.roomId : null,
@@ -388,11 +396,27 @@ export default function StaffCalendarPage() {
           batchId: bid,
         });
       }
-      await logAudit({ action: 'block_batch', entityType: 'slots', entityId: bid || 'single', notes: `${targets.length} slots — ${label || reason}` });
+      await logAudit({ action: 'block_batch', entityType: 'slots', entityId: bid || 'single', notes: `${sorted.length} slots ${shouldFuse ? '(fusionnés)' : '(séparés)'} — ${label || reason}` });
       setMultiSel([]); setSelAnchor(null); setSelected(null); setTick((t) => t + 1);
     } catch (e) {
       console.error('blockBatch', e);
       alert('Erreur blocage : ' + (e?.message || 'inconnue'));
+    }
+  };
+
+  // Débloquer N places d'un bloc partiel
+  const partialUnblockHandler = async (block, n) => {
+    try {
+      const newSeats = (block.seatsBlocked || 0) - n;
+      if (newSeats <= 0) {
+        await unblockSlot(block.id);
+      } else {
+        await updateSlotBlock(block.id, { seatsBlocked: newSeats });
+      }
+      setSelected(null); setTick((t) => t + 1);
+    } catch (e) {
+      console.error('partialUnblock', e);
+      alert('Erreur déblocage : ' + (e?.message || 'inconnue'));
     }
   };
 
@@ -832,6 +856,7 @@ export default function StaffCalendarPage() {
             else await updateSlotBlock(block.id, { label, note });
             setSelected(null); setTick((t) => t + 1);
           }}
+          onPartialUnblock={partialUnblockHandler}
         />
       )}
     </div>
@@ -936,19 +961,26 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   const height = Math.max((lane.duration / 60) * pxH - 1, 14);
                   const slotItems = laneBookings.filter((i) => i.start === slot.start);
                   const players = slotItems.reduce((s, i) => s + (i.players || 0), 0);
-                  const sBlock = standalone.find((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start);
+                  // Tous les blocs sur ce slot (standalones, peut être plusieurs)
+                  const allBlocksHere = laneBlocks.filter((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start && !bl.batchId);
+                  const sBlock = allBlocksHere[0];
+                  const isFullBlock = allBlocksHere.some((b) => (b.seats_blocked ?? b.seatsBlocked) == null);
+                  const seatsBlockedSum = isFullBlock ? lane.maxPlayers : allBlocksHere.reduce((s, b) => s + ((b.seats_blocked ?? b.seatsBlocked) || 0), 0);
                   const inBatch = Object.values(byBatch).some((arr) => arr.some((bl) => (bl.start_time?.slice(0, 5) || bl.start) === slot.start));
                   if (inBatch) return null;
 
                   const isSel = multiSel.some((s) => s.laneId === lane.laneId && s.slot.start === slot.start);
                   const isHighlight = slotItems.some((it) => highlightIds.has(it.booking?.id || it.booking?.reference));
-                  const full = lane.privative ? players > 0 : players >= lane.maxPlayers;
+                  const effectiveMax = Math.max(0, lane.maxPlayers - seatsBlockedSum);
+                  const full = effectiveMax === 0 || (lane.privative ? players > 0 : players >= effectiveMax);
                   const partial = players > 0 && !full;
+                  const partialBlock = !isFullBlock && seatsBlockedSum > 0;
 
                   let cls = 'cal-slot-free';
-                  if (sBlock) cls = 'cal-slot-blocked';
+                  if (isFullBlock) cls = 'cal-slot-blocked';
                   else if (full) cls = 'cal-slot-full';
-                  else if (partial) cls = 'cal-slot-partial';
+                  else if (partial || partialBlock) cls = 'cal-slot-partial';
+                  if (partialBlock) cls += ' cal-slot-partial-blocked';
                   if (isSel) cls += ' cal-slot-selected';
                   if (isHighlight) cls += ' cal-slot-highlight';
 
@@ -990,7 +1022,13 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                     >
                       <div className="flex w-full items-center justify-between">
                         <span className="cal-time display">{slot.start}</span>
-                        {sBlock ? <span className="text-[10px]">🔒</span> : <span className="cal-players">{players}/{lane.maxPlayers}</span>}
+                        {isFullBlock ? (
+                          <span className="text-[10px]">🔒</span>
+                        ) : partialBlock ? (
+                          <span className="cal-players">{players}/{effectiveMax}<span className="ml-1 inline-block rounded bg-mw-red/80 px-1 text-[8px] text-white">🔒{seatsBlockedSum}</span></span>
+                        ) : (
+                          <span className="cal-players">{players}/{lane.maxPlayers}</span>
+                        )}
                       </div>
                       {sBlock?.label && <div className="truncate text-[10px] font-bold">{sBlock.label}</div>}
                       {slotNotes.length > 0 && (
@@ -1063,14 +1101,17 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
   );
 }
 
-function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
+function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel, onPartialUnblock }) {
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [label, setLabel] = useState('');
   const [blockedSeats, setBlockedSeats] = useState(0);
   const isBatch = Boolean(slot.batch);
   const existingBlock = slot.block;
-  const maxPlayers = slot.activity?.maxPlayers || 12;
+  // maxPlayers : depuis l'activité directe ou depuis le 1er slot du batch
+  const activityRef = slot.activity || slot.batch?.[0]?.actDef;
+  const maxPlayers = activityRef?.maxPlayers || 12;
+  const [unblockN, setUnblockN] = useState(existingBlock?.seatsBlocked || 0);
 
   // Alerte si des joueurs sont déjà réservés sur les créneaux sélectionnés
   const hasExistingBookings = isBatch
@@ -1116,6 +1157,20 @@ function BlockDialog({ slot, onClose, onBlock, onUnblock, onUpdateLabel }) {
               {existingBlock.reason && <div className="text-[10px] text-white/50">{existingBlock.reason}</div>}
               {existingBlock.createdByName && <div className="text-[10px] text-white/40 mt-1">par {existingBlock.createdByName}</div>}
               <input value={label || existingBlock.label || ''} onChange={(e) => setLabel(e.target.value)} placeholder="Label visible" className="input mt-3 text-sm" />
+              {existingBlock.seatsBlocked > 0 && (
+                <div className="mt-3 rounded border border-white/10 bg-white/[0.03] p-3">
+                  <label className="mb-1 block text-[10px] uppercase text-white/50">Débloquer N places</label>
+                  <div className="flex items-center gap-2">
+                    <input type="range" min="1" max={existingBlock.seatsBlocked} value={unblockN} onChange={(e) => setUnblockN(Number(e.target.value))} className="flex-1 accent-mw-pink" />
+                    <span className="w-10 text-center display text-mw-pink">{unblockN}</span>
+                  </div>
+                  <button
+                    onClick={() => onPartialUnblock && onPartialUnblock(existingBlock, unblockN)}
+                    disabled={unblockN < 1 || unblockN > existingBlock.seatsBlocked}
+                    className="btn-outline mt-2 w-full !py-2 text-xs disabled:opacity-30"
+                  >🔓 Débloquer {unblockN} place{unblockN > 1 ? 's' : ''}</button>
+                </div>
+              )}
               <div className="mt-3 flex gap-2">
                 <button onClick={() => onUpdateLabel(existingBlock, label || existingBlock.label, note)} className="btn-outline flex-1 !py-2 text-xs">Mettre à jour</button>
                 <button onClick={() => onUnblock(existingBlock)} className="btn-outline flex-1 !py-2 text-xs text-mw-red">🔓 Débloquer entièrement</button>

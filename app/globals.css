@@ -158,6 +158,11 @@ body {
   opacity: 0.5;
 }
 
+.cal-slot-partial-blocked {
+  border-color: #CC003C !important;
+  border-width: 2px !important;
+}
+
 /* Tiptap rich text editor */
 .prose-tiptap p { margin: 0 0 0.5em; }
 .prose-tiptap p:last-child { margin-bottom: 0; }

@@ -309,7 +309,9 @@ export default function StepSlots() {
 
               const privative = currentActivity.privative;
               const full = totalCap === 0 || (privative ? playersInSlot > 0 : playersInSlot >= totalCap);
-              const shared = !privative && playersInSlot > 0 && !full;
+              const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
+              // "shared" → visuel jaune si groupe déjà présent OU bloc partiel
+              const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
 
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
@@ -349,9 +351,9 @@ export default function StepSlots() {
                   title={
                     hasFullBlock ? `Bloqué`
                       : full ? 'Complet'
-                      : shared ? `Libre ${totalCap - playersInSlot}/${totalCap} — ${groupsInSlot} groupe(s) déjà présent(s)`
+                      : shared ? `Libre ${totalCap - playersInSlot}/${roomCap} — ${groupsInSlot} groupe(s) déjà présent(s)${partialBlock ? ` (dont ${seatsBlockedTotal} bloquées)` : ''}`
                       : pastCutoff ? 'Fermé (moins de 30 min avant le créneau)'
-                      : `Libre ${totalCap}/${totalCap}`
+                      : `Libre ${totalCap}/${roomCap}`
                   }
                 >
                   {isAssigned && (
@@ -361,10 +363,10 @@ export default function StepSlots() {
                   )}
                   {slot.start}
                   {!privative && shared && wouldFit && (
-                    <div className="mt-0.5 text-[8px] font-normal">Libre {totalCap - playersInSlot}/{totalCap}</div>
+                    <div className="mt-0.5 text-[8px] font-normal">Libre {totalCap - playersInSlot}/{roomCap}</div>
                   )}
                   {!privative && !shared && !full && !hasFullBlock && !pastCutoff && (
-                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{totalCap}</div>
+                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{roomCap}</div>
                   )}
                   {shared && !wouldFit && (
                     <div className="mt-0.5 text-[8px] font-normal">{totalCap - playersInSlot} place{totalCap - playersInSlot > 1 ? 's' : ''}</div>

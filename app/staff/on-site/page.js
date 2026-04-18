@@ -457,11 +457,13 @@ export default function OnSiteBookingPage() {
                           : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
                         const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
                         const full = effectiveMax === 0 || (privative ? playersInSlot > 0 : playersInSlot >= effectiveMax);
-                        const shared = !privative && playersInSlot > 0 && !full;
+                        const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
+                        const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
                         let cls = 'border-white/15 text-white/70 hover:border-white/40';
                         if (chosen) cls = 'border-mw-pink bg-mw-pink text-white';
                         else if (full) cls = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
                         else if (shared) cls = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow';
+                        if (partialBlock && !chosen) cls += ' !border-mw-red border-2';
                         return (
                           <button
                             key={slot.start}
@@ -471,7 +473,7 @@ export default function OnSiteBookingPage() {
                             title={shared ? `Libre: ${playersInSlot}/${a.maxPlayers}` : full ? 'Complet' : 'Libre'}
                           >
                             {slot.start}
-                            {shared && <div className="text-[8px]">{playersInSlot}/{a.maxPlayers}</div>}
+                            {shared && <div className="text-[8px]">{playersInSlot + seatsBlockedTotal}/{a.maxPlayers}{partialBlock ? ` 🔒${seatsBlockedTotal}` : ''}</div>}
                           </button>
                         );
                       })}
