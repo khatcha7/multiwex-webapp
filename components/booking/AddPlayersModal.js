@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { updateBooking, logAudit, getSlotOccupancy } from '@/lib/data';
 import { getActivity, getActivityPrice } from '@/lib/activities';
@@ -12,12 +12,20 @@ export default function AddPlayersModal({ booking, onClose, onUpdated }) {
   const isFormula = Boolean(booking?.packageId);
   const pkg = isFormula ? getPackage(booking.packageId) : null;
   const [globalAdd, setGlobalAdd] = useState(0);
+  const [promoInput, setPromoInput] = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
+  const [giftcardInput, setGiftcardInput] = useState('');
+  const [giftcardApplied, setGiftcardApplied] = useState(null);
 
   useEffect(() => {
     if (!booking) return;
     setAddPerSession({});
     setGlobalAdd(0);
     setPaymentStep(null);
+    setPromoInput('');
+    setPromoApplied(false);
+    setGiftcardInput('');
+    setGiftcardApplied(null);
     const load = async () => {
       const res = {};
       for (let i = 0; i < booking.items.length; i++) {
@@ -51,6 +59,30 @@ export default function AddPlayersModal({ booking, onClose, onUpdated }) {
       }, 0);
 
   const hasChanges = isFormula ? globalAdd > 0 : Object.values(addPerSession).some((v) => v > 0);
+
+  const promoReduction = promoApplied ? extraTotal : 0;
+  const giftcardReduction = giftcardApplied ? Math.min(giftcardApplied.balance, Math.max(0, extraTotal - promoReduction)) : 0;
+  const finalTotal = Math.max(0, extraTotal - promoReduction - giftcardReduction);
+
+  const tryApplyPromo = () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    if (code === 'DEMO100') setPromoApplied(true);
+    else alert('Code promo invalide. Essayez DEMO100 pour la démo.');
+  };
+
+  const tryApplyGiftcard = () => {
+    const code = giftcardInput.trim().toUpperCase();
+    if (!code) return;
+    try {
+      const all = JSON.parse(localStorage.getItem('mw_giftcards') || '[]');
+      const card = all.find((g) => (g.code || '').toUpperCase() === code && g.paid && (g.balance || 0) > 0);
+      if (card) setGiftcardApplied(card);
+      else alert('Carte cadeau introuvable, déjà utilisée ou solde insuffisant.');
+    } catch {
+      alert('Erreur lors de la vérification de la carte cadeau.');
+    }
+  };
 
   const startPayment = () => {
     if (!hasChanges) return;
@@ -183,11 +215,65 @@ export default function AddPlayersModal({ booking, onClose, onUpdated }) {
               {paymentStep === 'choose' && (
                 <>
                   <div className="mb-3 display text-2xl">Paiement</div>
-                  <div className="display mb-5 text-3xl text-mw-pink">{extraTotal.toFixed(2)}€</div>
-                  <div className="grid gap-3">
-                    <button onClick={() => processPayment('card')} className="btn-primary !py-4">💳 Carte bancaire</button>
-                    <button onClick={() => processPayment('bancontact')} className="btn-outline !py-4">🇧🇪 Bancontact</button>
-                  </div>
+                  <div className="mb-1 text-xs text-white/50">Total à régler</div>
+                  <div className="display mb-1 text-3xl text-mw-pink">{finalTotal.toFixed(2)}€</div>
+                  {(promoApplied || giftcardApplied) && (
+                    <div className="mb-4 text-[11px] text-white/50">
+                      <span className="line-through">{extraTotal.toFixed(2)}€</span>
+                      {promoApplied && <span className="ml-2 text-mw-pink">−{promoReduction.toFixed(2)}€ promo</span>}
+                      {giftcardApplied && <span className="ml-2 text-mw-pink">−{giftcardReduction.toFixed(2)}€ carte cadeau</span>}
+                    </div>
+                  )}
+
+                  {!promoApplied && (
+                    <div className="mb-2 flex gap-1.5">
+                      <input
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value)}
+                        placeholder="Code promo (DEMO100)"
+                        className="input !py-2 flex-1 text-xs"
+                      />
+                      <button onClick={tryApplyPromo} className="btn-outline !py-2 !px-3 text-xs">Appliquer</button>
+                    </div>
+                  )}
+                  {promoApplied && (
+                    <div className="mb-2 flex items-center justify-between rounded border border-mw-pink/40 bg-mw-pink/10 px-3 py-1.5 text-[11px] text-mw-pink">
+                      <span>✓ Code DEMO100 appliqué</span>
+                      <button onClick={() => { setPromoApplied(false); setPromoInput(''); }} className="text-white/50 hover:text-mw-red">✕</button>
+                    </div>
+                  )}
+
+                  {!giftcardApplied && (
+                    <div className="mb-3 flex gap-1.5">
+                      <input
+                        value={giftcardInput}
+                        onChange={(e) => setGiftcardInput(e.target.value)}
+                        placeholder="Code carte cadeau"
+                        className="input !py-2 flex-1 text-xs"
+                      />
+                      <button onClick={tryApplyGiftcard} className="btn-outline !py-2 !px-3 text-xs">Appliquer</button>
+                    </div>
+                  )}
+                  {giftcardApplied && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-mw-pink/40 bg-mw-pink/10 px-3 py-1.5 text-[11px] text-mw-pink">
+                      <span>✓ Carte {giftcardApplied.code} (solde {giftcardApplied.balance.toFixed(2)}€)</span>
+                      <button onClick={() => { setGiftcardApplied(null); setGiftcardInput(''); }} className="text-white/50 hover:text-mw-red">✕</button>
+                    </div>
+                  )}
+
+                  {finalTotal === 0 ? (
+                    <button
+                      onClick={() => processPayment(promoApplied ? 'free' : 'giftcard')}
+                      className="btn-primary w-full !py-4"
+                    >
+                      ✓ Confirmer (gratuit)
+                    </button>
+                  ) : (
+                    <div className="grid gap-3">
+                      <button onClick={() => processPayment('card')} className="btn-primary !py-4">💳 Carte bancaire</button>
+                      <button onClick={() => processPayment('bancontact')} className="btn-outline !py-4">🇧🇪 Bancontact</button>
+                    </div>
+                  )}
                   <button onClick={() => setPaymentStep(null)} className="mt-4 text-xs text-white/50 hover:text-mw-red">Annuler</button>
                   <p className="mt-4 text-[10px] text-white/40">Simulation — aucune transaction réelle.</p>
                 </>
