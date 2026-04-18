@@ -336,6 +336,7 @@ export default function StaffCalendarPage() {
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
 
+        <h1 className="section-title shrink-0 hidden md:block">Calendrier</h1>
         <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
           {activities.filter((a) => a.bookable).map((a) => (
             <button
@@ -412,17 +413,17 @@ export default function StaffCalendarPage() {
               <button onClick={() => setDayLayout('classic')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
               <button onClick={() => setDayLayout('transposed')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
             </div>
-            <div className="flex flex-1 items-center gap-1.5 text-xs text-white/60 md:flex-none md:gap-2">
-              <span className="text-[10px] hidden sm:inline">Heures</span>
-              <span className="text-[10px] sm:hidden">H</span>
-              <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="flex-1 accent-mw-pink md:w-24 md:flex-none" />
-              <span className="w-8 text-[10px] text-white/40 md:w-10">{pxTime}</span>
+            <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden md:inline">Heures</span>
+              <span className="text-[10px] md:hidden">H</span>
+              <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="min-w-0 flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="shrink-0 text-[10px] text-white/40 md:w-10">{pxTime}</span>
             </div>
-            <div className="flex flex-1 items-center gap-1.5 text-xs text-white/60 md:flex-none md:gap-2">
-              <span className="text-[10px] hidden sm:inline">Activités</span>
-              <span className="text-[10px] sm:hidden">A</span>
-              <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="flex-1 accent-mw-pink md:w-24 md:flex-none" />
-              <span className="w-8 text-[10px] text-white/40 md:w-10">{pxActivity}</span>
+            <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden md:inline">Activités</span>
+              <span className="text-[10px] md:hidden">A</span>
+              <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="min-w-0 flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="shrink-0 text-[10px] text-white/40 md:w-10">{pxActivity}</span>
             </div>
           </div>
         )}
@@ -438,14 +439,14 @@ export default function StaffCalendarPage() {
 
           <div className="flex h-9 shrink-0 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
             {[['day', 'Jour', 'J'], ['week', 'Semaine', 'S'], ['month', 'Mois', 'M']].map(([v, l, s]) => (
-              <button key={v} onClick={() => setView(v)} className={`display flex h-full items-center rounded px-1.5 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>
+              <button key={v} onClick={() => setView(v)} className={`display flex h-full min-w-[28px] items-center justify-center rounded px-2 text-[11px] md:px-1.5 md:text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>
                 <span className="hidden md:inline">{l}</span>
                 <span className="md:hidden">{s}</span>
               </button>
             ))}
           </div>
 
-          <div className="relative flex h-9 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[330px] md:flex-none">
+          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[330px] md:flex-none">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
