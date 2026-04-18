@@ -335,7 +335,6 @@ export default function StaffCalendarPage() {
       <div className={view === 'day' ? 'sticky top-[44px] z-30 bg-mw-bg pt-3 pb-2' : ''}>
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="section-title shrink-0">Calendrier</h1>
 
         <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
           {activities.filter((a) => a.bookable).map((a) => (
@@ -406,29 +405,29 @@ export default function StaffCalendarPage() {
       )}
 
       {/* Toolbar — view buttons, sliders, view selector, date picker */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 md:gap-3">
         {view === 'day' && (
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
-            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
-          </div>
-        )}
-        {view === 'day' && (
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className="text-[10px]">Heures</span>
-            <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
-            <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
-          </div>
-        )}
-        {view === 'day' && (
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className="text-[10px]">Activités</span>
-            <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-24 accent-mw-pink" />
-            <span className="w-10 text-[10px] text-white/40">{pxActivity}px</span>
+          <div className="flex w-full flex-nowrap items-center gap-2 md:w-auto md:contents">
+            <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1 shrink-0">
+              <button onClick={() => setDayLayout('classic')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
+              <button onClick={() => setDayLayout('transposed')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
+            </div>
+            <div className="flex flex-1 items-center gap-1.5 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden sm:inline">Heures</span>
+              <span className="text-[10px] sm:hidden">H</span>
+              <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="w-8 text-[10px] text-white/40 md:w-10">{pxTime}</span>
+            </div>
+            <div className="flex flex-1 items-center gap-1.5 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden sm:inline">Activités</span>
+              <span className="text-[10px] sm:hidden">A</span>
+              <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="w-8 text-[10px] text-white/40 md:w-10">{pxActivity}</span>
+            </div>
           </div>
         )}
 
-        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 md:w-[490px] md:flex-nowrap md:justify-between">
+        <div className="ml-auto flex w-full flex-nowrap items-center justify-between gap-2 md:w-[490px] md:justify-between">
           <button
             onClick={goNow}
             className="display flex h-9 items-center whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 text-xs text-mw-yellow hover:border-mw-yellow"
@@ -437,19 +436,23 @@ export default function StaffCalendarPage() {
             NOW
           </button>
 
-          <div className="flex h-9 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
-            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display flex h-full items-center rounded px-1.5 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+          <div className="flex h-9 shrink-0 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
+            {[['day', 'Jour', 'J'], ['week', 'Semaine', 'S'], ['month', 'Mois', 'M']].map(([v, l, s]) => (
+              <button key={v} onClick={() => setView(v)} className={`display flex h-full items-center rounded px-1.5 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>
+                <span className="hidden md:inline">{l}</span>
+                <span className="md:hidden">{s}</span>
+              </button>
             ))}
           </div>
 
-          <div className="relative flex h-9 w-[330px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          <div className="relative flex h-9 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[330px] md:flex-none">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
               className="display flex-1 whitespace-nowrap px-2 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
             >
-              {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+              <span className="hidden md:inline">{parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
+              <span className="md:hidden">{parseDate(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()}</span>
             </button>
             <button onClick={goNext} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
             <input
