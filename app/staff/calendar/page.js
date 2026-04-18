@@ -215,6 +215,7 @@ export default function StaffCalendarPage() {
   }, [search, allBookings, date]);
 
   const [searchFocused, setSearchFocused] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const onPickSearchResult = (b) => {
     if (b.date !== date) setDate(b.date);
@@ -352,9 +353,18 @@ export default function StaffCalendarPage() {
               <Image src={a.logo} alt={a.name} fill sizes="36px" className="object-contain p-1.5" />
             </button>
           ))}
+          <button
+            onClick={() => setMobileSearchOpen((v) => !v)}
+            title="Rechercher"
+            className={`md:hidden relative flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
+              mobileSearchOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 bg-white/5 text-white/70'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
         </div>
 
-        <div className="relative w-full md:w-[490px] md:shrink-0">
+        <div className={`relative w-full md:w-[490px] md:shrink-0 ${mobileSearchOpen ? '' : 'hidden md:block'}`}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
