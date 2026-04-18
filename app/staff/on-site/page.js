@@ -406,16 +406,31 @@ export default function OnSiteBookingPage() {
                     + Créneau
                   </button>
                 </div>
-                {arr.map((sess, idx) => (
+                {arr.map((sess, idx) => {
+                  // Calcul effectiveMax pour cette session (selon slot choisi + blocs)
+                  let sessEffectiveMax = a.maxPlayers;
+                  let sessSeatsBlocked = 0;
+                  if (sess.slot) {
+                    const sb = (blocks || []).filter((b) => b.activityId === id && b.start === sess.slot.start);
+                    const fullB = sb.some((b) => b.seatsBlocked == null);
+                    sessSeatsBlocked = fullB ? a.maxPlayers : sb.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+                    const occInfo = occ[sess.slot.start];
+                    const playersInSlot = occInfo?.players || 0;
+                    sessEffectiveMax = Math.max(0, a.maxPlayers - sessSeatsBlocked - playersInSlot);
+                  }
+                  const atMax = sess.players >= sessEffectiveMax;
+                  const atMin = sess.players <= (a.minPlayers || 1);
+                  return (
                   <div key={idx} className="mb-2 rounded border border-white/10 p-2">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white">{idx + 1}</div>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setSessionPlayers(id, idx, sess.players - 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">−</button>
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players - 1)} disabled={atMin} className="flex h-7 w-7 items-center justify-center rounded border border-white/20 disabled:opacity-30">−</button>
                           <span className="display w-7 text-center text-mw-pink">{sess.players}</span>
-                          <button onClick={() => setSessionPlayers(id, idx, sess.players + 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">+</button>
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players + 1)} disabled={atMax} className="flex h-7 w-7 items-center justify-center rounded border border-white/20 disabled:opacity-30" title={atMax ? `Max ${sessEffectiveMax}${sessSeatsBlocked ? ` (${sessSeatsBlocked} bloquées)` : ''}` : ''}>+</button>
                           <span className="ml-1 text-[10px] text-white/50">joueurs</span>
+                          {sess.slot && sessSeatsBlocked > 0 && <span className="text-[9px] text-mw-red">🔒{sessSeatsBlocked}</span>}
                         </div>
                       </div>
                       <button onClick={() => removeSession(id, idx)} className="text-xs text-mw-red">✕</button>
@@ -488,7 +503,8 @@ export default function OnSiteBookingPage() {
                       })}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
