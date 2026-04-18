@@ -12,7 +12,6 @@ import {
   toDateStr,
   parseDate,
   dayLabelsFrFull,
-  monthsFr,
 } from '@/lib/hours';
 import {
   listBookings,
@@ -25,13 +24,6 @@ import {
   subscribeBookings,
   logAudit,
 } from '@/lib/data';
-
-const ZOOM_PRESETS = [
-  { id: 'compact', label: 'S', px: 40 },
-  { id: 'normal', label: 'M', px: 64 },
-  { id: 'large', label: 'L', px: 96 },
-  { id: 'xl', label: 'XL', px: 128 },
-];
 
 function hashRoom(id) {
   const h = String(id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -52,15 +44,14 @@ export default function StaffCalendarPage() {
   const setView = (v) => { _setView(v); savePref('view', v); };
   const [dayLayout, _setDayLayout] = useState(() => loadPref('layout', 'transposed'));
   const setDayLayout = (v) => { _setDayLayout(v); savePref('layout', v); };
-  const [zoom, _setZoom] = useState(() => loadPref('zoom', 'normal'));
-  const setZoom = (v) => { _setZoom(v); savePref('zoom', v); };
-  const [pxTime, _setPxTime] = useState(() => loadPref('pxTime', 64));
-  const setPxTime = (v) => { _setPxTime(v); savePref('pxTime', v); };
+  const [pxTime, _setPxTime] = useState(() => Math.max(100, loadPref('pxTime', 100)));
+  const setPxTime = (v) => { const clamped = Math.max(100, Number(v) || 100); _setPxTime(clamped); savePref('pxTime', clamped); };
   const [pxActivity, _setPxActivity] = useState(() => loadPref('pxActivity', 160));
   const setPxActivity = (v) => { _setPxActivity(v); savePref('pxActivity', v); };
   const [visible, setVisible] = useState(new Set(activities.filter((a) => a.bookable).map((a) => a.id)));
   const [k7Open, setK7Open] = useState(false);
   const [bookings, setBookings] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [tick, setTick] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -71,12 +62,16 @@ export default function StaffCalendarPage() {
   const [hoverSlot, setHoverSlot] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const hoverTimer = useRef(null);
-  const [datePicker, setDatePicker] = useState(false);
+  const dateInputRef = useRef(null);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
     getSlotBlocks(date).then(setBlocks);
   }, [date, tick]);
+
+  useEffect(() => {
+    listBookings().then(setAllBookings);
+  }, [tick]);
 
   useEffect(() => {
     const unsub = subscribeBookings(() => setTick((t) => t + 1));
@@ -107,20 +102,47 @@ export default function StaffCalendarPage() {
     return out;
   }, [visible, k7Open, slashOpen]);
 
-  // Search highlight
+  // Selected search result → highlight slots (cyan)
+  const [highlightBookingId, setHighlightBookingId] = useState(null);
   const highlightIds = useMemo(() => {
-    if (!search.trim()) return new Set();
+    const s = new Set();
+    if (highlightBookingId) s.add(highlightBookingId);
+    return s;
+  }, [highlightBookingId]);
+
+  // Search dropdown results — current day first, then upcoming, then past
+  const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const ids = new Set();
-    bookings.forEach((b) => {
-      const match =
+    if (!q) return [];
+    const matched = allBookings.filter((b) => {
+      return (
         (b.id || b.reference || '').toLowerCase().includes(q) ||
         (b.customer?.name || '').toLowerCase().includes(q) ||
-        (b.customer?.email || '').toLowerCase().includes(q);
-      if (match) ids.add(b.id || b.reference);
+        (b.customer?.firstName || '').toLowerCase().includes(q) ||
+        (b.customer?.lastName || '').toLowerCase().includes(q) ||
+        (b.customer?.email || '').toLowerCase().includes(q)
+      );
     });
-    return ids;
-  }, [search, bookings]);
+    const today = date;
+    return matched.sort((a, b) => {
+      const aIsDay = a.date === today ? 0 : 1;
+      const bIsDay = b.date === today ? 0 : 1;
+      if (aIsDay !== bIsDay) return aIsDay - bIsDay;
+      // Then sort by absolute distance to displayed date
+      const da = Math.abs(new Date(a.date) - new Date(today));
+      const db = Math.abs(new Date(b.date) - new Date(today));
+      return da - db;
+    }).slice(0, 30);
+  }, [search, allBookings, date]);
+
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  const onPickSearchResult = (b) => {
+    if (b.date !== date) setDate(b.date);
+    setHighlightBookingId(b.id || b.reference);
+    setSearch('');
+    setSearchFocused(false);
+  };
 
   const toggleVis = (id) => { const n = new Set(visible); if (n.has(id)) n.delete(id); else n.add(id); setVisible(n); };
   const goPrev = () => { const d = parseDate(date); d.setDate(d.getDate() - (view === 'month' ? 30 : view === 'week' ? 7 : 1)); setDate(toDateStr(d)); };
@@ -232,67 +254,65 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
-      {/* Header */}
+      {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="section-title">Calendrier</h1>
-          <div className="text-sm text-white/60">
-            {dayLabelsFrFull[parseDate(date).getDay()]} {parseDate(date).getDate()} {monthsFr[parseDate(date).getMonth()]} {parseDate(date).getFullYear()}
-          </div>
+        <h1 className="section-title shrink-0">Calendrier</h1>
+
+        <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
+          {activities.filter((a) => a.bookable).map((a) => (
+            <button
+              key={a.id}
+              onClick={() => toggleVis(a.id)}
+              title={a.name}
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
+                visible.has(a.id)
+                  ? 'border-mw-pink bg-mw-pink/10'
+                  : 'border-white/15 bg-white/5 opacity-50 hover:opacity-80'
+              }`}
+            >
+              <Image src={a.logo} alt={a.name} fill sizes="36px" className="object-contain p-1.5" />
+            </button>
+          ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        <div className="relative shrink-0" style={{ width: '490px' }}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             placeholder="Rechercher ID, nom, email…"
-            className="input !py-2 max-w-xs text-sm"
+            className="input !py-2 text-sm w-full"
           />
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
-            <button onClick={goToday} className="display px-3 py-1 text-xs text-white/70 hover:text-mw-pink">Auj</button>
-            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
-            <button onClick={() => setDatePicker(!datePicker)} className="px-2 py-1 text-sm text-white/70 hover:text-mw-pink" title="Choisir une date">📅</button>
-          </div>
-          {view === 'day' && (
-            <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-              {ZOOM_PRESETS.map((p) => (
-                <button key={p.id} onClick={() => { setZoom(p.id); setPxTime(p.px); }} className={`display rounded px-2 py-1 text-xs ${zoom === p.id ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{p.label}</button>
-              ))}
+          {searchFocused && search.trim() && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded border border-white/10 bg-mw-surface shadow-xl">
+              {searchResults.length === 0 && (
+                <div className="px-3 py-2 text-xs text-white/40">Aucun résultat</div>
+              )}
+              {searchResults.map((b) => {
+                const isOtherDay = b.date !== date;
+                return (
+                  <button
+                    key={b.id || b.reference}
+                    onMouseDown={(e) => { e.preventDefault(); onPickSearchResult(b); }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-white/5"
+                  >
+                    <span className="font-mono text-mw-pink shrink-0">{b.id || b.reference}</span>
+                    <span className="flex-1 truncate text-white/80">
+                      {b.customer?.name || `${b.customer?.firstName || ''} ${b.customer?.lastName || ''}`.trim() || '—'}
+                      <span className="ml-2 text-white/40">{b.customer?.email}</span>
+                    </span>
+                    {isOtherDay && (
+                      <span className="shrink-0 rounded bg-mw-yellow/20 px-2 py-0.5 text-[10px] text-mw-yellow">
+                        {new Date(b.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
-
-      {/* Date picker popup */}
-      {datePicker && (
-        <div className="mb-4 rounded border border-white/10 bg-mw-surface p-3 max-w-xs">
-          <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setDatePicker(false); }} className="input" />
-        </div>
-      )}
-
-      {/* Activity toggles */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {activities.filter((a) => a.bookable).map((a) => (
-          <button key={a.id} onClick={() => toggleVis(a.id)} className={`flex items-center gap-1.5 rounded border px-3 py-1 text-xs transition ${visible.has(a.id) ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 text-white/40'}`}>
-            <div className="relative h-4 w-4"><Image src={a.logo} alt="" fill sizes="16px" className="object-contain" /></div>
-            <span className="display">{a.name}</span>
-          </button>
-        ))}
-        {visible.has('k7') && (
-          <button onClick={() => setK7Open(!k7Open)} className={`rounded border px-3 py-1 text-xs transition ${k7Open ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
-            {k7Open ? '−' : '+'} Salles K7
-          </button>
-        )}
-        {visible.has('slashhit') && (
-          <button onClick={() => setSlashOpen(!slashOpen)} className={`rounded border px-3 py-1 text-xs transition ${slashOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
-            {slashOpen ? '−' : '+'} Pistes Slash
-          </button>
-        )}
       </div>
 
       {/* Multi-sel banner */}
@@ -306,25 +326,57 @@ export default function StaffCalendarPage() {
         </div>
       )}
 
-      {/* Day layout toggle + sliders */}
-      {view === 'day' && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+      {/* Toolbar — view buttons, sliders, view selector, date picker */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        {view === 'day' && (
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Classique ↕</button>
-            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Transposée ↔</button>
+            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
+            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
           </div>
+        )}
+        {view === 'day' && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
-            <input type="range" min="24" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
+            <input type="range" min="100" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
           </div>
+        )}
+        {view === 'day' && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Activités</span>
             <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxActivity}px</span>
           </div>
+        )}
+
+        <div className="ml-auto flex items-center justify-between gap-3" style={{ width: '490px' }}>
+          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+            ))}
+          </div>
+
+          <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
+            <button
+              onClick={() => dateInputRef.current?.showPicker?.()}
+              className="display whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white hover:text-mw-pink"
+            >
+              {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+            </button>
+            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Calendar view */}
       {view === 'day' && hours && dayLayout === 'transposed' && (
@@ -334,7 +386,9 @@ export default function StaffCalendarPage() {
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
-          onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          onBlockHour={blockHour}
+          k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
         />
       )}
       {view === 'day' && hours && dayLayout === 'classic' && (
@@ -344,7 +398,9 @@ export default function StaffCalendarPage() {
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
-          onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          onBlockHour={blockHour}
+          k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
           onOpenBlock={setSelected}
         />
       )}
@@ -379,8 +435,7 @@ export default function StaffCalendarPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    // Highlight all slots from this customer
-                    setSearch(it.booking?.customer?.name || it.booking?.id || '');
+                    setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
                     setCtxMenu(null);
                   }}
                   className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-white/10"
@@ -496,7 +551,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, onOpenBlock }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -504,7 +559,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
   return (
     <div className="overflow-x-auto rounded border border-white/10 bg-mw-bg">
-      <div className="flex min-w-max">
+      <div className="flex min-w-full">
         {/* Time column */}
         <div className="sticky left-0 z-10 w-14 shrink-0 border-r border-white/10 bg-mw-bg">
           <div className="h-12 border-b border-white/10" />
@@ -544,11 +599,12 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
           });
 
           return (
-            <div key={lane.laneId} className="shrink-0 border-r border-white/10" style={{ width: `${laneW}px` }}>
-              <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : undefined}>
+            <div key={lane.laneId} className="shrink-0 grow border-r border-white/10" style={{ width: `${laneW}px`, minWidth: `${laneW}px` }}>
+              <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}>
                 <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
                 <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>
                 {lane.id === 'k7' && <span className="text-[10px] text-white/40">{k7Open ? '−' : '+'}</span>}
+                {lane.id === 'slashhit' && <span className="text-[10px] text-white/40">{slashOpen ? '−' : '+'}</span>}
               </div>
               <div className="relative" style={{ height: `${hourCount * pxH}px` }}>
                 {Array.from({ length: hourCount }).map((_, i) => {

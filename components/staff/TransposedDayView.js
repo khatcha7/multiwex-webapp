@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useMemo, useCallback, useEffect } from 'react';
+import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { generateSlotsForActivity, applySlotShifts, toMinutes, fromMinutes } from '@/lib/hours';
+import { generateSlotsForActivity, applySlotShifts, toMinutes, fromMinutes, toDateStr, isToday } from '@/lib/hours';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -17,6 +17,13 @@ const K7_SUB_LABELS = {
   'k7-record': 'Record',
   'k7-studio': 'Studio',
   'k7-dancefloor': 'Dancefloor',
+};
+
+const SLASH_ROOM_IDS = ['slash-piste1', 'slash-piste2', 'slash-piste3'];
+const SLASH_SUB_LABELS = {
+  'slash-piste1': 'Piste 1',
+  'slash-piste2': 'Piste 2',
+  'slash-piste3': 'Piste 3',
 };
 
 const TOTAL_HOURS = 24;
@@ -86,6 +93,8 @@ export default function TransposedDayView({
   onBlockHour,
   k7Open = false,
   onToggleK7,
+  slashOpen = false,
+  onToggleSlash,
 }) {
   ROW_HEIGHT = pxActivity; // Override with prop
   const scrollRef = useRef(null);
@@ -108,6 +117,23 @@ export default function TransposedDayView({
   const openMin = hours ? toMinutes(hours.open) : 0;
   const closeMin = hours ? toMinutes(hours.close) : 1440;
   const totalWidth = TOTAL_HOURS * pxPerHour;
+
+  /* ---------- now line (tick every minute) ---------- */
+  const [nowMinutes, setNowMinutes] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const update = () => {
+      const n = new Date();
+      setNowMinutes(n.getHours() * 60 + n.getMinutes());
+    };
+    update();
+    const id = setInterval(update, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const showNowLine = isToday(date);
+  const nowLeft = (nowMinutes / 60) * pxPerHour;
 
   /* ---------- batch-block merging ---------- */
   const mergedBlocksByLane = useMemo(() => {
@@ -162,6 +188,10 @@ export default function TransposedDayView({
     (lane) => lane.name?.toLowerCase().includes('karaok') || lane.id?.toLowerCase?.().includes('k7'),
     []
   );
+  const isSlash = useCallback(
+    (lane) => lane.id?.toLowerCase?.() === 'slashhit',
+    []
+  );
 
   /* ---------- shift+wheel → horizontal scroll ---------- */
   const handleWheel = useCallback((e) => {
@@ -183,6 +213,7 @@ export default function TransposedDayView({
   /* ---------- Determine which lanes are K7 ---------- */
   const k7Lanes = useMemo(() => lanes.filter(isK7), [lanes, isK7]);
   const nonK7Lanes = useMemo(() => lanes.filter((l) => !isK7(l)), [lanes, isK7]);
+  const slashLanes = useMemo(() => lanes.filter(isSlash), [lanes, isSlash]);
 
   /* ---------- build ordered row list ---------- */
   const rows = useMemo(() => {
@@ -193,12 +224,16 @@ export default function TransposedDayView({
         if (!result.find((r) => r.type === 'k7')) {
           result.push({ type: 'k7', lane, subLanes: k7Lanes });
         }
+      } else if (isSlash(lane)) {
+        if (!result.find((r) => r.type === 'slash')) {
+          result.push({ type: 'slash', lane, subLanes: slashLanes });
+        }
       } else {
         result.push({ type: 'normal', lane });
       }
     }
     return result;
-  }, [lanes, isK7, k7Lanes]);
+  }, [lanes, isK7, isSlash, k7Lanes, slashLanes]);
 
   /* ================================================================ */
   /*  RENDER                                                           */
@@ -346,6 +381,11 @@ export default function TransposedDayView({
       const h = k7Open ? ROW_HEIGHT * 3 : ROW_HEIGHT;
       rowMeta.push({ rowTop: gridHeight, rowHeight: h, row });
       gridHeight += h;
+    } else if (row.type === 'slash') {
+      const subCount = row.subLanes.length || 1;
+      const h = slashOpen ? ROW_HEIGHT * subCount : ROW_HEIGHT;
+      rowMeta.push({ rowTop: gridHeight, rowHeight: h, row });
+      gridHeight += h;
     } else {
       rowMeta.push({ rowTop: gridHeight, rowHeight: ROW_HEIGHT, row });
       gridHeight += ROW_HEIGHT;
@@ -354,7 +394,7 @@ export default function TransposedDayView({
 
   return (
     <div
-      style={{ position: 'relative', width: '100%', overflow: 'hidden' }}
+      style={{ position: 'relative', width: '100%', overflow: 'hidden', minHeight: '100vh' }}
     >
       {/* Time header */}
       <div style={{ display: 'flex' }}>
@@ -404,7 +444,7 @@ export default function TransposedDayView({
       </div>
 
       {/* Body: sticky row headers + scrollable grid */}
-      <div style={{ display: 'flex', maxHeight: 'calc(100vh - 200px)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', overflow: 'hidden' }}>
         {/* Row headers — sticky left, vertical scroll synced */}
         <div
           style={{
@@ -499,6 +539,93 @@ export default function TransposedDayView({
                           </span>
                           <span style={{ fontSize: 10, color: '#666' }}>
                             ▶ 3 salles
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (row.type === 'slash') {
+                const firstSlash = row.subLanes[0] || row.lane;
+                const subOrder = row.subLanes.length
+                  ? row.subLanes.map((l) => l.roomId || l.laneId)
+                  : SLASH_ROOM_IDS;
+                return (
+                  <div
+                    key={`header-slash`}
+                    style={{
+                      position: 'absolute',
+                      top: rowTop,
+                      height: rowHeight,
+                      width: '100%',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                    }}
+                    onClick={() => onToggleSlash?.()}
+                    title={slashOpen ? 'Réduire Slash and Hit' : 'Développer Slash and Hit'}
+                  >
+                    {slashOpen ? (
+                      subOrder.map((subKey, si) => (
+                        <div
+                          key={subKey}
+                          style={{
+                            height: ROW_HEIGHT,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '0 6px',
+                            borderBottom: si < subOrder.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                            background: si % 2 === 0 ? '#111111' : '#0f0f0f',
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: '#fff',
+                          }}
+                        >
+                          {firstSlash.logo && (
+                            <Image
+                              src={firstSlash.logo}
+                              alt=""
+                              width={20}
+                              height={20}
+                              style={{ borderRadius: 4 }}
+                            />
+                          )}
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {SLASH_SUB_LABELS[subKey] || subKey}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          height: ROW_HEIGHT,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '0 6px',
+                          background: '#111111',
+                        }}
+                      >
+                        {firstSlash.logo && (
+                          <Image
+                            src={firstSlash.logo}
+                            alt=""
+                            width={24}
+                            height={24}
+                            style={{ borderRadius: 4 }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            Slash and Hit
+                          </span>
+                          <span style={{ fontSize: 10, color: '#888' }}>
+                            ▶ {subOrder.length} pistes
                           </span>
                         </div>
                       </div>
@@ -614,6 +741,22 @@ export default function TransposedDayView({
               }}
             />
 
+            {/* Now line (today only) */}
+            {showNowLine && (
+              <div
+                className="pointer-events-none"
+                style={{
+                  position: 'absolute',
+                  left: nowLeft,
+                  top: 0,
+                  bottom: 0,
+                  width: 2,
+                  background: '#00ff66',
+                  zIndex: 10,
+                }}
+              />
+            )}
+
             {/* Slots per row */}
             {rowMeta.map(({ rowTop, rowHeight, row }) => {
               if (row.type === 'k7') {
@@ -702,6 +845,99 @@ export default function TransposedDayView({
                         onMouseEnter={() => onHoverEnter?.(subLane.laneId, subLane, slot)}
                         onMouseLeave={() => onHoverLeave?.()}
                         title={`${K7_SUB_LABELS[subKey]} — ${slot.start}`}
+                      >
+                        {isBlocked ? '' : `${players}`}
+                      </button>
+                    );
+                  });
+                });
+              }
+
+              if (row.type === 'slash') {
+                const subLanes = row.subLanes;
+                const subOrder = subLanes.map((l) => l.roomId || l.laneId);
+                if (slashOpen) {
+                  return subOrder.map((subKey, si) => {
+                    const subLane = subLanes.find((l) => (l.roomId || l.laneId) === subKey) || subLanes[si];
+                    if (!subLane) return null;
+                    return (
+                      <div key={`slash-sub-${subKey}`}>
+                        {renderLaneSlots(subLane, rowTop + si * ROW_HEIGHT, ROW_HEIGHT)}
+                      </div>
+                    );
+                  });
+                }
+
+                const subCount = subOrder.length || 1;
+                const miniH = ROW_HEIGHT / subCount;
+                return subOrder.map((subKey, si) => {
+                  const subLane = subLanes.find((l) => (l.roomId || l.laneId) === subKey) || subLanes[si];
+                  if (!subLane) return null;
+                  const slots = laneSlots[subLane.laneId] || [];
+                  return slots.map((slot) => {
+                    const sM = toMinutes(slot.start);
+                    const eM = toMinutes(slot.end);
+                    const duration = eM - sM;
+                    const left = (sM / 60) * pxPerHour;
+                    const width = (duration / 60) * pxPerHour;
+                    const isOutside = sM < openMin || sM >= closeMin;
+
+                    const laneBlocks = [
+                      ...(mergedBlocksByLane[subLane.laneId] || []),
+                      ...(mergedBlocksByLane['_all_'] || []),
+                    ];
+                    const matchingBlocks = blocksForSlot(laneBlocks, subLane.laneId, slot.start, slot.end);
+                    const isBlocked = matchingBlocks.length > 0;
+
+                    const matchingBookings = bookingsForSlot(bookings, subLane.laneId, slot.start, slot.end);
+                    let players = 0;
+                    let isHighlighted = false;
+                    for (const { booking, item } of matchingBookings) {
+                      players += item.players || item.count || 1;
+                      if (highlightIds.has?.(booking.id)) isHighlighted = true;
+                    }
+
+                    const statusCls = slotClass(players, subLane.maxPlayers || 1, isBlocked);
+                    const isSelected = multiSelSet.has(`${subLane.laneId}::${slot.start}`);
+
+                    const classes = [
+                      statusCls,
+                      isSelected ? 'cal-slot-selected' : '',
+                      isHighlighted ? 'cal-slot-highlight' : '',
+                    ].filter(Boolean).join(' ');
+
+                    return (
+                      <button
+                        key={`slash-mini-${subKey}-${slot.start}`}
+                        className={classes}
+                        style={{
+                          position: 'absolute',
+                          left,
+                          top: rowTop + si * miniH,
+                          width: Math.max(width - 1, 2),
+                          height: Math.max(miniH - 1, 8),
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          opacity: isOutside ? 0.5 : 1,
+                          fontSize: 10,
+                          color: statusCls === 'cal-slot-full' || statusCls === 'cal-slot-blocked' ? '#fff' : '#000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          boxSizing: 'border-box',
+                          overflow: 'hidden',
+                          lineHeight: 1,
+                          zIndex: isSelected ? 5 : 1,
+                        }}
+                        onClick={(e) => onClick?.(subLane.laneId, subLane, slot, e)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          onRightClick?.(e, subLane.laneId, subLane, slot);
+                        }}
+                        onMouseEnter={() => onHoverEnter?.(subLane.laneId, subLane, slot)}
+                        onMouseLeave={() => onHoverLeave?.()}
+                        title={`${SLASH_SUB_LABELS[subKey] || subKey} — ${slot.start}`}
                       >
                         {isBlocked ? '' : `${players}`}
                       </button>
