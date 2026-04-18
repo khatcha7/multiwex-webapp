@@ -337,7 +337,7 @@ export default function StaffCalendarPage() {
           ))}
         </div>
 
-        <div className="relative shrink-0" style={{ width: '490px' }}>
+        <div className="relative w-full md:w-[490px] md:shrink-0">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -411,7 +411,7 @@ export default function StaffCalendarPage() {
           </div>
         )}
 
-        <div className="ml-auto flex items-center justify-between gap-2" style={{ width: '490px' }}>
+        <div className="ml-auto flex w-full items-center justify-between gap-2 md:w-[490px]">
           <button
             onClick={goNow}
             className="display whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 py-1.5 text-sm text-mw-yellow hover:border-mw-yellow"
