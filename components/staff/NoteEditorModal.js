@@ -35,6 +35,9 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
       if (isEdit) await updateNote(editor.id, payload);
       else await createNote(payload);
       onSaved();
+    } catch (e) {
+      console.error('Note save error', e);
+      alert('Erreur lors de la sauvegarde : ' + (e?.message || 'inconnue'));
     } finally { setSaving(false); }
   };
 
