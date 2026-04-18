@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
@@ -39,6 +40,7 @@ function savePref(key, value) {
 }
 
 export default function StaffCalendarPage() {
+  const searchParams = useSearchParams();
   const [date, setDate] = useState(toDateStr(new Date()));
   const [view, _setView] = useState(() => loadPref('view', 'day'));
   const setView = (v) => { _setView(v); savePref('view', v); };
@@ -64,6 +66,8 @@ export default function StaffCalendarPage() {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const hoverTimer = useRef(null);
   const dateInputRef = useRef(null);
+  const calRef = useRef(null);
+  const [highlightBookingId, setHighlightBookingId] = useState(null);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -78,6 +82,78 @@ export default function StaffCalendarPage() {
     const unsub = subscribeBookings(() => setTick((t) => t + 1));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const d = searchParams.get('date');
+    if (d) setDate(d);
+    // Si on arrive avec un highlight (depuis /staff/bookings), forcer la vue classique
+    // car l'autoscroll vertical y fonctionne mieux qu'en transposée.
+    if (searchParams.get('highlight')) setDayLayout('classic');
+  }, [searchParams]);
+
+  const autoScrolledRef = useRef(null);
+
+  const goNow = () => {
+    const today = toDateStr(new Date());
+    if (date !== today) setDate(today);
+    if (view !== 'day') setView('day');
+    if (dayLayout !== 'classic') setDayLayout('classic');
+    // Heure courante en fuseau Europe/Brussels — H-15min, arrondi inférieur 5min
+    const fmt = new Intl.DateTimeFormat('fr-BE', {
+      timeZone: 'Europe/Brussels',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = fmt.formatToParts(new Date());
+    const h = parseInt(parts.find((p) => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find((p) => p.type === 'minute').value, 10);
+    const targetMin = Math.max(0, h * 60 + m - 15);
+    const targetHour = Math.floor(targetMin / 60);
+    const targetHourStr = `${String(targetHour).padStart(2, '0')}:00`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const root = calRef.current;
+      if (root) {
+        const target = root.querySelector(`[data-hour="${targetHourStr}"]`);
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          return;
+        }
+      }
+      attempts += 1;
+      if (attempts < 15) setTimeout(tryScroll, 200);
+    };
+    setTimeout(tryScroll, 350);
+  };
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const hl = searchParams.get('highlight');
+    if (!hl) return;
+    setHighlightBookingId(hl);
+    if (autoScrolledRef.current === hl) return;
+    if (!bookings || bookings.length === 0) return;
+    const target = bookings.find((b) => (b.id || b.reference) === hl);
+    if (!target) return;
+    autoScrolledRef.current = hl;
+    // scrollIntoView traverse tous les ancestors scrollables — plus robuste qu'un scrollTo manuel.
+    // Retry car le slot peut ne pas être rendu immédiatement.
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.querySelector('.cal-slot-highlight');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        return;
+      }
+      attempts += 1;
+      if (attempts < 8) setTimeout(tryScroll, 200);
+    };
+    setTimeout(tryScroll, 250);
+  }, [bookings, searchParams]);
 
   const pxH = pxTime; // Contrôlé par le slider (les presets mettent à jour pxTime)
   const hours = getHoursForDate(date);
@@ -104,7 +180,6 @@ export default function StaffCalendarPage() {
   }, [visible, k7Open, slashOpen]);
 
   // Selected search result → highlight slots (cyan)
-  const [highlightBookingId, setHighlightBookingId] = useState(null);
   const highlightIds = useMemo(() => {
     const s = new Set();
     if (highlightBookingId) s.add(highlightBookingId);
@@ -137,12 +212,36 @@ export default function StaffCalendarPage() {
   }, [search, allBookings, date]);
 
   const [searchFocused, setSearchFocused] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const onPickSearchResult = (b) => {
     if (b.date !== date) setDate(b.date);
+    if (view !== 'day') setView('day');
     setHighlightBookingId(b.id || b.reference);
     setSearch('');
     setSearchFocused(false);
+    // Autoscroll vers le 1er créneau de la résa
+    const items = (b.items || []).slice().sort((a, c) => (a.start || '').localeCompare(c.start || ''));
+    const first = items[0];
+    if (!first?.start) return;
+    const [hh] = first.start.split(':').map(Number);
+    const targetHourStr = `${String(hh).padStart(2, '0')}:00`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const root = calRef.current;
+      if (root) {
+        const target = root.querySelector(`[data-hour="${targetHourStr}"]`);
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          return;
+        }
+      }
+      attempts += 1;
+      if (attempts < 15) setTimeout(tryScroll, 200);
+    };
+    setTimeout(tryScroll, 350);
   };
 
   const toggleVis = (id) => { const n = new Set(visible); if (n.has(id)) n.delete(id); else n.add(id); setVisible(n); };
@@ -244,7 +343,6 @@ export default function StaffCalendarPage() {
   };
 
   // Disable native context menu on calendar
-  const calRef = useRef(null);
   useEffect(() => {
     const el = calRef.current;
     if (!el) return;
@@ -255,11 +353,12 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
+      <div className={view === 'day' ? 'sticky top-[44px] z-30 bg-mw-bg pt-3 pb-2' : ''}>
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="section-title shrink-0">Calendrier</h1>
 
-        <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
+        <h1 className="section-title shrink-0 hidden md:block">Calendrier</h1>
+        <div className="flex flex-1 items-center justify-start gap-1.5 flex-wrap md:justify-center">
           {activities.filter((a) => a.bookable).map((a) => (
             <button
               key={a.id}
@@ -274,9 +373,18 @@ export default function StaffCalendarPage() {
               <Image src={a.logo} alt={a.name} fill sizes="36px" className="object-contain p-1.5" />
             </button>
           ))}
+          <button
+            onClick={() => setMobileSearchOpen((v) => !v)}
+            title="Rechercher"
+            className={`md:hidden relative ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
+              mobileSearchOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 bg-white/5 text-white/70'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
         </div>
 
-        <div className="relative shrink-0" style={{ width: '490px' }}>
+        <div className={`relative w-full md:w-[490px] md:shrink-0 ${mobileSearchOpen ? '' : 'hidden md:block'}`}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -318,7 +426,7 @@ export default function StaffCalendarPage() {
 
       {/* Multi-sel banner */}
       {multiSel.length > 1 && (
-        <div className="sticky top-[158px] z-20 mb-3 flex items-center justify-between gap-3 rounded border-2 border-blue-400 bg-blue-500/15 px-4 py-3 text-sm">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded border-2 border-blue-400 bg-blue-500/15 px-4 py-3 text-sm">
           <div className="display text-blue-300">{multiSel.length} créneau(x) · Shift pour étendre · Ctrl pour ajouter</div>
           <div className="flex items-center gap-2">
             <button onClick={() => { setMultiSel([]); setSelAnchor(null); }} className="text-xs text-white/60 hover:text-mw-red">Annuler</button>
@@ -328,44 +436,56 @@ export default function StaffCalendarPage() {
       )}
 
       {/* Toolbar — view buttons, sliders, view selector, date picker */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 md:gap-3">
         {view === 'day' && (
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
-            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
-          </div>
-        )}
-        {view === 'day' && (
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className="text-[10px]">Heures</span>
-            <input type="range" min="100" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
-            <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
-          </div>
-        )}
-        {view === 'day' && (
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className="text-[10px]">Activités</span>
-            <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-24 accent-mw-pink" />
-            <span className="w-10 text-[10px] text-white/40">{pxActivity}px</span>
+          <div className="flex w-full flex-nowrap items-center gap-2 md:w-auto md:contents">
+            <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1 shrink-0">
+              <button onClick={() => setDayLayout('classic')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
+              <button onClick={() => setDayLayout('transposed')} className={`display rounded px-2 py-1 text-xs md:px-3 ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden md:inline">Heures</span>
+              <span className="text-[10px] md:hidden">H</span>
+              <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="min-w-0 flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="shrink-0 text-[10px] text-white/40 md:w-10">{pxTime}</span>
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-white/60 md:flex-none md:gap-2">
+              <span className="text-[10px] hidden md:inline">Activités</span>
+              <span className="text-[10px] md:hidden">A</span>
+              <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="min-w-0 flex-1 accent-mw-pink md:w-24 md:flex-none" />
+              <span className="shrink-0 text-[10px] text-white/40 md:w-10">{pxActivity}</span>
+            </div>
           </div>
         )}
 
-        <div className="ml-auto flex items-center justify-between gap-3" style={{ width: '490px' }}>
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+        <div className="ml-auto flex w-full flex-nowrap items-center justify-between gap-2 md:w-[490px] md:justify-between">
+          <button
+            onClick={goNow}
+            className="display flex h-9 items-center whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 text-xs text-mw-yellow hover:border-mw-yellow"
+            title="Aujourd'hui — H-15min (Europe/Brussels)"
+          >
+            NOW
+          </button>
+
+          <div className="flex h-9 shrink-0 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
+            {[['day', 'Jour', 'J'], ['week', 'Sem', 'S'], ['month', 'Mois', 'M']].map(([v, l, s]) => (
+              <button key={v} onClick={() => setView(v)} className={`display flex h-full min-w-[28px] items-center justify-center rounded px-2 text-[11px] md:px-1.5 md:text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>
+                <span className="hidden md:inline">{l}</span>
+                <span className="md:hidden">{s}</span>
+              </button>
             ))}
           </div>
 
-          <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
+          <div className="relative flex h-9 min-w-0 flex-1 items-center gap-1 rounded border border-white/15 bg-white/5 p-1 md:w-[300px]">
+            <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
-              className="display whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white hover:text-mw-pink"
+              className="display min-w-0 flex-1 truncate px-1 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
             >
-              {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+              <span className="hidden md:inline">{parseDate(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
+              <span className="md:hidden">{parseDate(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()}</span>
             </button>
-            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
+            <button onClick={goNext} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
             <input
               ref={dateInputRef}
               type="date"
@@ -377,6 +497,7 @@ export default function StaffCalendarPage() {
             />
           </div>
         </div>
+      </div>
       </div>
 
       {/* Calendar view */}
@@ -477,7 +598,7 @@ export default function StaffCalendarPage() {
                 const slotsToBook = multiSel.length > 0
                   ? multiSel.map((s) => ({ activityId: s.actDef.id, start: s.slot.start, end: s.slot.end }))
                   : [{ activityId: ctxMenu.actDef.id, start: ctxMenu.slot.start, end: ctxMenu.slot.end }];
-                sessionStorage.setItem('mw_onsite_prefill', JSON.stringify(slotsToBook));
+                sessionStorage.setItem('mw_onsite_prefill', JSON.stringify({ date, slots: slotsToBook }));
                 setCtxMenu(null);
                 window.location.href = '/staff/on-site';
               }}
@@ -547,7 +668,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
             const h = fromMinutes(i * 60);
             const inOpen = openM >= 0 && i * 60 >= openM && i * 60 < closeM;
             return (
-              <div key={i} className={`group relative border-b border-white/5 pr-1 pt-1 ${!inOpen ? 'cal-closed-hour' : ''}`} style={{ height: `${pxH}px` }}>
+              <div key={i} data-hour={h} className={`group relative border-b border-white/5 pr-1 pt-1 ${!inOpen ? 'cal-closed-hour' : ''}`} style={{ height: `${pxH}px` }}>
                 <div className="display text-right text-[12px] text-white/40">{h}</div>
                 {inOpen && (
                   <button onClick={() => onBlockHour(h)} className="absolute right-0 top-1/2 hidden -translate-y-1/2 rounded-l bg-mw-red px-1 text-[9px] text-white group-hover:block" title={`Bloquer ${h}`}>🔒</button>
@@ -618,6 +739,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   return (
                     <button
                       key={slot.start}
+                      data-time={slot.start}
                       onClick={(e) => onClick(lane.laneId, lane, slot, e)}
                       onContextMenu={(e) => onRightClick(e, lane.laneId, lane, slot)}
                       onMouseEnter={() => onHoverEnter(lane.laneId, lane, slot)}

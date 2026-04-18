@@ -82,7 +82,7 @@ export default function StaffSettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <h1 className="section-title mb-4">Réglages</h1>
 
       <div className="mb-6 flex flex-wrap gap-1 rounded border border-white/15 bg-white/5 p-1">

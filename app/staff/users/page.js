@@ -57,7 +57,7 @@ export default function StaffUsersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="section-title">Équipe</h1>
         <button onClick={addUser} className="btn-primary !py-2 text-xs">+ Ajouter</button>
