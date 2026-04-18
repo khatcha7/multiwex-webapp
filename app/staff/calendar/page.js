@@ -101,27 +101,26 @@ export default function StaffCalendarPage() {
     if (dayLayout !== 'classic') setDayLayout('classic');
     let attempts = 0;
     const tryScroll = () => {
+      const now = new Date();
+      const totalMin = Math.max(0, now.getHours() * 60 + now.getMinutes() - 15);
+      const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+      const mm = String(Math.floor((totalMin % 60) / 5) * 5).padStart(2, '0');
+      const targetTime = `${hh}:${mm}`;
       const root = calRef.current;
       if (!root) {
         attempts += 1;
-        if (attempts < 10) setTimeout(tryScroll, 200);
+        if (attempts < 12) setTimeout(tryScroll, 200);
         return;
       }
-      const now = new Date();
-      const targetMin = Math.max(0, now.getHours() * 60 + now.getMinutes() - 15);
-      const offsetPx = (targetMin / 60) * pxTime;
-      let scrolled = false;
-      const all = root.querySelectorAll('*');
-      all.forEach((el) => {
-        const s = window.getComputedStyle(el);
-        const scrollY = (s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 4;
-        const scrollX = (s.overflowX === 'auto' || s.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4;
-        if (scrollY) { el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' }); scrolled = true; }
-        if (scrollX) { el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' }); scrolled = true; }
+      const target = Array.from(root.querySelectorAll('button, div')).find((el) => {
+        const t = (el.textContent || '').trim();
+        return t === targetTime || t.startsWith(targetTime + ' ') || t.startsWith(targetTime + '\n');
       });
-      if (!scrolled) {
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      } else {
         attempts += 1;
-        if (attempts < 10) setTimeout(tryScroll, 200);
+        if (attempts < 12) setTimeout(tryScroll, 200);
       }
     };
     setTimeout(tryScroll, 350);
@@ -431,13 +430,13 @@ export default function StaffCalendarPage() {
             NOW
           </button>
 
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          <div className="flex items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
             {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-2 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+              <button key={v} onClick={() => setView(v)} className={`display rounded px-1.5 py-1 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
             ))}
           </div>
 
-          <div className="relative flex w-[290px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          <div className="relative flex w-[330px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
