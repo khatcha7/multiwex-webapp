@@ -99,29 +99,32 @@ export default function StaffCalendarPage() {
     if (date !== today) setDate(today);
     if (view !== 'day') setView('day');
     if (dayLayout !== 'classic') setDayLayout('classic');
+    // Heure courante en fuseau Europe/Brussels — H-15min, arrondi inférieur 5min
+    const fmt = new Intl.DateTimeFormat('fr-BE', {
+      timeZone: 'Europe/Brussels',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = fmt.formatToParts(new Date());
+    const h = parseInt(parts.find((p) => p.type === 'hour').value, 10);
+    const m = parseInt(parts.find((p) => p.type === 'minute').value, 10);
+    const totalMin = Math.max(0, h * 60 + m - 15);
+    const tH = String(Math.floor(totalMin / 60)).padStart(2, '0');
+    const tM = String(Math.floor((totalMin % 60) / 5) * 5).padStart(2, '0');
+    const targetTime = `${tH}:${tM}`;
     let attempts = 0;
     const tryScroll = () => {
-      const now = new Date();
-      const totalMin = Math.max(0, now.getHours() * 60 + now.getMinutes() - 15);
-      const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
-      const mm = String(Math.floor((totalMin % 60) / 5) * 5).padStart(2, '0');
-      const targetTime = `${hh}:${mm}`;
       const root = calRef.current;
-      if (!root) {
-        attempts += 1;
-        if (attempts < 12) setTimeout(tryScroll, 200);
-        return;
+      if (root) {
+        const target = root.querySelector(`[data-time="${targetTime}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          return;
+        }
       }
-      const target = Array.from(root.querySelectorAll('button, div')).find((el) => {
-        const t = (el.textContent || '').trim();
-        return t === targetTime || t.startsWith(targetTime + ' ') || t.startsWith(targetTime + '\n');
-      });
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-      } else {
-        attempts += 1;
-        if (attempts < 12) setTimeout(tryScroll, 200);
-      }
+      attempts += 1;
+      if (attempts < 15) setTimeout(tryScroll, 200);
     };
     setTimeout(tryScroll, 350);
   };
@@ -424,19 +427,19 @@ export default function StaffCalendarPage() {
         <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 md:w-[490px] md:flex-nowrap md:justify-between">
           <button
             onClick={goNow}
-            className="display whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 py-1.5 text-xs text-mw-yellow hover:border-mw-yellow"
-            title="Aujourd'hui — H-15min"
+            className="display flex h-9 items-center whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 text-xs text-mw-yellow hover:border-mw-yellow"
+            title="Aujourd'hui — H-15min (Europe/Brussels)"
           >
             NOW
           </button>
 
-          <div className="flex items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
+          <div className="flex h-9 items-center gap-0.5 rounded border border-white/15 bg-white/5 p-1">
             {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-1.5 py-1 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+              <button key={v} onClick={() => setView(v)} className={`display flex h-full items-center rounded px-1.5 text-[10px] ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
             ))}
           </div>
 
-          <div className="relative flex w-[330px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          <div className="relative flex h-9 w-[330px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
@@ -698,6 +701,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   return (
                     <button
                       key={slot.start}
+                      data-time={slot.start}
                       onClick={(e) => onClick(lane.laneId, lane, slot, e)}
                       onContextMenu={(e) => onRightClick(e, lane.laneId, lane, slot)}
                       onMouseEnter={() => onHoverEnter(lane.laneId, lane, slot)}
