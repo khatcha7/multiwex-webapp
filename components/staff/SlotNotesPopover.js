@@ -36,6 +36,7 @@ export default function SlotNotesPopover({ notes, categories, position, onClose,
                   <span className="inline-flex items-center gap-1.5 text-xs">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: cat?.color || '#888' }} />
                     <span className="text-white/70">{cat?.name || 'Sans catégorie'}</span>
+                    {n.locked && <span title="Verrouillée par admin" className="text-[10px]">🔒</span>}
                   </span>
                   <span className="text-[10px] text-white/40">
                     {new Date(n.updated_at || n.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}

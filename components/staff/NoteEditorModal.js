@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { listNoteCategories, createNote, updateNote, deleteNote } from '@/lib/data';
+import { listNoteCategories, createNote, updateNote, deleteNote, getActiveStaff } from '@/lib/data';
 import RichTextEditor from './RichTextEditor';
 
 export default function NoteEditorModal({ editor, activities, onClose, onSaved }) {
@@ -13,6 +13,11 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
   const [slotEnd, setSlotEnd] = useState(editor.slot_end || editor.slotEnd || '');
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [locked, setLocked] = useState(!!editor.locked);
+  const staff = typeof window !== 'undefined' ? getActiveStaff() : null;
+  const isAdmin = !!staff?.permissions?.all;
+  // Si la note est lockée et user pas admin → édition désactivée
+  const readOnly = isEdit && editor.locked && !isAdmin;
 
   useEffect(() => {
     listNoteCategories().then(setCategories);
@@ -32,6 +37,7 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
         activityId: scope === 'day' ? null : activityId,
         slotStart: scope === 'day' ? null : slotStart,
         slotEnd: scope === 'range' ? slotEnd : (scope === 'slot' ? slotEnd : null),
+        ...(isAdmin && { locked }),
       };
       if (isEdit) await updateNote(editor.id, payload);
       else await createNote(payload);
@@ -127,6 +133,18 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
             <RichTextEditor value={content} onChange={setContent} />
           </div>
 
+          {isAdmin && (
+            <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer">
+              <input type="checkbox" checked={locked} onChange={(e) => setLocked(e.target.checked)} className="accent-mw-pink" />
+              <span>🔒 Verrouiller — seul un admin pourra éditer/supprimer</span>
+            </label>
+          )}
+          {readOnly && (
+            <div className="rounded border border-mw-yellow/40 bg-mw-yellow/10 p-2 text-xs text-mw-yellow">
+              🔒 Note verrouillée par un admin — édition désactivée pour ton rôle.
+            </div>
+          )}
+
           {isEdit && (editor.created_by_name || editor.updated_by_name) && (
             <div className="rounded bg-white/[0.03] p-2 text-[11px] text-white/50">
               {editor.created_by_name && <div>Créée par <span className="text-white/70">{editor.created_by_name}</span> le {new Date(editor.created_at).toLocaleString('fr-BE')}</div>}
@@ -138,14 +156,16 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
         </div>
 
         <div className="mt-5 flex items-center justify-between">
-          {isEdit ? (
+          {isEdit && !readOnly ? (
             <button onClick={remove} disabled={saving} className="text-xs text-mw-red hover:underline disabled:opacity-30">🗑 Supprimer</button>
           ) : <span />}
           <div className="flex gap-2">
-            <button onClick={onClose} disabled={saving} className="btn-outline !py-2 !px-4 text-sm">Annuler</button>
-            <button onClick={save} disabled={!canSave || saving} className="btn-primary !py-2 !px-4 text-sm disabled:opacity-30">
-              {saving ? '…' : (isEdit ? 'Enregistrer' : 'Créer')}
-            </button>
+            <button onClick={onClose} disabled={saving} className="btn-outline !py-2 !px-4 text-sm">{readOnly ? 'Fermer' : 'Annuler'}</button>
+            {!readOnly && (
+              <button onClick={save} disabled={!canSave || saving} className="btn-primary !py-2 !px-4 text-sm disabled:opacity-30">
+                {saving ? '…' : (isEdit ? 'Enregistrer' : 'Créer')}
+              </button>
+            )}
           </div>
         </div>
       </div>
