@@ -360,7 +360,7 @@ export default function StaffCalendarPage() {
             <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
-              className="display px-3 py-1 text-xs font-bold text-white hover:text-mw-pink"
+              className="display whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white hover:text-mw-pink"
             >
               {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
             </button>
