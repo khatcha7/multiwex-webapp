@@ -403,7 +403,7 @@ export default function StaffCalendarPage() {
 
       {/* Multi-sel banner */}
       {multiSel.length > 1 && (
-        <div className="sticky top-[158px] z-20 mb-3 flex items-center justify-between gap-3 rounded border-2 border-blue-400 bg-blue-500/15 px-4 py-3 text-sm">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded border-2 border-blue-400 bg-blue-500/15 px-4 py-3 text-sm">
           <div className="display text-blue-300">{multiSel.length} créneau(x) · Shift pour étendre · Ctrl pour ajouter</div>
           <div className="flex items-center gap-2">
             <button onClick={() => { setMultiSel([]); setSelAnchor(null); }} className="text-xs text-white/60 hover:text-mw-red">Annuler</button>
