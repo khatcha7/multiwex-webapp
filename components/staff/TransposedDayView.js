@@ -98,6 +98,7 @@ export default function TransposedDayView({
   notes = [],
   noteCategories = [],
   onEditNote,
+  onOpenNotesList,
 }) {
   ROW_HEIGHT = pxActivity; // Override with prop
   const scrollRef = useRef(null);
@@ -322,6 +323,12 @@ export default function TransposedDayView({
               });
               if (slotNotes.length === 0) return null;
               return (
+                <>
+                <span
+                  onClick={(e) => { e.stopPropagation(); onOpenNotesList && onOpenNotesList(slotNotes, lane, slot, e); }}
+                  title={`${slotNotes.length} note${slotNotes.length > 1 ? 's' : ''} — voir détails`}
+                  className="absolute top-0.5 left-0.5 flex h-3.5 w-3.5 items-center justify-center rounded bg-mw-pink/80 text-[8px] text-white hover:bg-mw-pink cursor-pointer z-10"
+                >📓</span>
                 <div className="flex w-full flex-col gap-0.5 mt-0.5">
                   {slotNotes.map((n) => {
                     const cat = noteCategories.find((c) => c.id === n.category_id);
@@ -340,6 +347,7 @@ export default function TransposedDayView({
                     );
                   })}
                 </div>
+                </>
               );
             })()}
           </>

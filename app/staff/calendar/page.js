@@ -6,6 +6,7 @@ import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
 import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
 import NoteEditorModal from '@/components/staff/NoteEditorModal';
+import SlotNotesPopover from '@/components/staff/SlotNotesPopover';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -96,6 +97,7 @@ export default function StaffCalendarPage() {
   const [noteCategories, setNoteCategories] = useState([]);
   const [noteEditor, setNoteEditor] = useState(null);
   const [notesTick, setNotesTick] = useState(0);
+  const [slotNotesPopover, setSlotNotesPopover] = useState(null);
 
   useEffect(() => {
     ensureDefaultNoteCategories().then(setNoteCategories);
@@ -549,6 +551,7 @@ export default function StaffCalendarPage() {
           slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
           notes={notes} noteCategories={noteCategories}
           onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
+          onOpenNotesList={(slotNotes, actDef, slot, e) => setSlotNotesPopover({ notes: slotNotes, position: { x: e.clientX, y: e.clientY }, context: { actDef, slot } })}
         />
       )}
       {view === 'day' && hours && dayLayout === 'classic' && (
@@ -565,6 +568,7 @@ export default function StaffCalendarPage() {
           notes={notes} noteCategories={noteCategories}
           onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
           onAddNoteToSlot={(actDef, slot) => setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: actDef.id, slotStart: slot.start, slotEnd: slot.end })}
+          onOpenNotesList={(slotNotes, actDef, slot, e) => setSlotNotesPopover({ notes: slotNotes, position: { x: e.clientX, y: e.clientY }, context: { actDef, slot } })}
         />
       )}
       {view === 'day' && !hours && (
@@ -676,6 +680,22 @@ export default function StaffCalendarPage() {
         />
       )}
 
+      {slotNotesPopover && (
+        <SlotNotesPopover
+          notes={slotNotesPopover.notes}
+          categories={noteCategories}
+          position={slotNotesPopover.position}
+          onClose={() => setSlotNotesPopover(null)}
+          onEdit={(n) => { setSlotNotesPopover(null); setNoteEditor({ mode: 'edit', ...n }); }}
+          onDeleted={() => { setSlotNotesPopover(null); setNotesTick((t) => t + 1); }}
+          onAddNew={() => {
+            const ctx = slotNotesPopover.context;
+            setSlotNotesPopover(null);
+            setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: ctx.actDef.id, slotStart: ctx.slot.start, slotEnd: ctx.slot.end });
+          }}
+        />
+      )}
+
       {/* Hover tooltip */}
       {hoverSlot && (
         <div className="fixed z-40 rounded border border-white/20 bg-mw-surface px-3 py-2 shadow-lg text-xs pointer-events-none"
@@ -718,7 +738,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock, notes = [], noteCategories = [], onEditNote, onAddNoteToSlot }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock, notes = [], noteCategories = [], onEditNote, onAddNoteToSlot, onOpenNotesList }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -863,6 +883,13 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                         {sBlock ? <span className="text-[10px]">🔒</span> : <span className="cal-players">{players}/{lane.maxPlayers}</span>}
                       </div>
                       {sBlock?.label && <div className="truncate text-[10px] font-bold">{sBlock.label}</div>}
+                      {slotNotes.length > 0 && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); onOpenNotesList && onOpenNotesList(slotNotes, lane, slot, e); }}
+                          title={`${slotNotes.length} note${slotNotes.length > 1 ? 's' : ''} — voir détails`}
+                          className="absolute top-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-mw-pink/80 text-[10px] text-white hover:bg-mw-pink cursor-pointer z-10"
+                        >📓</span>
+                      )}
                       {slotNotes.length > 0 && (
                         <div className="flex w-full flex-col gap-0.5 mt-0.5">
                           {slotNotes.map((n) => {
