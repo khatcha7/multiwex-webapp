@@ -110,29 +110,18 @@ export default function StaffCalendarPage() {
     const h = parseInt(parts.find((p) => p.type === 'hour').value, 10);
     const m = parseInt(parts.find((p) => p.type === 'minute').value, 10);
     const targetMin = Math.max(0, h * 60 + m - 15);
+    const targetHour = Math.floor(targetMin / 60);
+    const targetHourStr = `${String(targetHour).padStart(2, '0')}:00`;
     let attempts = 0;
     const tryScroll = () => {
       const root = calRef.current;
       if (root) {
-        const all = root.querySelectorAll('[data-time]');
-        if (all.length > 0) {
-          // Trouver le slot le plus proche de targetMin
-          let best = null;
-          let bestDiff = Infinity;
-          all.forEach((el) => {
-            const t = el.getAttribute('data-time') || '';
-            const [hh, mm] = t.split(':').map(Number);
-            if (Number.isNaN(hh) || Number.isNaN(mm)) return;
-            const diff = Math.abs(hh * 60 + mm - targetMin);
-            if (diff < bestDiff) { bestDiff = diff; best = el; }
-          });
-          if (best) {
-            const rect = best.getBoundingClientRect();
-            const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
-            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-            best.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            return;
-          }
+        const target = root.querySelector(`[data-hour="${targetHourStr}"]`);
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          return;
         }
       }
       attempts += 1;
@@ -656,7 +645,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
             const h = fromMinutes(i * 60);
             const inOpen = openM >= 0 && i * 60 >= openM && i * 60 < closeM;
             return (
-              <div key={i} className={`group relative border-b border-white/5 pr-1 pt-1 ${!inOpen ? 'cal-closed-hour' : ''}`} style={{ height: `${pxH}px` }}>
+              <div key={i} data-hour={h} className={`group relative border-b border-white/5 pr-1 pt-1 ${!inOpen ? 'cal-closed-hour' : ''}`} style={{ height: `${pxH}px` }}>
                 <div className="display text-right text-[12px] text-white/40">{h}</div>
                 {inOpen && (
                   <button onClick={() => onBlockHour(h)} className="absolute right-0 top-1/2 hidden -translate-y-1/2 rounded-l bg-mw-red px-1 text-[9px] text-white group-hover:block" title={`Bloquer ${h}`}>🔒</button>
