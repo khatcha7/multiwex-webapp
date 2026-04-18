@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
+import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -57,6 +58,7 @@ export default function StaffCalendarPage() {
   const [multiSel, setMultiSel] = useState([]);
   const [selAnchor, setSelAnchor] = useState(null);
   const [ctxMenu, setCtxMenu] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [search, setSearch] = useState('');
   const [hoverSlot, setHoverSlot] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
@@ -431,17 +433,31 @@ export default function StaffCalendarPage() {
             <div className="border-b border-white/10 px-3 py-2">
               <div className="mb-1 text-[10px] uppercase text-white/40">Réservations</div>
               {ctxMenu.items.map((it, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
-                    setCtxMenu(null);
-                  }}
-                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-white/10"
-                >
-                  <span className="text-mw-pink">{it.booking?.customer?.name || 'Client'}</span>
-                  <span className="ml-2 text-white/50">{it.players}j · {it.booking?.id || it.booking?.reference}</span>
-                </button>
+                <div key={i} className="flex w-full items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setHighlightBookingId(it.booking?.id || it.booking?.reference || null);
+                      setCtxMenu(null);
+                    }}
+                    className="flex-1 rounded px-2 py-1 text-left text-xs hover:bg-white/10"
+                  >
+                    <span className="text-mw-pink">{it.booking?.customer?.name || 'Client'}</span>
+                    <span className="ml-2 text-white/50">{it.players}j · {it.booking?.id || it.booking?.reference}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingItem({ booking: it.booking, item: it });
+                      setCtxMenu(null);
+                    }}
+                    title="Modifier (déplacer ou splitter)"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-white/60 hover:bg-mw-pink/20 hover:text-mw-pink"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15 14" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -484,6 +500,14 @@ export default function StaffCalendarPage() {
           ))}
         </div>
       )}
+
+      <EditBookingItemModal
+        open={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        booking={editingItem?.booking}
+        item={editingItem?.item}
+        onSaved={() => { setTick((t) => t + 1); setEditingItem(null); }}
+      />
 
       {/* Block dialog */}
       {selected && (
