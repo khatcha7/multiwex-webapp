@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { activities, getActivityPrice } from '@/lib/activities';
-import { generateSlotsForActivity, toDateStr } from '@/lib/hours';
+import { generateSlotsForActivity, toDateStr, parseDate, isOpenOn, monthsFr, dayLabelsFr } from '@/lib/hours';
 import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
 
 export default function OnSiteBookingPage() {
@@ -15,6 +15,10 @@ export default function OnSiteBookingPage() {
   const [companyName, setCompanyName] = useState('');
   const [vatNumber, setVatNumber] = useState('');
   const [date, setDate] = useState(today);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = parseDate(today);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
   // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
   const [occupancy, setOccupancy] = useState({});
@@ -33,7 +37,11 @@ export default function OnSiteBookingPage() {
         sessionStorage.removeItem('mw_onsite_prefill');
         // Compat : ancien format = array de slots, nouveau = { date, slots }
         const slotsToBook = Array.isArray(parsed) ? parsed : (parsed.slots || []);
-        if (parsed && parsed.date) setDate(parsed.date);
+        if (parsed && parsed.date) {
+          setDate(parsed.date);
+          const dd = parseDate(parsed.date);
+          setViewMonth({ year: dd.getFullYear(), month: dd.getMonth() });
+        }
         const newItems = {};
         slotsToBook.forEach((s) => {
           const a = activities.find((x) => x.id === s.activityId);
@@ -251,21 +259,8 @@ export default function OnSiteBookingPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="section-title mb-1">Réservation sur place</h1>
-          <p className="text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
-        </div>
-        <label className="flex items-center gap-2 text-xs text-white/70">
-          <span className="display">Date :</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="input !py-1.5 text-xs"
-          />
-        </label>
-      </div>
+      <h1 className="section-title mb-1">Réservation sur place</h1>
+      <p className="mb-6 text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
 
       {/* Customer */}
       <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
@@ -286,6 +281,69 @@ export default function OnSiteBookingPage() {
             <input value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} placeholder="N° TVA (ex: BE0123456789)" className="input" />
           </div>
         )}
+      </div>
+
+      {/* Date */}
+      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="display text-sm">Date {date === today && <span className="text-mw-pink text-xs">(aujourd'hui)</span>}</div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const t = parseDate(today);
+                const pm = new Date(viewMonth.year, viewMonth.month - 1, 1);
+                if (pm < new Date(t.getFullYear(), t.getMonth(), 1)) return;
+                setViewMonth({ year: pm.getFullYear(), month: pm.getMonth() });
+              }}
+              disabled={(() => { const t = parseDate(today); return viewMonth.year === t.getFullYear() && viewMonth.month === t.getMonth(); })()}
+              className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm disabled:opacity-20"
+            >←</button>
+            <div className="display w-32 text-center text-sm">{monthsFr[viewMonth.month]} {viewMonth.year}</div>
+            <button
+              onClick={() => {
+                const nm = new Date(viewMonth.year, viewMonth.month + 1, 1);
+                setViewMonth({ year: nm.getFullYear(), month: nm.getMonth() });
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded border border-white/15 text-sm hover:border-mw-pink hover:text-mw-pink"
+            >→</button>
+          </div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+          {(() => {
+            const todayStr = today;
+            const lastDay = new Date(viewMonth.year, viewMonth.month + 1, 0);
+            const days = [];
+            for (let d = 1; d <= lastDay.getDate(); d++) {
+              const ds = toDateStr(new Date(viewMonth.year, viewMonth.month, d));
+              if (ds >= todayStr) days.push(ds);
+            }
+            return days.map((d) => {
+              const dt = parseDate(d);
+              const open = isOpenOn(d);
+              const isWed = dt.getDay() === 3;
+              const active = date === d;
+              const isTodayD = todayStr === d;
+              const disabled = !open;
+              return (
+                <button
+                  key={d}
+                  onClick={() => !disabled && setDate(d)}
+                  disabled={disabled}
+                  className={`relative shrink-0 rounded border px-3.5 py-2.5 text-center transition ${
+                    active ? 'border-mw-pink bg-mw-pink text-white shadow-neon-pink' : 'border-white/15 bg-white/[0.03] hover:border-white/40'
+                  } ${disabled ? 'cursor-not-allowed opacity-25' : ''}`}
+                >
+                  {isTodayD && !active && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mw-pink" />}
+                  <div className="text-[10px] font-bold uppercase opacity-80">{dayLabelsFr[dt.getDay()]}</div>
+                  <div className="display text-xl leading-none">{dt.getDate()}</div>
+                  {isWed && open && (
+                    <div className={`mt-0.5 text-[9px] font-bold ${active ? 'text-white' : 'text-mw-pink'}`}>-50%</div>
+                  )}
+                </button>
+              );
+            });
+          })()}
+        </div>
       </div>
 
       {/* Activities */}

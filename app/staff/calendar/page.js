@@ -457,7 +457,7 @@ export default function StaffCalendarPage() {
             <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
-              className="display flex-1 whitespace-nowrap px-2 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
+              className="display min-w-0 flex-1 truncate px-1 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
             >
               <span className="hidden md:inline">{parseDate(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
               <span className="md:hidden">{parseDate(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()}</span>
