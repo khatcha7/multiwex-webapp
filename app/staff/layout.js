@@ -46,6 +46,13 @@ export default function StaffLayout({ children }) {
       <div className="sticky top-0 z-40 border-b border-mw-pink/30 bg-mw-darker/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2">
           <nav className="flex flex-wrap items-center gap-1">
+            <Link
+              href="/"
+              title="Retour au site client"
+              className="display flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/70 transition hover:bg-white/10 hover:text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+            </Link>
             {tabs.filter((t) => can(t.perm)).map((t) => {
               const active = pathname.startsWith(t.href);
               return (
