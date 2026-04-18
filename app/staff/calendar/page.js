@@ -99,27 +99,21 @@ export default function StaffCalendarPage() {
     if (!bookings || bookings.length === 0) return;
     const target = bookings.find((b) => (b.id || b.reference) === hl);
     if (!target) return;
-    const firstItem = (target.items || [])[0];
-    if (!firstItem) return;
-    const startMin = toMinutes(firstItem.start || firstItem.slot_start || '00:00');
-    const dayStartMin = (typeof hours !== 'undefined' && hours && hours.length) ? toMinutes(hours[0]) : 0;
-    const offsetMin = Math.max(0, startMin - dayStartMin);
-    const offsetPx = (offsetMin / 60) * pxTime;
     autoScrolledRef.current = hl;
-    setTimeout(() => {
-      const root = calRef.current;
-      if (!root) return;
-      const scrollables = root.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
-      scrollables.forEach((el) => {
-        if (el.scrollHeight > el.clientHeight + 4) {
-          el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' });
-        }
-        if (el.scrollWidth > el.clientWidth + 4) {
-          el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' });
-        }
-      });
-    }, 250);
-  }, [bookings, searchParams, pxTime]);
+    // scrollIntoView traverse tous les ancestors scrollables — plus robuste qu'un scrollTo manuel.
+    // Retry car le slot peut ne pas être rendu immédiatement.
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.querySelector('.cal-slot-highlight');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        return;
+      }
+      attempts += 1;
+      if (attempts < 8) setTimeout(tryScroll, 200);
+    };
+    setTimeout(tryScroll, 250);
+  }, [bookings, searchParams]);
 
   const pxH = pxTime; // Contrôlé par le slider (les presets mettent à jour pxTime)
   const hours = getHoursForDate(date);
