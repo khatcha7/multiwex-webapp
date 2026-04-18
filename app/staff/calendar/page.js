@@ -216,9 +216,32 @@ export default function StaffCalendarPage() {
 
   const onPickSearchResult = (b) => {
     if (b.date !== date) setDate(b.date);
+    if (view !== 'day') setView('day');
     setHighlightBookingId(b.id || b.reference);
     setSearch('');
     setSearchFocused(false);
+    // Autoscroll vers le 1er créneau de la résa
+    const items = (b.items || []).slice().sort((a, c) => (a.start || '').localeCompare(c.start || ''));
+    const first = items[0];
+    if (!first?.start) return;
+    const [hh] = first.start.split(':').map(Number);
+    const targetHourStr = `${String(hh).padStart(2, '0')}:00`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const root = calRef.current;
+      if (root) {
+        const target = root.querySelector(`[data-hour="${targetHourStr}"]`);
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          const targetY = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          return;
+        }
+      }
+      attempts += 1;
+      if (attempts < 15) setTimeout(tryScroll, 200);
+    };
+    setTimeout(tryScroll, 350);
   };
 
   const toggleVis = (id) => { const n = new Set(visible); if (n.has(id)) n.delete(id); else n.add(id); setVisible(n); };
