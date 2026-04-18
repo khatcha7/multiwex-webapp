@@ -12,7 +12,6 @@ import {
   toDateStr,
   parseDate,
   dayLabelsFrFull,
-  monthsFr,
 } from '@/lib/hours';
 import {
   listBookings,
@@ -227,37 +226,17 @@ export default function StaffCalendarPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="section-title">Calendrier</h1>
-          <div className="text-sm text-white/60">
-            {dayLabelsFrFull[parseDate(date).getDay()]} {parseDate(date).getDate()} {monthsFr[parseDate(date).getMonth()]} {parseDate(date).getFullYear()}
-          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex flex-wrap items-center gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher ID, nom, email…"
-            className="input !py-2 max-w-xs text-sm"
+            className="input !py-2 text-sm"
+            style={{ width: '490px' }}
           />
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
-            <button onClick={goToday} className="display px-3 py-1 text-xs text-white/70 hover:text-mw-pink">Auj</button>
-            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
-            <button onClick={() => setDatePicker(!datePicker)} className="px-2 py-1 text-sm text-white/70 hover:text-mw-pink" title="Choisir une date">📅</button>
-          </div>
         </div>
       </div>
-
-      {/* Date picker popup */}
-      {datePicker && (
-        <div className="mb-4 rounded border border-white/10 bg-mw-surface p-3 max-w-xs">
-          <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setDatePicker(false); }} className="input" />
-        </div>
-      )}
 
       {/* Activity toggles */}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -280,25 +259,56 @@ export default function StaffCalendarPage() {
         </div>
       )}
 
-      {/* Day layout toggle + sliders */}
-      {view === 'day' && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+      {/* Toolbar — view buttons, sliders, view selector, date picker */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        {view === 'day' && (
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
             <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
           </div>
+        )}
+        {view === 'day' && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
             <input type="range" min="100" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
           </div>
+        )}
+        {view === 'day' && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Activités</span>
             <input type="range" min="30" max="600" value={pxActivity} onChange={(e) => setPxActivity(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxActivity}px</span>
           </div>
+        )}
+
+        <div className="ml-auto flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
+            <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-xs ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+          ))}
         </div>
-      )}
+
+        <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+          <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
+          <button
+            onClick={() => setDatePicker(!datePicker)}
+            className="display px-3 py-1 text-xs font-bold text-white hover:text-mw-pink"
+          >
+            {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+          </button>
+          <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
+          {datePicker && (
+            <div className="absolute right-0 top-full z-50 mt-1 rounded border border-white/15 bg-mw-surface p-2 shadow-xl">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => { setDate(e.target.value); setDatePicker(false); }}
+                className="input !py-2 text-sm"
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Calendar view */}
       {view === 'day' && hours && dayLayout === 'transposed' && (
