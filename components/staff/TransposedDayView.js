@@ -326,15 +326,16 @@ export default function TransposedDayView({
                   {slotNotes.map((n) => {
                     const cat = noteCategories.find((c) => c.id === n.category_id);
                     const color = cat?.color || '#888';
+                    const plain = (n.content || '').replace(/<[^>]+>/g, '').trim();
                     return (
                       <div
                         key={n.id}
                         onClick={(e) => { e.stopPropagation(); onEditNote && onEditNote(n); }}
-                        title={`${cat?.name || 'Note'} — ${n.content}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                        title={`${cat?.name || 'Note'} — ${plain}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
                         className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
                       >
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
-                        {width >= 50 && <span className="truncate text-white/80">{n.content}</span>}
+                        {width >= 50 && <span className="truncate text-white/80">{plain}</span>}
                       </div>
                     );
                   })}

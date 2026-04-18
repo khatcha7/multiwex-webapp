@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { listNoteCategories, createNote, updateNote, deleteNote } from '@/lib/data';
+import RichTextEditor from './RichTextEditor';
 
 export default function NoteEditorModal({ editor, activities, onClose, onSaved }) {
   const isEdit = editor.mode === 'edit';
@@ -122,15 +123,8 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
           )}
 
           <div>
-            <label className="mb-1 block text-xs text-white/60">Contenu (rich text en Phase 2)</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Écris ta note ici…"
-              rows={5}
-              className="input min-h-[100px] resize-y"
-              autoFocus
-            />
+            <label className="mb-1 block text-xs text-white/60">Contenu</label>
+            <RichTextEditor value={content} onChange={setContent} />
           </div>
 
           {isEdit && (editor.created_by_name || editor.updated_by_name) && (
