@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup } from '@/lib/data';
+import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup, listNoteCategories, createNoteCategory, updateNoteCategory, deleteNoteCategory, restoreDefaultNoteCategories, ensureDefaultNoteCategories } from '@/lib/data';
 import { activities } from '@/lib/activities';
 
 const TABS = [
@@ -12,6 +12,7 @@ const TABS = [
   { id: 'popups', label: 'Pop-ups' },
   { id: 'pdf', label: 'PDF / Invitation' },
   { id: 'pricing', label: 'Tarifs' },
+  { id: 'notes', label: 'Notes' },
 ];
 
 export default function StaffSettingsPage() {
@@ -288,7 +289,137 @@ export default function StaffSettingsPage() {
         </div>
       </div>)}
 
+      {tab === 'notes' && <NoteCategoriesPanel />}
+
       {editingPopup && <PopupEditor popup={editingPopup} onSave={savePopup} onCancel={() => setEditingPopup(null)} />}
+    </div>
+  );
+}
+
+function NoteCategoriesPanel() {
+  const [cats, setCats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [drafts, setDrafts] = useState({}); // { [id]: { name, color } } unsaved edits
+  const [adding, setAdding] = useState(null); // { name, color } for new row
+
+  const reload = async () => {
+    setLoading(true);
+    const list = await ensureDefaultNoteCategories();
+    setCats(list);
+    setDrafts({});
+    setLoading(false);
+  };
+
+  useEffect(() => { reload(); }, []);
+
+  const startEdit = (c) => setDrafts((d) => ({ ...d, [c.id]: { name: c.name, color: c.color } }));
+  const cancelEdit = (id) => setDrafts((d) => { const n = { ...d }; delete n[id]; return n; });
+  const saveEdit = async (id) => {
+    const draft = drafts[id];
+    if (!draft || !draft.name?.trim()) return;
+    await updateNoteCategory(id, { name: draft.name.trim(), color: draft.color });
+    await reload();
+  };
+  const removeCat = async (id) => {
+    if (!confirm('Supprimer cette catégorie ? Les notes existantes resteront mais sans catégorie.')) return;
+    await deleteNoteCategory(id);
+    await reload();
+  };
+  const addNew = () => setAdding({ name: '', color: '#e8005a' });
+  const cancelNew = () => setAdding(null);
+  const saveNew = async () => {
+    if (!adding?.name?.trim()) return;
+    await createNoteCategory({ name: adding.name.trim(), color: adding.color, position: cats.length });
+    setAdding(null);
+    await reload();
+  };
+  const restoreDefaults = async () => {
+    await restoreDefaultNoteCategories();
+    await reload();
+  };
+
+  if (loading) return <div className="rounded border border-white/10 bg-mw-surface p-5 text-white/60">Chargement…</div>;
+
+  return (
+    <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="display text-xl">Catégories de notes</h2>
+        <div className="flex gap-2">
+          <button onClick={restoreDefaults} className="btn-outline !py-1.5 !px-3 text-xs">Restaurer défauts</button>
+          <button onClick={addNew} disabled={!!adding} className="btn-primary !py-1.5 !px-3 text-xs disabled:opacity-40">+ Catégorie</button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded border border-white/10">
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-xs text-white/60">
+            <tr>
+              <th className="p-2 text-left">Aperçu</th>
+              <th className="p-2 text-left">Nom</th>
+              <th className="p-2 text-left">Couleur</th>
+              <th className="p-2 w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {adding && (
+              <tr className="border-t border-white/10 bg-mw-pink/5">
+                <td className="p-2"><span className="inline-block h-5 w-5 rounded-full" style={{ background: adding.color }} /></td>
+                <td className="p-2">
+                  <input autoFocus value={adding.name} onChange={(e) => setAdding({ ...adding, name: e.target.value })} placeholder="Nom catégorie" className="input !py-1.5 text-sm" />
+                </td>
+                <td className="p-2">
+                  <input type="color" value={adding.color} onChange={(e) => setAdding({ ...adding, color: e.target.value })} className="h-8 w-16 cursor-pointer rounded border border-white/15 bg-transparent" />
+                </td>
+                <td className="p-2 text-right">
+                  <button onClick={saveNew} disabled={!adding.name.trim()} className="text-xs text-mw-green disabled:opacity-30 mr-2">Sauver</button>
+                  <button onClick={cancelNew} className="text-xs text-white/50">Annuler</button>
+                </td>
+              </tr>
+            )}
+            {cats.map((c) => {
+              const draft = drafts[c.id];
+              const isEditing = !!draft;
+              const dispName = isEditing ? draft.name : c.name;
+              const dispColor = isEditing ? draft.color : c.color;
+              return (
+                <tr key={c.id} className="border-t border-white/10 hover:bg-white/[0.02]">
+                  <td className="p-2"><span className="inline-block h-5 w-5 rounded-full" style={{ background: dispColor }} /></td>
+                  <td className="p-2">
+                    {isEditing ? (
+                      <input value={draft.name} onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: { ...d[c.id], name: e.target.value } }))} className="input !py-1.5 text-sm" />
+                    ) : (
+                      <span className="display">{c.name}</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {isEditing ? (
+                      <input type="color" value={draft.color} onChange={(e) => setDrafts((d) => ({ ...d, [c.id]: { ...d[c.id], color: e.target.value } }))} className="h-8 w-16 cursor-pointer rounded border border-white/15 bg-transparent" />
+                    ) : (
+                      <span className="font-mono text-xs text-white/50">{c.color}</span>
+                    )}
+                  </td>
+                  <td className="p-2 text-right">
+                    {isEditing ? (
+                      <>
+                        <button onClick={() => saveEdit(c.id)} disabled={!draft.name.trim()} className="text-xs text-mw-green disabled:opacity-30 mr-2">Sauver</button>
+                        <button onClick={() => cancelEdit(c.id)} className="text-xs text-white/50">Annuler</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(c)} className="text-xs text-mw-pink hover:underline mr-2">Éditer</button>
+                        <button onClick={() => removeCat(c.id)} className="text-xs text-mw-red hover:underline">Suppr.</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {cats.length === 0 && !adding && (
+              <tr><td colSpan={4} className="p-4 text-center text-white/40 text-xs">Aucune catégorie. Clique "+ Catégorie" ou "Restaurer défauts".</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

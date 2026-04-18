@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { activities } from '@/lib/activities';
 import TransposedDayView from '@/components/staff/TransposedDayView';
 import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
+import NoteEditorModal from '@/components/staff/NoteEditorModal';
+import SlotNotesPopover from '@/components/staff/SlotNotesPopover';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -24,6 +26,12 @@ import {
   updateSlotBlockBatch,
   subscribeBookings,
   logAudit,
+  listNotes,
+  listNoteCategories,
+  ensureDefaultNoteCategories,
+  createNote,
+  updateNote,
+  deleteNote,
 } from '@/lib/data';
 
 function hashRoom(id) {
@@ -85,6 +93,29 @@ export default function StaffCalendarPage() {
     return () => { ro.disconnect(); window.removeEventListener('resize', update); };
   }, [view]);
   const [highlightBookingId, setHighlightBookingId] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [noteCategories, setNoteCategories] = useState([]);
+  const [noteEditor, setNoteEditor] = useState(null);
+  const [notesTick, setNotesTick] = useState(0);
+  const [slotNotesPopover, setSlotNotesPopover] = useState(null);
+  const [hiddenCats, setHiddenCats] = useState(new Set());
+  const [catFilterOpen, setCatFilterOpen] = useState(false);
+
+  useEffect(() => {
+    ensureDefaultNoteCategories().then(setNoteCategories);
+  }, []);
+
+  useEffect(() => {
+    listNotes({ from: date, to: date }).then(setNotes);
+  }, [date, notesTick]);
+
+  // Filtre catégories (cachées) appliqué aux notes affichées dans calendar
+  const filteredNotes = useMemo(() => {
+    if (hiddenCats.size === 0) return notes;
+    return notes.filter((n) => !hiddenCats.has(n.category_id || ''));
+  }, [notes, hiddenCats]);
+
+  const dayNotes = useMemo(() => filteredNotes.filter((n) => n.scope === 'day'), [filteredNotes]);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -515,6 +546,74 @@ export default function StaffCalendarPage() {
           </div>
         </div>
       </div>
+
+      {/* Day notes banner + category filter */}
+      {(dayNotes.length > 0 || noteCategories.length > 0) && view === 'day' && (
+        <div className="mb-2 flex items-start gap-2">
+          {/* Filter dropdown */}
+          {noteCategories.length > 0 && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setCatFilterOpen((v) => !v)}
+                className={`flex h-9 items-center gap-1.5 rounded border px-2.5 text-xs transition ${
+                  hiddenCats.size > 0 ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 bg-white/5 text-white/70 hover:border-white/30'
+                }`}
+                title="Filtrer notes par catégorie"
+              >
+                🗂 Filtrer {hiddenCats.size > 0 && `(${noteCategories.length - hiddenCats.size}/${noteCategories.length})`}
+              </button>
+              {catFilterOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setCatFilterOpen(false)} />
+                  <div className="absolute left-0 top-full z-40 mt-1 w-56 rounded border border-white/15 bg-mw-surface p-2 shadow-xl">
+                    {noteCategories.map((c) => {
+                      const visible = !hiddenCats.has(c.id);
+                      return (
+                        <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-white/5">
+                          <input
+                            type="checkbox"
+                            checked={visible}
+                            onChange={() => setHiddenCats((s) => { const n = new Set(s); if (visible) n.add(c.id); else n.delete(c.id); return n; })}
+                            className="accent-mw-pink"
+                          />
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
+                          <span className="flex-1">{c.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Day notes banner */}
+          {dayNotes.length > 0 && (
+            <div className="flex h-9 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto rounded border border-white/10 bg-mw-surface/60 px-2">
+              <span className="display text-[10px] uppercase tracking-wider text-white/50 shrink-0">📅 Journée :</span>
+              {dayNotes.map((n) => {
+                const cat = noteCategories.find((c) => c.id === n.category_id);
+                const plain = (n.content || '').replace(/<[^>]+>/g, '').trim();
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => setNoteEditor({ mode: 'edit', ...n })}
+                    title={`${cat?.name || 'Note'} — ${plain}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                    className="flex h-7 max-w-[300px] shrink-0 items-center gap-1.5 rounded border border-white/15 bg-white/5 px-2 text-xs hover:border-white/40"
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cat?.color || '#888' }} />
+                    <span className="truncate">{plain}</span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setNoteEditor({ mode: 'create', scope: 'day', date })}
+                className="flex h-7 shrink-0 items-center rounded border border-dashed border-white/20 px-2 text-[11px] text-white/50 hover:border-mw-pink hover:text-mw-pink"
+              >+ note</button>
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Calendar view */}
@@ -528,6 +627,9 @@ export default function StaffCalendarPage() {
           onBlockHour={blockHour}
           k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
           slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
+          notes={filteredNotes} noteCategories={noteCategories}
+          onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
+          onOpenNotesList={(slotNotes, actDef, slot, e) => setSlotNotesPopover({ notes: slotNotes, position: { x: e.clientX, y: e.clientY }, context: { actDef, slot } })}
         />
       )}
       {view === 'day' && hours && dayLayout === 'classic' && (
@@ -541,6 +643,10 @@ export default function StaffCalendarPage() {
           k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
           slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
           onOpenBlock={setSelected}
+          notes={filteredNotes} noteCategories={noteCategories}
+          onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
+          onAddNoteToSlot={(actDef, slot) => setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: actDef.id, slotStart: slot.start, slotEnd: slot.end })}
+          onOpenNotesList={(slotNotes, actDef, slot, e) => setSlotNotesPopover({ notes: slotNotes, position: { x: e.clientX, y: e.clientY }, context: { actDef, slot } })}
         />
       )}
       {view === 'day' && !hours && (
@@ -623,8 +729,49 @@ export default function StaffCalendarPage() {
             >
               📝 Réserver sur ce(s) créneau(x)
             </button>
+            <button
+              onClick={() => {
+                setNoteEditor({
+                  mode: 'create',
+                  scope: 'slot',
+                  date,
+                  activityId: ctxMenu.actDef.id,
+                  slotStart: ctxMenu.slot.start,
+                  slotEnd: ctxMenu.slot.end,
+                });
+                setCtxMenu(null);
+              }}
+              className="block w-full rounded px-3 py-2 text-left text-xs hover:bg-white/10"
+            >
+              🗒 Ajouter une note
+            </button>
           </div>
         </div>
+      )}
+
+      {noteEditor && (
+        <NoteEditorModal
+          editor={noteEditor}
+          activities={activities}
+          onClose={() => setNoteEditor(null)}
+          onSaved={() => { setNoteEditor(null); setNotesTick((t) => t + 1); }}
+        />
+      )}
+
+      {slotNotesPopover && (
+        <SlotNotesPopover
+          notes={slotNotesPopover.notes}
+          categories={noteCategories}
+          position={slotNotesPopover.position}
+          onClose={() => setSlotNotesPopover(null)}
+          onEdit={(n) => { setSlotNotesPopover(null); setNoteEditor({ mode: 'edit', ...n }); }}
+          onDeleted={() => { setSlotNotesPopover(null); setNotesTick((t) => t + 1); }}
+          onAddNew={() => {
+            const ctx = slotNotesPopover.context;
+            setSlotNotesPopover(null);
+            setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: ctx.actDef.id, slotStart: ctx.slot.start, slotEnd: ctx.slot.end });
+          }}
+        />
       )}
 
       {/* Hover tooltip */}
@@ -669,7 +816,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock, notes = [], noteCategories = [], onEditNote, onAddNoteToSlot, onOpenNotesList }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -785,6 +932,19 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
                   const slotInOpen = openM >= 0 && slotM >= openM && slotM < closeM;
 
+                  // Notes attachées à ce slot (slot exact, range qui le couvre, ou day)
+                  const slotNotes = notes.filter((n) => {
+                    if (n.scope === 'day') return false; // affichées ailleurs (Phase 3)
+                    if (n.activity_id !== lane.id) return false;
+                    if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
+                    if (n.scope === 'range') {
+                      const ns = toMinutes((n.slot_start || '').slice(0, 5));
+                      const ne = toMinutes((n.slot_end || '').slice(0, 5));
+                      return slotM >= ns && slotM < ne;
+                    }
+                    return false;
+                  });
+
                   return (
                     <button
                       key={slot.start}
@@ -801,6 +961,35 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                         {sBlock ? <span className="text-[10px]">🔒</span> : <span className="cal-players">{players}/{lane.maxPlayers}</span>}
                       </div>
                       {sBlock?.label && <div className="truncate text-[10px] font-bold">{sBlock.label}</div>}
+                      {slotNotes.length > 0 && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); onOpenNotesList && onOpenNotesList(slotNotes, lane, slot, e); }}
+                          title={`${slotNotes.length} note${slotNotes.length > 1 ? 's' : ''} — voir détails`}
+                          className="absolute top-0.5 left-0.5 flex h-4 w-4 items-center justify-center rounded bg-mw-pink/80 text-[10px] text-white hover:bg-mw-pink cursor-pointer z-10"
+                        >📓</span>
+                      )}
+                      {slotNotes.length > 0 && (
+                        <div className="flex w-full flex-col gap-0.5 mt-0.5">
+                          {slotNotes.map((n) => {
+                            const cat = noteCategories.find((c) => c.id === n.category_id);
+                            const color = cat?.color || '#888';
+                            const plain = (n.content || '').replace(/<[^>]+>/g, '').trim();
+                            return (
+                              <div
+                                key={n.id}
+                                onClick={(e) => { e.stopPropagation(); onEditNote && onEditNote(n); }}
+                                title={`${cat?.name || 'Note'} — ${plain}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                                className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
+                              >
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+                                {height >= 40 && (
+                                  <span className="truncate text-white/80">{plain}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1055,3 +1244,4 @@ function MonthView({ date, bookings, onChangeDate, visibleActivityIds }) {
     </div>
   );
 }
+

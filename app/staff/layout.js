@@ -41,6 +41,7 @@ export default function StaffLayout({ children }) {
     { href: '/staff/reports', label: 'Reports', perm: 'financial_reports' },
     { href: '/staff/settings', label: 'Réglages', perm: 'settings' },
     { href: '/staff/users', label: 'Équipe', perm: 'users_manage' },
+    { href: '/staff/notes', label: 'Notes', perm: 'calendar' },
   ];
   const can = (p) => staff?.permissions?.all || staff?.permissions?.[p];
 

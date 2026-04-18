@@ -157,3 +157,14 @@ body {
 .cal-closed-hour {
   opacity: 0.5;
 }
+
+/* Tiptap rich text editor */
+.prose-tiptap p { margin: 0 0 0.5em; }
+.prose-tiptap p:last-child { margin-bottom: 0; }
+.prose-tiptap strong { font-weight: 700; }
+.prose-tiptap em { font-style: italic; }
+.prose-tiptap u { text-decoration: underline; }
+.prose-tiptap s { text-decoration: line-through; }
+.prose-tiptap ul { list-style: disc; padding-left: 1.5em; margin: 0.5em 0; }
+.prose-tiptap ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+.prose-tiptap a { color: #00d9ff; text-decoration: underline; }

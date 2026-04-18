@@ -95,6 +95,10 @@ export default function TransposedDayView({
   onToggleK7,
   slashOpen = false,
   onToggleSlash,
+  notes = [],
+  noteCategories = [],
+  onEditNote,
+  onOpenNotesList,
 }) {
   ROW_HEIGHT = pxActivity; // Override with prop
   const scrollRef = useRef(null);
@@ -305,6 +309,47 @@ export default function TransposedDayView({
           <>
             <span className="cal-time display">{slot.start}</span>
             <span className="cal-players">{players}/{lane.maxPlayers || '?'}</span>
+            {(() => {
+              const slotNotes = notes.filter((n) => {
+                if (n.scope === 'day') return false;
+                if (n.activity_id !== lane.id) return false;
+                if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
+                if (n.scope === 'range') {
+                  const ns = toMinutes((n.slot_start || '').slice(0, 5));
+                  const ne = toMinutes((n.slot_end || '').slice(0, 5));
+                  return slotStartM >= ns && slotStartM < ne;
+                }
+                return false;
+              });
+              if (slotNotes.length === 0) return null;
+              return (
+                <>
+                <span
+                  onClick={(e) => { e.stopPropagation(); onOpenNotesList && onOpenNotesList(slotNotes, lane, slot, e); }}
+                  title={`${slotNotes.length} note${slotNotes.length > 1 ? 's' : ''} — voir détails`}
+                  className="absolute top-0.5 left-0.5 flex h-3.5 w-3.5 items-center justify-center rounded bg-mw-pink/80 text-[8px] text-white hover:bg-mw-pink cursor-pointer z-10"
+                >📓</span>
+                <div className="flex w-full flex-col gap-0.5 mt-0.5">
+                  {slotNotes.map((n) => {
+                    const cat = noteCategories.find((c) => c.id === n.category_id);
+                    const color = cat?.color || '#888';
+                    const plain = (n.content || '').replace(/<[^>]+>/g, '').trim();
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={(e) => { e.stopPropagation(); onEditNote && onEditNote(n); }}
+                        title={`${cat?.name || 'Note'} — ${plain}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                        className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
+                      >
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+                        {width >= 50 && <span className="truncate text-white/80">{plain}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                </>
+              );
+            })()}
           </>
         )}
       </button>
