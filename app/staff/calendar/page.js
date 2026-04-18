@@ -93,6 +93,29 @@ export default function StaffCalendarPage() {
   }, [searchParams]);
 
   const autoScrolledRef = useRef(null);
+
+  const goNow = () => {
+    const today = toDateStr(new Date());
+    setDate(today);
+    if (view !== 'day') setView('day');
+    setTimeout(() => {
+      const now = new Date();
+      const targetMin = Math.max(0, now.getHours() * 60 + now.getMinutes() - 15);
+      const offsetPx = (targetMin / 60) * pxTime;
+      const root = calRef.current;
+      if (!root) return;
+      const scrollables = root.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto');
+      scrollables.forEach((el) => {
+        if (el.scrollHeight > el.clientHeight + 4) {
+          el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' });
+        }
+        if (el.scrollWidth > el.clientWidth + 4) {
+          el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' });
+        }
+      });
+    }, 300);
+  };
+
   useEffect(() => {
     if (!searchParams) return;
     const hl = searchParams.get('highlight');
@@ -292,6 +315,7 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
+      <div className={view === 'day' ? 'sticky top-[52px] z-30 -mx-2 md:-mx-4 px-2 md:px-4 pt-2 bg-mw-bg/95 backdrop-blur-md' : ''}>
       {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="section-title shrink-0">Calendrier</h1>
@@ -375,7 +399,7 @@ export default function StaffCalendarPage() {
         {view === 'day' && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
-            <input type="range" min="100" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
+            <input type="range" min="104" max="600" value={pxTime} onChange={(e) => setPxTime(Number(e.target.value))} className="w-24 accent-mw-pink" />
             <span className="w-10 text-[10px] text-white/40">{pxTime}px</span>
           </div>
         )}
@@ -387,10 +411,18 @@ export default function StaffCalendarPage() {
           </div>
         )}
 
-        <div className="ml-auto flex items-center justify-between gap-3" style={{ width: '490px' }}>
+        <div className="ml-auto flex items-center justify-between gap-2" style={{ width: '490px' }}>
+          <button
+            onClick={goNow}
+            className="display whitespace-nowrap rounded border border-mw-yellow/40 bg-mw-yellow/15 px-2.5 py-1.5 text-sm text-mw-yellow hover:border-mw-yellow"
+            title="Aujourd'hui — H-15min"
+          >
+            NOW
+          </button>
+
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
             {[['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} className={`display rounded px-3 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
+              <button key={v} onClick={() => setView(v)} className={`display rounded px-2 py-1 text-sm ${view === v ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{l}</button>
             ))}
           </div>
 
@@ -414,6 +446,7 @@ export default function StaffCalendarPage() {
             />
           </div>
         </div>
+      </div>
       </div>
 
       {/* Calendar view */}
