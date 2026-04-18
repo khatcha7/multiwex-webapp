@@ -117,13 +117,17 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     const minP = a.minPlayers || 1;
     let maxP = a.maxPlayers;
-    // Si un slot est déjà sélectionné, max = places restantes
+    // Si un slot est déjà sélectionné, max = places restantes (− blocs partiels)
     const cur = items[id]?.[idx];
     if (cur?.slot) {
       const occ = (occupancy[id] || {})[cur.slot.start];
       const playersInSlot = occ?.players || 0;
+      const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === cur.slot.start);
+      const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+      const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+      const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
       if (a.privative && playersInSlot > 0) maxP = 0;
-      else maxP = Math.min(a.maxPlayers, a.maxPlayers - playersInSlot);
+      else maxP = Math.min(effectiveMax, effectiveMax - playersInSlot);
     }
     const clamped = Math.min(Math.max(minP, players), Math.max(minP, maxP));
     setItems((prev) => {
@@ -152,12 +156,17 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     const occ = (occupancy[id] || {})[slot.start];
     const playersInSlot = occ?.players || 0;
-    // Clamp joueurs à la capacité restante
+    const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === slot.start);
+    const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+    const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+    const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+    // Clamp joueurs à la capacité restante (effective − déjà réservé)
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
       const cur = arr[idx] || { players: a.minPlayers || 1 };
-      let maxAllowed = a.maxPlayers - playersInSlot;
+      let maxAllowed = effectiveMax - playersInSlot;
       if (a.privative && playersInSlot > 0) return prev; // bloqué
+      if (effectiveMax === 0) return prev; // tout bloqué
       const newPlayers = Math.max(a.minPlayers || 1, Math.min(cur.players, Math.max(a.minPlayers || 1, maxAllowed)));
       arr[idx] = { ...cur, slot, players: newPlayers };
       return { ...prev, [id]: arr };
