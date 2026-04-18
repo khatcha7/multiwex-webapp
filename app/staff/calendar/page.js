@@ -547,6 +547,8 @@ export default function StaffCalendarPage() {
           onBlockHour={blockHour}
           k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
           slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
+          notes={notes} noteCategories={noteCategories}
+          onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
         />
       )}
       {view === 'day' && hours && dayLayout === 'classic' && (

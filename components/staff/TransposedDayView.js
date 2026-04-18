@@ -95,6 +95,9 @@ export default function TransposedDayView({
   onToggleK7,
   slashOpen = false,
   onToggleSlash,
+  notes = [],
+  noteCategories = [],
+  onEditNote,
 }) {
   ROW_HEIGHT = pxActivity; // Override with prop
   const scrollRef = useRef(null);
@@ -305,6 +308,39 @@ export default function TransposedDayView({
           <>
             <span className="cal-time display">{slot.start}</span>
             <span className="cal-players">{players}/{lane.maxPlayers || '?'}</span>
+            {(() => {
+              const slotNotes = notes.filter((n) => {
+                if (n.scope === 'day') return false;
+                if (n.activity_id !== lane.id) return false;
+                if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
+                if (n.scope === 'range') {
+                  const ns = toMinutes((n.slot_start || '').slice(0, 5));
+                  const ne = toMinutes((n.slot_end || '').slice(0, 5));
+                  return slotStartM >= ns && slotStartM < ne;
+                }
+                return false;
+              });
+              if (slotNotes.length === 0) return null;
+              return (
+                <div className="flex w-full flex-col gap-0.5 mt-0.5">
+                  {slotNotes.map((n) => {
+                    const cat = noteCategories.find((c) => c.id === n.category_id);
+                    const color = cat?.color || '#888';
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={(e) => { e.stopPropagation(); onEditNote && onEditNote(n); }}
+                        title={`${cat?.name || 'Note'} — ${n.content}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
+                        className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
+                      >
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+                        {width >= 50 && <span className="truncate text-white/80">{n.content}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         )}
       </button>
