@@ -16,6 +16,7 @@ import {
   toMinutes,
   dayToMondayIndex,
   CLOSURE_MIN_ONLINE,
+  nowMinutesBrussels,
 } from '@/lib/hours';
 
 export default function StepSlots() {
@@ -292,23 +293,31 @@ export default function StepSlots() {
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {allSlots.map((slot) => {
               const occ = occupancy[slot.start];
-              const blockedHere = blocks.find(
+              // Tous les blocs sur ce slot pour cette activité
+              const blocksHere = blocks.filter(
                 (b) => (b.activity_id || b.activityId) === currentActivity.id && (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start)
               );
+              // Si au moins un bloc total → slot bloqué
+              const hasFullBlock = blocksHere.some((b) => (b.seatsBlocked ?? b.seats_blocked) == null);
+              // Sinon, somme des places bloquées (capacité réduite)
+              const seatsBlockedTotal = hasFullBlock
+                ? roomCap
+                : blocksHere.reduce((s, b) => s + (b.seatsBlocked ?? b.seats_blocked ?? 0), 0);
 
-              const totalCap = roomCap;
+              const totalCap = Math.max(0, roomCap - seatsBlockedTotal);
               const playersInSlot = occ?.players || 0;
               const groupsInSlot = occ?.groups || 0;
 
               const privative = currentActivity.privative;
-              const full = privative ? playersInSlot > 0 : playersInSlot >= totalCap;
-              const shared = !privative && playersInSlot > 0 && !full;
+              const full = totalCap === 0 || (privative ? playersInSlot > 0 : playersInSlot >= totalCap);
+              const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
+              // "shared" → visuel jaune si groupe déjà présent OU bloc partiel
+              const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
 
               const isToday = toDateStr(new Date()) === cart.date;
               let pastCutoff = false;
               if (isToday) {
-                const now = new Date();
-                const nowM = now.getHours() * 60 + now.getMinutes();
+                const nowM = nowMinutesBrussels();
                 const slotM = toMinutes(slot.start);
                 if (slotM - nowM < CLOSURE_MIN_ONLINE) pastCutoff = true;
               }
@@ -322,11 +331,11 @@ export default function StepSlots() {
               const assignedSessionIdx = sessionIndices.find((i) => currentSlots[i] && currentSlots[i].start === slot.start);
               const isAssigned = assignedSessionIdx != null;
 
-              const disabled = Boolean(blockedHere) || full || pastCutoff || (shared && !wouldFit);
+              const disabled = full || pastCutoff || (shared && !wouldFit);
 
               let classes = '';
               if (isAssigned) classes = 'border-mw-pink bg-mw-pink text-white shadow-neon-pink';
-              else if (blockedHere) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
+              else if (hasFullBlock) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
               else if (full) classes = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
               else if (shared && !wouldFit) classes = 'cursor-not-allowed border-mw-red/50 bg-mw-red/15 text-mw-red';
               else if (shared) classes = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow hover:bg-mw-yellow/20';
@@ -340,11 +349,11 @@ export default function StepSlots() {
                   disabled={disabled}
                   className={`relative rounded border py-2.5 text-sm font-bold transition ${classes}`}
                   title={
-                    blockedHere ? `Bloqué: ${blockedHere.block_reason || blockedHere.reason || 'staff'}`
+                    hasFullBlock ? `Bloqué`
                       : full ? 'Complet'
-                      : shared ? `Libre ${totalCap - playersInSlot}/${totalCap} — ${groupsInSlot} groupe(s) déjà présent(s)`
+                      : shared ? `Libre ${totalCap - playersInSlot}/${roomCap} — ${groupsInSlot} groupe(s) déjà présent(s)${partialBlock ? ` (dont ${seatsBlockedTotal} bloquées)` : ''}`
                       : pastCutoff ? 'Fermé (moins de 30 min avant le créneau)'
-                      : `Libre ${totalCap}/${totalCap}`
+                      : `Libre ${totalCap}/${roomCap}`
                   }
                 >
                   {isAssigned && (
@@ -354,15 +363,15 @@ export default function StepSlots() {
                   )}
                   {slot.start}
                   {!privative && shared && wouldFit && (
-                    <div className="mt-0.5 text-[8px] font-normal">Libre {totalCap - playersInSlot}/{totalCap}</div>
+                    <div className="mt-0.5 text-[8px] font-normal">Libre {totalCap - playersInSlot}/{roomCap}</div>
                   )}
-                  {!privative && !shared && !full && !blockedHere && !pastCutoff && (
-                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{totalCap}</div>
+                  {!privative && !shared && !full && !hasFullBlock && !pastCutoff && (
+                    <div className="mt-0.5 text-[8px] font-normal opacity-60">Libre {totalCap}/{roomCap}</div>
                   )}
                   {shared && !wouldFit && (
                     <div className="mt-0.5 text-[8px] font-normal">{totalCap - playersInSlot} place{totalCap - playersInSlot > 1 ? 's' : ''}</div>
                   )}
-                  {(full || blockedHere) && <div className="text-[8px] font-normal opacity-80">complet</div>}
+                  {(full || hasFullBlock) && <div className="text-[8px] font-normal opacity-80">complet</div>}
                 </button>
               );
             })}

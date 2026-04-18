@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { activities, getActivityPrice } from '@/lib/activities';
 import { generateSlotsForActivity, toDateStr, parseDate, isOpenOn, monthsFr, dayLabelsFr } from '@/lib/hours';
-import { createBooking, logAudit, getActiveStaff, getSlotOccupancy } from '@/lib/data';
+import { createBooking, logAudit, getActiveStaff, getSlotOccupancy, getSlotBlocks } from '@/lib/data';
 
 export default function OnSiteBookingPage() {
   const today = toDateStr(new Date());
@@ -22,6 +22,11 @@ export default function OnSiteBookingPage() {
   // items = { activityId: [{ players, slot }] }  (une entrée = un créneau demandé)
   const [items, setItems] = useState({});
   const [occupancy, setOccupancy] = useState({});
+  const [blocks, setBlocks] = useState([]);
+
+  useEffect(() => {
+    getSlotBlocks(date).then(setBlocks);
+  }, [date]);
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const [prefilled, setPrefilled] = useState(false);
@@ -112,13 +117,17 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     const minP = a.minPlayers || 1;
     let maxP = a.maxPlayers;
-    // Si un slot est déjà sélectionné, max = places restantes
+    // Si un slot est déjà sélectionné, max = places restantes (− blocs partiels)
     const cur = items[id]?.[idx];
     if (cur?.slot) {
       const occ = (occupancy[id] || {})[cur.slot.start];
       const playersInSlot = occ?.players || 0;
+      const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === cur.slot.start);
+      const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+      const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+      const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
       if (a.privative && playersInSlot > 0) maxP = 0;
-      else maxP = Math.min(a.maxPlayers, a.maxPlayers - playersInSlot);
+      else maxP = Math.min(effectiveMax, effectiveMax - playersInSlot);
     }
     const clamped = Math.min(Math.max(minP, players), Math.max(minP, maxP));
     setItems((prev) => {
@@ -147,12 +156,17 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     const occ = (occupancy[id] || {})[slot.start];
     const playersInSlot = occ?.players || 0;
-    // Clamp joueurs à la capacité restante
+    const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === slot.start);
+    const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+    const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+    const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+    // Clamp joueurs à la capacité restante (effective − déjà réservé)
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
       const cur = arr[idx] || { players: a.minPlayers || 1 };
-      let maxAllowed = a.maxPlayers - playersInSlot;
+      let maxAllowed = effectiveMax - playersInSlot;
       if (a.privative && playersInSlot > 0) return prev; // bloqué
+      if (effectiveMax === 0) return prev; // tout bloqué
       const newPlayers = Math.max(a.minPlayers || 1, Math.min(cur.players, Math.max(a.minPlayers || 1, maxAllowed)));
       arr[idx] = { ...cur, slot, players: newPlayers };
       return { ...prev, [id]: arr };
@@ -392,16 +406,31 @@ export default function OnSiteBookingPage() {
                     + Créneau
                   </button>
                 </div>
-                {arr.map((sess, idx) => (
+                {arr.map((sess, idx) => {
+                  // Calcul effectiveMax pour cette session (selon slot choisi + blocs)
+                  let sessEffectiveMax = a.maxPlayers;
+                  let sessSeatsBlocked = 0;
+                  if (sess.slot) {
+                    const sb = (blocks || []).filter((b) => b.activityId === id && b.start === sess.slot.start);
+                    const fullB = sb.some((b) => b.seatsBlocked == null);
+                    sessSeatsBlocked = fullB ? a.maxPlayers : sb.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+                    const occInfo = occ[sess.slot.start];
+                    const playersInSlot = occInfo?.players || 0;
+                    sessEffectiveMax = Math.max(0, a.maxPlayers - sessSeatsBlocked - playersInSlot);
+                  }
+                  const atMax = sess.players >= sessEffectiveMax;
+                  const atMin = sess.players <= (a.minPlayers || 1);
+                  return (
                   <div key={idx} className="mb-2 rounded border border-white/10 p-2">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-mw-pink text-[10px] font-bold text-white">{idx + 1}</div>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setSessionPlayers(id, idx, sess.players - 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">−</button>
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players - 1)} disabled={atMin} className="flex h-7 w-7 items-center justify-center rounded border border-white/20 disabled:opacity-30">−</button>
                           <span className="display w-7 text-center text-mw-pink">{sess.players}</span>
-                          <button onClick={() => setSessionPlayers(id, idx, sess.players + 1)} className="flex h-7 w-7 items-center justify-center rounded border border-white/20">+</button>
+                          <button onClick={() => setSessionPlayers(id, idx, sess.players + 1)} disabled={atMax} className="flex h-7 w-7 items-center justify-center rounded border border-white/20 disabled:opacity-30" title={atMax ? `Max ${sessEffectiveMax}${sessSeatsBlocked ? ` (${sessSeatsBlocked} bloquées)` : ''}` : ''}>+</button>
                           <span className="ml-1 text-[10px] text-white/50">joueurs</span>
+                          {sess.slot && sessSeatsBlocked > 0 && <span className="text-[9px] text-mw-red">🔒{sessSeatsBlocked}</span>}
                         </div>
                       </div>
                       <button onClick={() => removeSession(id, idx)} className="text-xs text-mw-red">✕</button>
@@ -444,12 +473,21 @@ export default function OnSiteBookingPage() {
                         const occInfo = occ[slot.start];
                         const playersInSlot = occInfo?.players || 0;
                         const privative = a.privative;
-                        const full = privative ? playersInSlot > 0 : playersInSlot >= a.maxPlayers;
-                        const shared = !privative && playersInSlot > 0 && !full;
+                        // Blocs sur ce slot
+                        const blocksHere = (blocks || []).filter((b) => b.activityId === a.id && b.start === slot.start);
+                        const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
+                        const seatsBlockedTotal = hasFullBlock
+                          ? a.maxPlayers
+                          : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+                        const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+                        const full = effectiveMax === 0 || (privative ? playersInSlot > 0 : playersInSlot >= effectiveMax);
+                        const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
+                        const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
                         let cls = 'border-white/15 text-white/70 hover:border-white/40';
                         if (chosen) cls = 'border-mw-pink bg-mw-pink text-white';
                         else if (full) cls = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
                         else if (shared) cls = 'border-mw-yellow/60 bg-mw-yellow/10 text-mw-yellow';
+                        if (partialBlock && !chosen) cls += ' !border-mw-red border-2';
                         return (
                           <button
                             key={slot.start}
@@ -459,13 +497,14 @@ export default function OnSiteBookingPage() {
                             title={shared ? `Libre: ${playersInSlot}/${a.maxPlayers}` : full ? 'Complet' : 'Libre'}
                           >
                             {slot.start}
-                            {shared && <div className="text-[8px]">{playersInSlot}/{a.maxPlayers}</div>}
+                            {shared && <div className="text-[8px]">{playersInSlot + seatsBlockedTotal}/{a.maxPlayers}{partialBlock ? ` 🔒${seatsBlockedTotal}` : ''}</div>}
                           </button>
                         );
                       })}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
