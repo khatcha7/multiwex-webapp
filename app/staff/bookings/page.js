@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { listBookings, subscribeBookings } from '@/lib/data';
 import { toDateStr } from '@/lib/hours';
+import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
 
 export default function StaffBookingsPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function StaffBookingsPage() {
   const [sourceFilter, setSourceFilter] = useState('all'); // all, online, on_site
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
     listBookings().then(setAll);
@@ -99,6 +101,7 @@ export default function StaffBookingsPage() {
           <thead className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/50">
             <tr>
               <th className="px-2 py-3 text-center w-8">📅</th>
+              <th className="px-2 py-3 text-center w-8"></th>
               <th className="px-3 py-3 text-left">ID</th>
               <th className="px-3 py-3 text-left">Client</th>
               <th className="px-3 py-3 text-left">Date</th>
@@ -128,6 +131,20 @@ export default function StaffBookingsPage() {
                   >
                     📅
                   </button>
+                </td>
+                <td className="px-2 py-2 text-center">
+                  {(b.items || []).length > 0 ? (
+                    <button
+                      onClick={() => setEditingItem({ booking: b, item: b.items[0] })}
+                      className="text-white/50 hover:text-mw-pink"
+                      title={`Édite le créneau de ${b.items[0]?.activityName || b.items[0]?.activity_id || ''}`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <polyline points="12 7 12 12 15 14" />
+                      </svg>
+                    </button>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-mw-pink">{b.id || b.reference}</td>
                 <td className="px-3 py-2">
@@ -178,6 +195,14 @@ export default function StaffBookingsPage() {
           <div className="py-10 text-center text-white/40">Aucune réservation.</div>
         )}
       </div>
+
+      <EditBookingItemModal
+        open={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        booking={editingItem?.booking}
+        item={editingItem?.item}
+        onSaved={() => { setTick((t) => t + 1); setEditingItem(null); }}
+      />
     </div>
   );
 }
