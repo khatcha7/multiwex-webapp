@@ -117,6 +117,21 @@ export default function OnSiteBookingPage() {
     });
   };
 
+  const setSessionRoom = (id, idx, roomId) => {
+    const a = activities.find((x) => x.id === id);
+    setItems((prev) => {
+      const arr = (prev[id] || []).slice();
+      const cur = arr[idx] || { players: a.minPlayers || 1 };
+      let players = cur.players;
+      if (a.rooms) {
+        const room = a.rooms.find((r) => r.id === roomId);
+        if (room) players = Math.min(Math.max(room.minPlayers || 1, players), room.maxPlayers);
+      }
+      arr[idx] = { ...cur, roomId, players };
+      return { ...prev, [id]: arr };
+    });
+  };
+
   const setSessionSlot = (id, idx, slot) => {
     const a = activities.find((x) => x.id === id);
     const occ = (occupancy[id] || {})[slot.start];
@@ -148,6 +163,7 @@ export default function OnSiteBookingPage() {
         billedPlayers: Math.max(s.players, a.minPlayers || 1),
         unit,
         total: unit * Math.max(s.players, a.minPlayers || 1),
+        roomId: s.roomId || null,
       }))
       .sort((x, y) => x.start.localeCompare(y.start));
   });
@@ -155,7 +171,11 @@ export default function OnSiteBookingPage() {
   const subtotal = flat.reduce((s, i) => s + i.total, 0);
   const allAssigned =
     Object.keys(items).length > 0 &&
-    Object.values(items).every((arr) => arr.every((s) => s.slot));
+    Object.entries(items).every(([id, arr]) => {
+      const a = activities.find((x) => x.id === id);
+      const needsRoom = a?.rooms && a.rooms.length > 0;
+      return arr.every((s) => s.slot && (!needsRoom || s.roomId));
+    });
 
   const submitPayment = async (method) => {
     setPayment({ method, status: 'processing' });
@@ -312,6 +332,38 @@ export default function OnSiteBookingPage() {
                       </div>
                       <button onClick={() => removeSession(id, idx)} className="text-xs text-mw-red">✕</button>
                     </div>
+                    {a.rooms && a.rooms.length > 0 && (
+                      <div className="mb-2">
+                        <div className="mb-1 text-[10px] text-white/50">Choisir la salle / piste :</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {a.rooms.map((rm) => {
+                            const selected = sess.roomId === rm.id;
+                            const tooMany = sess.players > rm.maxPlayers;
+                            return (
+                              <button
+                                key={rm.id}
+                                onClick={() => setSessionRoom(id, idx, rm.id)}
+                                disabled={tooMany}
+                                className={`rounded border px-3 py-1.5 text-xs transition ${
+                                  selected
+                                    ? 'border-mw-pink bg-mw-pink/20 text-mw-pink'
+                                    : tooMany
+                                    ? 'cursor-not-allowed border-white/10 text-white/20 opacity-50'
+                                    : 'border-white/20 text-white/70 hover:border-mw-pink'
+                                }`}
+                                title={tooMany ? `Max ${rm.maxPlayers} joueurs pour ${rm.name}` : ''}
+                              >
+                                <span className="display">{rm.name}</span>
+                                <span className="ml-1 text-[9px] text-white/40">{rm.minPlayers}-{rm.maxPlayers}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {!sess.roomId && (
+                          <div className="mt-1 text-[10px] text-mw-yellow">⚠ Choisir une salle / piste avant le créneau.</div>
+                        )}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1">
                       {allSlots.slice(0, 40).map((slot) => {
                         const chosen = sess.slot?.start === slot.start;
