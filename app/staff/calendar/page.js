@@ -98,22 +98,33 @@ export default function StaffCalendarPage() {
     const today = toDateStr(new Date());
     if (date !== today) setDate(today);
     if (view !== 'day') setView('day');
-    setTimeout(() => {
+    if (dayLayout !== 'classic') setDayLayout('classic');
+    let attempts = 0;
+    const tryScroll = () => {
+      const root = calRef.current;
+      if (!root) {
+        attempts += 1;
+        if (attempts < 10) setTimeout(tryScroll, 200);
+        return;
+      }
       const now = new Date();
       const targetMin = Math.max(0, now.getHours() * 60 + now.getMinutes() - 15);
       const offsetPx = (targetMin / 60) * pxTime;
-      const root = calRef.current;
-      if (!root) return;
-      // Détecte tous les éléments scrollables (basé sur computed style, pas sur classes Tailwind)
+      let scrolled = false;
       const all = root.querySelectorAll('*');
       all.forEach((el) => {
         const s = window.getComputedStyle(el);
         const scrollY = (s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 4;
         const scrollX = (s.overflowX === 'auto' || s.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4;
-        if (scrollY) el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' });
-        if (scrollX) el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' });
+        if (scrollY) { el.scrollTo({ top: Math.max(0, offsetPx - 80), behavior: 'smooth' }); scrolled = true; }
+        if (scrollX) { el.scrollTo({ left: Math.max(0, offsetPx - 80), behavior: 'smooth' }); scrolled = true; }
       });
-    }, 400);
+      if (!scrolled) {
+        attempts += 1;
+        if (attempts < 10) setTimeout(tryScroll, 200);
+      }
+    };
+    setTimeout(tryScroll, 350);
   };
 
   useEffect(() => {
@@ -426,15 +437,15 @@ export default function StaffCalendarPage() {
             ))}
           </div>
 
-          <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
+          <div className="relative flex w-[290px] items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
+            <button onClick={goPrev} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
             <button
               onClick={() => dateInputRef.current?.showPicker?.()}
-              className="display whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white hover:text-mw-pink"
+              className="display flex-1 whitespace-nowrap px-2 py-1 text-center text-[11px] font-bold text-white hover:text-mw-pink"
             >
               {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
             </button>
-            <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
+            <button onClick={goNext} className="shrink-0 px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
             <input
               ref={dateInputRef}
               type="date"
