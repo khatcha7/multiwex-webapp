@@ -26,13 +26,6 @@ import {
   logAudit,
 } from '@/lib/data';
 
-const ZOOM_PRESETS = [
-  { id: 'compact', label: 'S', px: 40 },
-  { id: 'normal', label: 'M', px: 64 },
-  { id: 'large', label: 'L', px: 96 },
-  { id: 'xl', label: 'XL', px: 128 },
-];
-
 function hashRoom(id) {
   const h = String(id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return ['k7-record', 'k7-studio', 'k7-dancefloor'][h % 3];
@@ -52,8 +45,6 @@ export default function StaffCalendarPage() {
   const setView = (v) => { _setView(v); savePref('view', v); };
   const [dayLayout, _setDayLayout] = useState(() => loadPref('layout', 'transposed'));
   const setDayLayout = (v) => { _setDayLayout(v); savePref('layout', v); };
-  const [zoom, _setZoom] = useState(() => loadPref('zoom', 'normal'));
-  const setZoom = (v) => { _setZoom(v); savePref('zoom', v); };
   const [pxTime, _setPxTime] = useState(() => loadPref('pxTime', 64));
   const setPxTime = (v) => { _setPxTime(v); savePref('pxTime', v); };
   const [pxActivity, _setPxActivity] = useState(() => loadPref('pxActivity', 160));
@@ -258,13 +249,6 @@ export default function StaffCalendarPage() {
             <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
             <button onClick={() => setDatePicker(!datePicker)} className="px-2 py-1 text-sm text-white/70 hover:text-mw-pink" title="Choisir une date">📅</button>
           </div>
-          {view === 'day' && (
-            <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-              {ZOOM_PRESETS.map((p) => (
-                <button key={p.id} onClick={() => { setZoom(p.id); setPxTime(p.px); }} className={`display rounded px-2 py-1 text-xs ${zoom === p.id ? 'bg-mw-pink text-white' : 'text-white/70'}`}>{p.label}</button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -283,16 +267,6 @@ export default function StaffCalendarPage() {
             <span className="display">{a.name}</span>
           </button>
         ))}
-        {visible.has('k7') && (
-          <button onClick={() => setK7Open(!k7Open)} className={`rounded border px-3 py-1 text-xs transition ${k7Open ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
-            {k7Open ? '−' : '+'} Salles K7
-          </button>
-        )}
-        {visible.has('slashhit') && (
-          <button onClick={() => setSlashOpen(!slashOpen)} className={`rounded border px-3 py-1 text-xs transition ${slashOpen ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/30 text-white/60'}`}>
-            {slashOpen ? '−' : '+'} Pistes Slash
-          </button>
-        )}
       </div>
 
       {/* Multi-sel banner */}
@@ -310,8 +284,8 @@ export default function StaffCalendarPage() {
       {view === 'day' && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
-            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Classique ↕</button>
-            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>Transposée ↔</button>
+            <button onClick={() => setDayLayout('classic')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'classic' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↕</button>
+            <button onClick={() => setDayLayout('transposed')} className={`display rounded px-3 py-1 text-xs ${dayLayout === 'transposed' ? 'bg-mw-pink text-white' : 'text-white/70'}`}>↔</button>
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className="text-[10px]">Heures</span>
@@ -334,7 +308,9 @@ export default function StaffCalendarPage() {
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
-          onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          onBlockHour={blockHour}
+          k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
         />
       )}
       {view === 'day' && hours && dayLayout === 'classic' && (
@@ -344,7 +320,9 @@ export default function StaffCalendarPage() {
           multiSel={multiSel} highlightIds={highlightIds}
           onClick={handleClick} onRightClick={handleRightClick}
           onHoverEnter={onSlotEnter} onHoverLeave={onSlotLeave}
-          onBlockHour={blockHour} k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          onBlockHour={blockHour}
+          k7Open={k7Open} onToggleK7={() => setK7Open(!k7Open)}
+          slashOpen={slashOpen} onToggleSlash={() => setSlashOpen(!slashOpen)}
           onOpenBlock={setSelected}
         />
       )}
@@ -496,7 +474,7 @@ export default function StaffCalendarPage() {
   );
 }
 
-function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, onOpenBlock }) {
+function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock }) {
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -545,10 +523,11 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
           return (
             <div key={lane.laneId} className="shrink-0 border-r border-white/10" style={{ width: `${laneW}px` }}>
-              <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : undefined}>
+              <div className="sticky top-0 z-10 flex h-12 items-center gap-1 border-b border-white/10 bg-mw-bg px-1.5 cursor-pointer" onClick={lane.id === 'k7' ? onToggleK7 : (lane.id === 'slashhit' ? onToggleSlash : undefined)}>
                 <div className="relative h-5 w-5 shrink-0"><Image src={lane.logo} alt="" fill sizes="20px" className="object-contain" /></div>
                 <div className="display min-w-0 truncate text-[12px]">{lane.laneLabel}</div>
                 {lane.id === 'k7' && <span className="text-[10px] text-white/40">{k7Open ? '−' : '+'}</span>}
+                {lane.id === 'slashhit' && <span className="text-[10px] text-white/40">{slashOpen ? '−' : '+'}</span>}
               </div>
               <div className="relative" style={{ height: `${hourCount * pxH}px` }}>
                 {Array.from({ length: hourCount }).map((_, i) => {
