@@ -62,7 +62,7 @@ export default function StaffCalendarPage() {
   const [hoverSlot, setHoverSlot] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const hoverTimer = useRef(null);
-  const [datePicker, setDatePicker] = useState(false);
+  const dateInputRef = useRef(null);
 
   useEffect(() => {
     listBookings({ from: date, to: date }).then(setBookings);
@@ -254,61 +254,65 @@ export default function StaffCalendarPage() {
 
   return (
     <div ref={calRef} className="mx-auto max-w-7xl px-2 py-4 md:px-4 md:py-6" onClick={() => { setCtxMenu(null); }} onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}>
-      {/* Header */}
+      {/* Header — titre, toggles activités (logos compacts), recherche */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="section-title">Calendrier</h1>
-        </div>
-        <div className="relative flex flex-wrap items-center gap-2">
-          <div className="relative" style={{ width: '490px' }}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-              placeholder="Rechercher ID, nom, email…"
-              className="input !py-2 text-sm w-full"
-            />
-            {searchFocused && search.trim() && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded border border-white/10 bg-mw-surface shadow-xl">
-                {searchResults.length === 0 && (
-                  <div className="px-3 py-2 text-xs text-white/40">Aucun résultat</div>
-                )}
-                {searchResults.map((b) => {
-                  const isOtherDay = b.date !== date;
-                  return (
-                    <button
-                      key={b.id || b.reference}
-                      onMouseDown={(e) => { e.preventDefault(); onPickSearchResult(b); }}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-white/5"
-                    >
-                      <span className="font-mono text-mw-pink shrink-0">{b.id || b.reference}</span>
-                      <span className="flex-1 truncate text-white/80">
-                        {b.customer?.name || `${b.customer?.firstName || ''} ${b.customer?.lastName || ''}`.trim() || '—'}
-                        <span className="ml-2 text-white/40">{b.customer?.email}</span>
-                      </span>
-                      {isOtherDay && (
-                        <span className="shrink-0 rounded bg-mw-yellow/20 px-2 py-0.5 text-[10px] text-mw-yellow">
-                          {new Date(b.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        <h1 className="section-title shrink-0">Calendrier</h1>
 
-      {/* Activity toggles */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {activities.filter((a) => a.bookable).map((a) => (
-          <button key={a.id} onClick={() => toggleVis(a.id)} className={`flex items-center gap-1.5 rounded border px-3 py-1 text-xs transition ${visible.has(a.id) ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 text-white/40'}`}>
-            <div className="relative h-4 w-4"><Image src={a.logo} alt="" fill sizes="16px" className="object-contain" /></div>
-            <span className="display">{a.name}</span>
-          </button>
-        ))}
+        <div className="flex flex-1 items-center justify-center gap-1.5 flex-wrap">
+          {activities.filter((a) => a.bookable).map((a) => (
+            <button
+              key={a.id}
+              onClick={() => toggleVis(a.id)}
+              title={a.name}
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded border transition ${
+                visible.has(a.id)
+                  ? 'border-mw-pink bg-mw-pink/10'
+                  : 'border-white/15 bg-white/5 opacity-50 hover:opacity-80'
+              }`}
+            >
+              <Image src={a.logo} alt={a.name} fill sizes="36px" className="object-contain p-1.5" />
+            </button>
+          ))}
+        </div>
+
+        <div className="relative shrink-0" style={{ width: '490px' }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            placeholder="Rechercher ID, nom, email…"
+            className="input !py-2 text-sm w-full"
+          />
+          {searchFocused && search.trim() && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded border border-white/10 bg-mw-surface shadow-xl">
+              {searchResults.length === 0 && (
+                <div className="px-3 py-2 text-xs text-white/40">Aucun résultat</div>
+              )}
+              {searchResults.map((b) => {
+                const isOtherDay = b.date !== date;
+                return (
+                  <button
+                    key={b.id || b.reference}
+                    onMouseDown={(e) => { e.preventDefault(); onPickSearchResult(b); }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-white/5"
+                  >
+                    <span className="font-mono text-mw-pink shrink-0">{b.id || b.reference}</span>
+                    <span className="flex-1 truncate text-white/80">
+                      {b.customer?.name || `${b.customer?.firstName || ''} ${b.customer?.lastName || ''}`.trim() || '—'}
+                      <span className="ml-2 text-white/40">{b.customer?.email}</span>
+                    </span>
+                    {isOtherDay && (
+                      <span className="shrink-0 rounded bg-mw-yellow/20 px-2 py-0.5 text-[10px] text-mw-yellow">
+                        {new Date(b.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Multi-sel banner */}
@@ -354,22 +358,21 @@ export default function StaffCalendarPage() {
         <div className="relative flex items-center gap-1 rounded border border-white/15 bg-white/5 p-1">
           <button onClick={goPrev} className="px-2 py-1 text-sm text-white/70 hover:text-white">←</button>
           <button
-            onClick={() => setDatePicker(!datePicker)}
+            onClick={() => dateInputRef.current?.showPicker?.()}
             className="display px-3 py-1 text-xs font-bold text-white hover:text-mw-pink"
           >
             {parseDate(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
           </button>
           <button onClick={goNext} className="px-2 py-1 text-sm text-white/70 hover:text-white">→</button>
-          {datePicker && (
-            <div className="absolute right-0 top-full z-50 mt-1 rounded border border-white/15 bg-mw-surface p-2 shadow-xl">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => { setDate(e.target.value); setDatePicker(false); }}
-                className="input !py-2 text-sm"
-              />
-            </div>
-          )}
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
         </div>
       </div>
 
