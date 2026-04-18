@@ -555,7 +555,7 @@ export default function StaffCalendarPage() {
             <div className="relative shrink-0">
               <button
                 onClick={() => setCatFilterOpen((v) => !v)}
-                className={`flex h-8 items-center gap-1.5 rounded border px-2.5 text-xs transition ${
+                className={`flex h-9 items-center gap-1.5 rounded border px-2.5 text-xs transition ${
                   hiddenCats.size > 0 ? 'border-mw-pink bg-mw-pink/10 text-mw-pink' : 'border-white/15 bg-white/5 text-white/70 hover:border-white/30'
                 }`}
                 title="Filtrer notes par catégorie"
@@ -589,7 +589,7 @@ export default function StaffCalendarPage() {
 
           {/* Day notes banner */}
           {dayNotes.length > 0 && (
-            <div className="flex flex-1 flex-wrap items-center gap-1.5 rounded border border-white/10 bg-mw-surface/60 px-2 py-1.5">
+            <div className="flex h-9 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto rounded border border-white/10 bg-mw-surface/60 px-2">
               <span className="display text-[10px] uppercase tracking-wider text-white/50 shrink-0">📅 Journée :</span>
               {dayNotes.map((n) => {
                 const cat = noteCategories.find((c) => c.id === n.category_id);
@@ -599,7 +599,7 @@ export default function StaffCalendarPage() {
                     key={n.id}
                     onClick={() => setNoteEditor({ mode: 'edit', ...n })}
                     title={`${cat?.name || 'Note'} — ${plain}\n${n.updated_by_name || n.created_by_name || ''} · ${new Date(n.updated_at || n.created_at).toLocaleString('fr-BE')}`}
-                    className="flex max-w-[300px] items-center gap-1.5 rounded border border-white/15 bg-white/5 px-2 py-1 text-xs hover:border-white/40"
+                    className="flex h-7 max-w-[300px] shrink-0 items-center gap-1.5 rounded border border-white/15 bg-white/5 px-2 text-xs hover:border-white/40"
                   >
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cat?.color || '#888' }} />
                     <span className="truncate">{plain}</span>
@@ -608,7 +608,7 @@ export default function StaffCalendarPage() {
               })}
               <button
                 onClick={() => setNoteEditor({ mode: 'create', scope: 'day', date })}
-                className="flex h-6 items-center rounded border border-dashed border-white/20 px-2 text-[11px] text-white/50 hover:border-mw-pink hover:text-mw-pink"
+                className="flex h-7 shrink-0 items-center rounded border border-dashed border-white/20 px-2 text-[11px] text-white/50 hover:border-mw-pink hover:text-mw-pink"
               >+ note</button>
             </div>
           )}
