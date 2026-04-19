@@ -16,10 +16,15 @@ export async function GET() {
   return NextResponse.json({ Key: key });
 }
 
-// POST : événement de paiement
+// POST : événement de paiement (ou test ping sans body)
 export async function POST(req) {
   try {
-    const body = await req.json();
+    // Tolère un body vide (Viva peut faire un test ping pour vérifier l'endpoint)
+    let body;
+    try { body = await req.json(); } catch { body = {}; }
+    if (!body || Object.keys(body).length === 0) {
+      return NextResponse.json({ ok: true, ping: true });
+    }
     // Structure typique :
     // { EventTypeId: 1796, Created, Url, EventData: { OrderCode, StatusId, Amount, ... } }
     const ed = body.EventData || body.eventData || {};
