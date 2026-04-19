@@ -156,7 +156,10 @@ export default function StaffBookingsPage() {
                 <td className="px-3 py-2 text-xs text-white/70">{formatCreatedAt(b.createdAt)}</td>
                 <td className="px-3 py-2 text-xs text-white/70">{new Date(b.date).toLocaleDateString('fr-FR')}</td>
                 <td className="px-3 py-2 text-[10px] text-white/60">
-                  {b.items?.map((i, idx) => <div key={idx}>· {i.activityName || i.activity_id} @ {i.start || i.slot_start}</div>)}
+                  {b.items?.map((i, idx) => {
+                    const t = i.start || i.slot_start;
+                    return <div key={idx}>· {i.activityName || i.activity_id}{t ? ` @ ${t}` : ''}</div>;
+                  })}
                 </td>
                 <td className="px-3 py-2 text-center">{b.players}</td>
                 <td className="px-3 py-2 text-right font-bold">{(b.total || 0).toFixed(0)}€</td>
