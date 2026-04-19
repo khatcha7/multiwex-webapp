@@ -763,10 +763,26 @@ export default function StaffCalendarPage() {
             </button>
             <button
               onClick={() => {
-                // Pré-remplir avec les créneaux sélectionnés (multiSel ou créneau unique)
-                const slotsToBook = multiSel.length > 0
-                  ? multiSel.map((s) => ({ activityId: s.actDef.id, roomId: s.actDef.isRoom ? s.actDef.roomId : null, start: s.slot.start, end: s.slot.end }))
-                  : [{ activityId: ctxMenu.actDef.id, roomId: ctxMenu.actDef.isRoom ? ctxMenu.actDef.roomId : null, start: ctxMenu.slot.start, end: ctxMenu.slot.end }];
+                // Validation : tout slot complet → erreur, pas de redirect
+                const targets = multiSel.length > 0
+                  ? multiSel.map((s) => ({ actDef: s.actDef, slot: s.slot }))
+                  : [{ actDef: ctxMenu.actDef, slot: ctxMenu.slot }];
+                const fullSlots = [];
+                for (const t of targets) {
+                  const lane = t.actDef;
+                  const blocksOnSlot = blocks.filter((b) => (b.activity_id || b.activityId) === lane.id && (b.start || (b.start_time||'').slice(0,5)) === t.slot.start && (lane.isRoom ? ((b.roomId || b.room_id) === lane.roomId) : !(b.roomId || b.room_id)));
+                  const hasFull = blocksOnSlot.some((b) => (b.seats_blocked ?? b.seatsBlocked) == null);
+                  const seatsBlocked = hasFull ? lane.maxPlayers : blocksOnSlot.reduce((s, b) => s + ((b.seats_blocked ?? b.seatsBlocked) || 0), 0);
+                  const playersOnSlot = bookings.flatMap((b) => (b.items || []).filter((i) => i.activityId === lane.id && i.start === t.slot.start && (lane.isRoom ? i.roomId === lane.roomId : true))).reduce((s, i) => s + (i.players || 0), 0);
+                  const eff = Math.max(0, lane.maxPlayers - seatsBlocked);
+                  if (eff - playersOnSlot <= 0) fullSlots.push(`${lane.name || lane.laneLabel} ${t.slot.start}`);
+                }
+                if (fullSlots.length > 0) {
+                  alert(`⚠ Créneau(x) complet(s) — impossible de réserver :\n\n${fullSlots.join('\n')}`);
+                  setCtxMenu(null);
+                  return;
+                }
+                const slotsToBook = targets.map((t) => ({ activityId: t.actDef.id, roomId: t.actDef.isRoom ? t.actDef.roomId : null, start: t.slot.start, end: t.slot.end }));
                 sessionStorage.setItem('mw_onsite_prefill', JSON.stringify({ date, slots: slotsToBook }));
                 setCtxMenu(null);
                 window.location.href = '/staff/on-site';

@@ -139,8 +139,8 @@ export default function OnSiteBookingPage() {
       const baseCap = room?.maxPlayers || a.maxPlayers;
       const seatsBlockedTotal = hasFullBlock ? baseCap : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
       const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
-      if (a.privative && playersInSlot > 0) maxP = 0;
-      else maxP = Math.max(0, effectiveMax - playersInSlot);
+      // Back-end staff peut joindre un groupe privatif tant qu'il reste de la place
+      maxP = Math.max(0, effectiveMax - playersInSlot);
     }
     const clamped = Math.min(Math.max(minP, players), Math.max(minP, maxP));
     setItems((prev) => {
@@ -181,8 +181,8 @@ export default function OnSiteBookingPage() {
       const arr = (prev[id] || []).slice();
       const c = arr[idx] || { players: a.minPlayers || 1 };
       const maxAllowed = effectiveMax - playersInSlot;
-      if (a.privative && playersInSlot > 0) return prev;
-      if (effectiveMax === 0) return prev;
+      // Privatif : on autorise à condition qu'il reste de la place
+      if (maxAllowed <= 0) return prev;
       const newPlayers = Math.max(a.minPlayers || 1, Math.min(c.players, Math.max(a.minPlayers || 1, maxAllowed)));
       arr[idx] = { ...c, slot, players: newPlayers };
       return { ...prev, [id]: arr };
@@ -504,7 +504,8 @@ export default function OnSiteBookingPage() {
                           ? baseCap
                           : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
                         const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
-                        const full = effectiveMax === 0 || (privative ? playersInSlot > 0 : playersInSlot >= effectiveMax);
+                        // En back-end : staff peut joindre un groupe privatif tant qu'il y a de la place
+                        const full = effectiveMax === 0 || playersInSlot >= effectiveMax;
                         const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
                         const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
                         let cls = 'border-white/15 text-white/70 hover:border-white/40';
