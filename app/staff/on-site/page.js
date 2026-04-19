@@ -237,7 +237,7 @@ export default function OnSiteBookingPage() {
     setPayment({ method, status: 'success' });
     await new Promise((r) => setTimeout(r, 600));
     const booking = {
-      id: 'MW-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+      id: 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase(),
       date,
       players: Math.max(...flat.map((i) => i.players), 0),
       items: flat,

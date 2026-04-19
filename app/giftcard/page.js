@@ -26,7 +26,7 @@ export default function GiftCardPage() {
 
   const submit = async () => {
     if (!from || !to || !email || !value) return alert('Remplis tous les champs requis');
-    const code = 'GIFT-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+    const code = 'GIFT-' + crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase();
     try {
       const created = await createGiftcard({
         code,
@@ -38,11 +38,12 @@ export default function GiftCardPage() {
         message,
         paid: final === 0,
       });
-      // Envoie le mail giftcard avec voucher PDF
+      // Envoie le mail giftcard avec voucher PDF — l'API lookup les détails serveur,
+      // on n'envoie que le code (anti-tampering).
       fetch('/api/send-giftcard', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...created, fromName: from, toName: to, toEmail: email, message, amount: value }),
+        body: JSON.stringify({ code: created.code }),
       }).catch((e) => console.warn('send-giftcard failed', e));
       setDone({ ...created, email, from, to });
     } catch (e) {
