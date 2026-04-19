@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { updateBooking, logAudit, getSlotOccupancy } from '@/lib/data';
+import { updateBooking, logAudit, getSlotOccupancy, getGiftcardByCode } from '@/lib/data';
 import { getActivity, getActivityPrice } from '@/lib/activities';
 import { getPackage } from '@/lib/packages';
 
@@ -73,16 +73,15 @@ export default function AddPlayersModal({ booking, onClose, onUpdated }) {
     else alert('Code promo invalide. Essayez DEMO100 pour la démo.');
   };
 
-  const tryApplyGiftcard = () => {
+  const tryApplyGiftcard = async () => {
     const code = giftcardInput.trim().toUpperCase();
     if (!code) return;
     try {
-      const all = JSON.parse(localStorage.getItem('mw_giftcards') || '[]');
-      const card = all.find((g) => (g.code || '').toUpperCase() === code && g.paid && (g.balance || 0) > 0);
-      if (card) setGiftcardApplied(card);
+      const card = await getGiftcardByCode(code);
+      if (card && card.paid && (card.balance || 0) > 0) setGiftcardApplied(card);
       else alert('Carte cadeau introuvable, déjà utilisée ou solde insuffisant.');
-    } catch {
-      alert('Erreur lors de la vérification de la carte cadeau.');
+    } catch (e) {
+      alert('Erreur lors de la vérification : ' + e.message);
     }
   };
 

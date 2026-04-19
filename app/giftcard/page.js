@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { createGiftcard } from '@/lib/data';
 
 const AMOUNTS = [20, 50, 100, 150];
 
@@ -23,23 +24,24 @@ export default function GiftCardPage() {
     else alert('Code invalide. Essaie DEMO100 pour la démo.');
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!from || !to || !email || !value) return alert('Remplis tous les champs requis');
     const code = 'GIFT-' + Math.random().toString(36).slice(2, 10).toUpperCase();
-    const card = {
-      code,
-      amount: value,
-      from,
-      to,
-      email,
-      message,
-      createdAt: new Date().toISOString(),
-      paid: final === 0,
-    };
-    const all = JSON.parse(localStorage.getItem('mw_giftcards') || '[]');
-    all.push(card);
-    localStorage.setItem('mw_giftcards', JSON.stringify(all));
-    setDone(card);
+    try {
+      const created = await createGiftcard({
+        code,
+        amount: value,
+        balance: value,
+        fromName: from,
+        toName: to,
+        toEmail: email,
+        message,
+        paid: final === 0,
+      });
+      setDone({ ...created, email, from, to });
+    } catch (e) {
+      alert('Erreur création carte cadeau : ' + e.message);
+    }
   };
 
   if (done) {

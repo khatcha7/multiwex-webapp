@@ -1,11 +1,11 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBooking } from '@/lib/store';
 import { getActivity, getActivityPrice, isWednesdayDiscount } from '@/lib/activities';
 import { getRestrictions } from '@/lib/restrictions';
-import { createBooking, logAudit, getConfig } from '@/lib/data';
+import { createBooking, logAudit, getConfig, listGiftcards } from '@/lib/data';
 
 export default function StepRecap({ onConfirm }) {
   const { cart, user, clearCart } = useBooking();
@@ -360,10 +360,13 @@ function PaymentModal({ step, method, total, onChoose, onCancel, user }) {
   const [gcAppliedAmount, setGcAppliedAmount] = useState(0);
   const maxGc = (typeof window !== 'undefined' ? getConfig('payment.max_giftcards') : 3) || 3;
 
-  // Simulated user gift cards (in real app, fetched from DB by email)
-  const userCards = user?.email ? JSON.parse(typeof window !== 'undefined' ? localStorage.getItem('mw_giftcards') || '[]' : '[]').filter(
-    (gc) => gc.to_email === user.email && (gc.balance || gc.amount) > 0
-  ) : [];
+  const [userCards, setUserCards] = useState([]);
+  useEffect(() => {
+    if (!user?.email) { setUserCards([]); return; }
+    listGiftcards({ email: user.email }).then((cards) => {
+      setUserCards(cards.filter((c) => (c.balance ?? c.amount) > 0));
+    });
+  }, [user?.email]);
 
   const toggleCard = (code) => {
     setSelectedCards((prev) => {
