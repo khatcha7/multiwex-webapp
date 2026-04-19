@@ -1,5 +1,6 @@
 'use client';
 import { deleteNote } from '@/lib/data';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 export default function SlotNotesPopover({ notes, categories, position, onClose, onEdit, onDeleted, onAddNew }) {
   const remove = async (note) => {
@@ -42,7 +43,7 @@ export default function SlotNotesPopover({ notes, categories, position, onClose,
                     {new Date(n.updated_at || n.created_at).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <div className="prose-tiptap mb-2 text-xs text-white/85" dangerouslySetInnerHTML={{ __html: n.content }} />
+                <div className="prose-tiptap mb-2 text-xs text-white/85" dangerouslySetInnerHTML={{ __html: sanitizeHTML(n.content) }} />
                 <div className="flex items-center justify-between text-[10px] text-white/50">
                   <span>{n.updated_by_name || n.created_by_name || '—'}</span>
                   <div className="flex gap-2">

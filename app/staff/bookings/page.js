@@ -186,13 +186,35 @@ export default function StaffBookingsPage() {
                     {b.paid ? '✓ Payé' : 'Impayé'}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-center">
+                <td className="px-3 py-2 text-center whitespace-nowrap">
                   <button
                     onClick={() => setAddPlayersBooking(b)}
-                    className="text-xs text-mw-pink hover:underline"
+                    className="text-xs text-mw-pink hover:underline mr-2"
                     title="Ajouter des joueurs"
                   >
                     +
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const ref = b.reference || b.id;
+                      if (!confirm(`Renvoyer le mail de confirmation pour ${ref} à ${b.customer?.email || 'le client'} ?`)) return;
+                      try {
+                        const r = await fetch('/api/send-confirmation', {
+                          method: 'POST',
+                          headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify({ ref }),
+                        });
+                        const j = await r.json();
+                        if (r.ok && j.ok) alert('✓ Mail renvoyé');
+                        else alert('Échec : ' + (j.error?.message || j.error || 'erreur inconnue'));
+                      } catch (e) {
+                        alert('Erreur : ' + e.message);
+                      }
+                    }}
+                    className="text-xs text-white/60 hover:text-mw-cyan hover:underline"
+                    title="Renvoyer le mail de confirmation"
+                  >
+                    ✉
                   </button>
                 </td>
               </tr>

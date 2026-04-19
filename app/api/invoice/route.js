@@ -3,10 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import { generateInvoicePDF } from '@/lib/pdf/generateInvoice';
 import { getActivity } from '@/lib/activities';
 import { verifyRef } from '@/lib/signedToken';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
 export async function GET(req) {
+  // Anti-DoS : 30 téléchargements de facture par IP par minute
+  const rl = checkRateLimit(req, { limit: 30, windowSec: 60 });
+  if (!rl.ok) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+
   const { searchParams } = new URL(req.url);
   const ref = searchParams.get('ref');
   const token = searchParams.get('token');

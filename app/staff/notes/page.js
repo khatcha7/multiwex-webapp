@@ -4,6 +4,7 @@ import { activities } from '@/lib/activities';
 import { listNotes, listNoteCategories, ensureDefaultNoteCategories, deleteNote } from '@/lib/data';
 import { toDateStr, parseDate } from '@/lib/hours';
 import NoteEditorModal from '@/components/staff/NoteEditorModal';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 export default function StaffNotesPage() {
   const today = toDateStr(new Date());
@@ -135,7 +136,7 @@ export default function StaffNotesPage() {
                       <span className="block text-white/50">{scopeLabel}</span>
                     </td>
                     <td className="p-2">
-                      <div className="prose-tiptap text-xs text-white/85" dangerouslySetInnerHTML={{ __html: n.content }} />
+                      <div className="prose-tiptap text-xs text-white/85" dangerouslySetInnerHTML={{ __html: sanitizeHTML(n.content) }} />
                     </td>
                     <td className="p-2 text-xs text-white/60">{n.created_by_name || '—'}</td>
                     <td className="p-2 text-xs text-white/50">
