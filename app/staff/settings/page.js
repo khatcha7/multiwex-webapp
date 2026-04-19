@@ -19,6 +19,14 @@ const TABS = [
     ],
   },
   { id: 'invoice', label: 'Facture' },
+  {
+    id: 'chatbot_root',
+    label: '💬 Chatbot',
+    children: [
+      { id: 'chatbot_config', label: 'Configuration' },
+      { id: 'chatbot_faq', label: 'FAQ' },
+    ],
+  },
   { id: 'rules', label: 'Règles métier' },
   { id: 'display', label: 'Affichage' },
   { id: 'activities', label: 'Activités' },
@@ -319,6 +327,36 @@ export default function StaffSettingsPage() {
         </div>
       </div>)}
 
+      {tab === 'chatbot_config' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Configuration chatbot</h2>
+        <label className="mb-4 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={cfg['chatbot.enabled'] === true || cfg['chatbot.enabled'] === 'true'} onChange={(e) => save('chatbot.enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+          <span className="display">Activer le chatbot sur le site public</span>
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nom du bot" value={cfg['chatbot.bot_name']} onSave={(v) => save('chatbot.bot_name', v)} />
+          <div>
+            <div className="mb-1 text-xs text-white/50">Position bulle</div>
+            <select value={cfg['chatbot.position'] || 'bottom-right'} onChange={(e) => save('chatbot.position', e.target.value)} className="input">
+              <option value="bottom-right">Bas droite</option>
+              <option value="bottom-left">Bas gauche</option>
+            </select>
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-white/50">Couleur principale</div>
+            <input type="color" value={cfg['chatbot.bubble_color'] || '#e8005a'} onChange={(e) => save('chatbot.bubble_color', e.target.value)} className="h-10 w-24 rounded border border-white/15 bg-transparent" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <TextareaField label="Message d'accueil" value={cfg['chatbot.welcome_message']} onSave={(v) => save('chatbot.welcome_message', v)} rows={3} />
+        </div>
+        <div className="mt-3">
+          <TextareaField label="Suggestions de démarrage (1 par ligne, max 4)" value={cfg['chatbot.starter_suggestions']} onSave={(v) => save('chatbot.starter_suggestions', v)} rows={4} />
+        </div>
+      </div>)}
+
+      {tab === 'chatbot_faq' && <ChatbotFAQPanel />}
+
       {tab === 'rules' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Règles métier</h2>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -507,6 +545,136 @@ export default function StaffSettingsPage() {
       {tab === 'notes' && <NoteCategoriesPanel />}
 
       {editingPopup && <PopupEditor popup={editingPopup} onSave={savePopup} onCancel={() => setEditingPopup(null)} />}
+    </div>
+  );
+}
+
+function ChatbotFAQPanel() {
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null); // FAQ object being edited or created
+
+  const reload = async () => {
+    setLoading(true);
+    const r = await fetch('/api/chat/faq');
+    const j = await r.json();
+    if (j.ok) setFaqs(j.faqs || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { reload(); }, []);
+
+  const save = async (faq) => {
+    const r = await fetch('/api/chat/faq', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(faq),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      setEditing(null);
+      reload();
+    } else {
+      alert('Erreur : ' + (j.error || 'inconnue'));
+    }
+  };
+
+  const remove = async (id) => {
+    if (!confirm('Supprimer cette FAQ ?')) return;
+    const r = await fetch(`/api/chat/faq?id=${id}`, { method: 'DELETE' });
+    const j = await r.json();
+    if (j.ok) reload();
+    else alert('Erreur : ' + (j.error || 'inconnue'));
+  };
+
+  const newFAQ = () => setEditing({
+    question: '',
+    keywords: [],
+    answer: '',
+    category: '',
+    enabled: true,
+    position: faqs.length,
+  });
+
+  if (loading) return <div className="rounded border border-white/10 bg-mw-surface p-5 text-white/60">Chargement…</div>;
+
+  return (
+    <div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="display text-xl">FAQ Chatbot</h2>
+          <p className="text-xs text-white/50">{faqs.length} entrées · {faqs.filter((f) => f.enabled).length} activées</p>
+        </div>
+        <button onClick={newFAQ} className="btn-primary !py-2 !px-4 text-xs">+ Nouvelle FAQ</button>
+      </div>
+
+      {faqs.length === 0 && (
+        <div className="rounded bg-white/5 p-6 text-center text-sm text-white/60">
+          Aucune FAQ. Le chatbot a été appelé au moins 1 fois en front pour seeder automatiquement les FAQ par défaut, ou clique "+ Nouvelle FAQ" pour créer manuellement.
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {faqs.map((f) => (
+          <div key={f.id} className={`flex items-center gap-3 rounded border p-3 ${f.enabled ? 'border-white/10 bg-white/[0.02]' : 'border-white/5 bg-white/[0.01] opacity-50'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="display truncate text-sm">{f.question}</div>
+              <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                {f.category && <span className="chip">{f.category}</span>}
+                <span className="text-white/40">{(f.keywords || []).slice(0, 5).join(', ')}{f.keywords?.length > 5 ? '…' : ''}</span>
+                {f.hits > 0 && <span className="text-mw-cyan">↗ {f.hits} hits</span>}
+              </div>
+            </div>
+            <button onClick={() => setEditing(f)} className="text-xs text-mw-pink hover:underline">Éditer</button>
+            <button onClick={() => remove(f.id)} className="text-xs text-mw-red hover:underline">Suppr.</button>
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded border border-mw-pink/40 bg-mw-surface p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="display mb-4 text-xl">{editing.id ? 'Éditer la FAQ' : 'Nouvelle FAQ'}</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="mb-1 text-xs text-white/50">Question</div>
+                <input value={editing.question} onChange={(e) => setEditing({ ...editing, question: e.target.value })} className="input" />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-white/50">Mots-clés (séparés par des virgules)</div>
+                <input
+                  value={(editing.keywords || []).join(', ')}
+                  onChange={(e) => setEditing({ ...editing, keywords: e.target.value.split(',').map((k) => k.trim()).filter(Boolean) })}
+                  className="input"
+                  placeholder="horaires, ouverture, samedi"
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-xs text-white/50">Réponse (markdown supporté : **gras**, *italique*, [lien](url), • liste)</div>
+                <textarea value={editing.answer} onChange={(e) => setEditing({ ...editing, answer: e.target.value })} rows={8} className="input resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="mb-1 text-xs text-white/50">Catégorie</div>
+                  <input value={editing.category || ''} onChange={(e) => setEditing({ ...editing, category: e.target.value })} className="input" placeholder="horaires / tarifs / activites…" />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs text-white/50">Position (ordre)</div>
+                  <input type="number" value={editing.position ?? 0} onChange={(e) => setEditing({ ...editing, position: Number(e.target.value) })} className="input" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editing.enabled !== false} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} className="accent-mw-pink" />
+                <span>Activée (visible par les visiteurs)</span>
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setEditing(null)} className="btn-outline flex-1 !py-2 text-sm">Annuler</button>
+              <button onClick={() => save(editing)} disabled={!editing.question || !editing.answer} className="btn-primary flex-1 !py-2 text-sm">Sauver</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

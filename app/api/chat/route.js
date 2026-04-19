@@ -74,20 +74,27 @@ export async function POST(req) {
     let answer;
     let source = 'fallback';
     let faqId = null;
+    let suggestions = []; // questions cliquables proposées après la réponse
 
     if (result) {
       answer = result.faq.answer;
       source = result.source;
       faqId = result.faq.id;
-      // Increment hit
       await supabase
         .from('chat_faq')
         .update({ hits: (result.faq.hits || 0) + 1 })
         .eq('id', result.faq.id);
+      // Suggestions : 3 FAQ de la même catégorie (sauf celle qu'on vient de répondre),
+      // complétées par les plus populaires si pas assez.
+      const sameCat = faqs.filter((f) => f.enabled && f.id !== result.faq.id && f.category === result.faq.category);
+      const filler = faqs
+        .filter((f) => f.enabled && f.id !== result.faq.id && f.category !== result.faq.category)
+        .sort((a, b) => (b.hits || 0) - (a.hits || 0));
+      suggestions = [...sameCat, ...filler].slice(0, 3).map((f) => f.question);
     } else {
-      // Fallback : suggestions des 3 FAQ les plus populaires
-      const topFaqs = [...faqs].sort((a, b) => (b.hits || 0) - (a.hits || 0)).slice(0, 3);
-      answer = `Je n'ai pas trouvé de réponse précise à votre question. Voici les sujets les plus consultés :\n\n${topFaqs.map((f) => `• ${f.question}`).join('\n')}\n\nSinon contactez-nous directement à **${config['contact.email'] || 'info@multiwex.be'}** ou au **${config['contact.phone'] || '+32 (0)84 770 222'}**.`;
+      const topFaqs = [...faqs].filter((f) => f.enabled).sort((a, b) => (b.hits || 0) - (a.hits || 0)).slice(0, 3);
+      answer = `Je n'ai pas trouvé de réponse précise à votre question. Voici les sujets les plus consultés ci-dessous, ou contactez-nous directement.`;
+      suggestions = topFaqs.map((f) => f.question);
     }
 
     // Sauve la réponse bot
@@ -110,6 +117,8 @@ export async function POST(req) {
       answer,
       source,
       conversationId: convId,
+      suggestions,
+      contactEmail: config['contact.email'] || 'info@multiwex.be',
     });
   } catch (e) {
     console.error('[/api/chat] error', e);
