@@ -653,7 +653,6 @@ function PaymentSimulation({ payment, total, onCancel }) {
 function QuickSaleModal({ staff, onClose, onConfirmed }) {
   const [type, setType] = useState('battlekart'); // 'battlekart' | 'starcadium'
   const [qty, setQty] = useState(1);
-  const [unitPrice, setUnitPrice] = useState(19); // BattleKart par défaut
   const [starcadiumAmount, setStarcadiumAmount] = useState(10);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -662,10 +661,11 @@ function QuickSaleModal({ staff, onClose, onConfirmed }) {
   const STARCADIUM_AMOUNTS = [5, 10, 20, 50];
   const battleKart = activities.find((a) => a.id === 'battlekart');
   const isWed = isWednesdayDiscount(toDateStr(new Date()));
+  // BattleKart : prix automatique selon jour (pas modifiable par staff)
   const battleKartPrice = isWed ? (battleKart?.priceWed || 10) : (battleKart?.priceRegular || 19);
 
   // Total
-  const total = type === 'battlekart' ? unitPrice * qty : starcadiumAmount * qty;
+  const total = type === 'battlekart' ? battleKartPrice * qty : starcadiumAmount * qty;
 
   const buildBookingItems = () => {
     if (type === 'battlekart') {
@@ -677,7 +677,7 @@ function QuickSaleModal({ staff, onClose, onConfirmed }) {
         end: null,
         players: qty,
         billedPlayers: qty,
-        unit: unitPrice,
+        unit: battleKartPrice,
         total: total,
       }];
     } else {
@@ -702,22 +702,16 @@ function QuickSaleModal({ staff, onClose, onConfirmed }) {
 
     setPaying(true);
     try {
-      // Si VivaWallet (méthode 'card') → redirect vers checkout (à venir)
-      // Pour l'instant : tous les modes simulent (cash/test/card)
-      if (method !== 'cash' && method !== 'test') {
-        // TODO VivaWallet
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-
+      const ref = 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
       const booking = {
-        id: 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase(),
+        id: ref,
         date: toDateStr(new Date()),
         players: qty,
         items: buildBookingItems(),
         subtotal: total,
         discount: 0,
         total,
-        paid: true,
+        paid: method !== 'card', // Cash + test → paid immédiatement, viva → après webhook
         source: 'on_site',
         kind: 'quick_sale',
         customer: {
@@ -729,19 +723,43 @@ function QuickSaleModal({ staff, onClose, onConfirmed }) {
         createdAt: new Date().toISOString(),
         staffId: staff?.id,
         staffName: staff?.name,
-        paymentMethod: method === 'card' ? 'on_site_vivawallet' : method === 'test' ? 'on_site_test' : 'on_site_cash',
+        paymentMethod: method === 'card' ? 'on_site_viva_wallet' : method === 'test' ? 'on_site_test' : 'on_site_cash',
       };
 
       await createBooking(booking);
       await logAudit({
         action: 'create_quick_sale',
         entityType: 'booking',
-        entityId: booking.id,
+        entityId: ref,
         notes: `Vente rapide ${type} par ${staff?.name || 'staff'} (${method})`,
         after: { type, total, qty, method },
       });
 
-      // Mail de confirmation si email fourni
+      // VivaWallet → crée ordre + redirect terminal staff (ou popup)
+      if (method === 'card') {
+        const r = await fetch('/api/payment/viva/create-order', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            bookingRef: ref,
+            amount: total,
+            customer: { email: booking.customer.email || '', name: booking.customer.name, country: 'BE' },
+            merchantTrns: ref,
+            customerTrns: `Multiwex — Vente rapide ${type}`,
+          }),
+        });
+        const j = await r.json();
+        if (!j.ok || !j.checkoutUrl) {
+          throw new Error(j.error || 'Erreur création ordre VivaWallet');
+        }
+        // Ouvre dans nouvel onglet pour pas perdre le contexte staff
+        window.open(j.checkoutUrl, '_blank');
+        alert(`Lien de paiement VivaWallet ouvert dans un nouvel onglet.\nRéf : ${ref}\n\nUne fois payé, le statut sera mis à jour automatiquement.`);
+        onConfirmed(booking);
+        return;
+      }
+
+      // Cash + test : mail confirmation immédiate si email fourni
       if (booking.customer?.email) {
         fetch('/api/send-confirmation', {
           method: 'POST',
@@ -783,15 +801,16 @@ function QuickSaleModal({ staff, onClose, onConfirmed }) {
           </button>
         </div>
 
-        {/* BattleKart fields */}
+        {/* BattleKart fields — prix fixé par règles métier (auto mer) */}
         {type === 'battlekart' && (
-          <div className="mb-4 grid grid-cols-2 gap-3">
-            <div>
-              <div className="mb-1 text-xs text-white/50">Prix unitaire (€)</div>
-              <input type="number" min="1" step="0.5" value={unitPrice} onChange={(e) => setUnitPrice(Number(e.target.value))} className="input" />
+          <div className="mb-4">
+            <div className="mb-2 rounded border border-white/10 bg-white/[0.02] p-3 text-xs">
+              <div className="text-white/50">Tarif appliqué</div>
+              <div className="display text-mw-pink">{battleKartPrice} € / joueur</div>
+              {isWed && <div className="mt-1 text-[10px] text-mw-yellow">⚡ Tarif mercredi auto -50%</div>}
             </div>
             <div>
-              <div className="mb-1 text-xs text-white/50">Nombre de tours</div>
+              <div className="mb-1 text-xs text-white/50">Nombre de joueurs</div>
               <input type="number" min="1" max="50" value={qty} onChange={(e) => setQty(Number(e.target.value))} className="input" />
             </div>
           </div>
