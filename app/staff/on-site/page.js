@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { activities, getActivityPrice } from '@/lib/activities';
+import { activities, getActivityPrice, isWednesdayDiscount } from '@/lib/activities';
 import { generateSlotsForActivity, toDateStr, parseDate, isOpenOn, monthsFr, dayLabelsFr } from '@/lib/hours';
 import { createBooking, logAudit, getActiveStaff, getSlotOccupancy, getSlotBlocks } from '@/lib/data';
 
@@ -29,6 +29,7 @@ export default function OnSiteBookingPage() {
   }, [date]);
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
+  const [quickSaleOpen, setQuickSaleOpen] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
   const staff = typeof window !== 'undefined' ? getActiveStaff() : null;
 
@@ -317,8 +318,21 @@ export default function OnSiteBookingPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <h1 className="section-title mb-1">Réservation sur place</h1>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h1 className="section-title">Réservation sur place</h1>
+        <button onClick={() => setQuickSaleOpen(true)} className="btn-outline !py-2 !px-4 text-xs whitespace-nowrap">
+          ⚡ Vente rapide (BattleKart / Starcadium)
+        </button>
+      </div>
       <p className="mb-6 text-sm text-white/60">Mode accueil — créez une réservation pour un client présent, encaissement direct.</p>
+
+      {quickSaleOpen && (
+        <QuickSaleModal
+          staff={staff}
+          onClose={() => setQuickSaleOpen(false)}
+          onConfirmed={(b) => { setQuickSaleOpen(false); setConfirmed(b); }}
+        />
+      )}
 
       {/* Customer */}
       <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
@@ -628,6 +642,243 @@ function PaymentSimulation({ payment, total, onCancel }) {
         {payment.status === 'processing' && (
           <button onClick={onCancel} className="mt-4 text-xs text-white/50 hover:text-mw-red">Annuler</button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ====================================================================
+// VENTE RAPIDE (BattleKart + Starcadium — pas de slot, juste qty × prix)
+// ====================================================================
+function QuickSaleModal({ staff, onClose, onConfirmed }) {
+  const [type, setType] = useState('battlekart'); // 'battlekart' | 'starcadium'
+  const [qty, setQty] = useState(1);
+  const [starcadiumAmount, setStarcadiumAmount] = useState(10);
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [paying, setPaying] = useState(false);
+
+  const STARCADIUM_AMOUNTS = [5, 10, 20, 50];
+  const battleKart = activities.find((a) => a.id === 'battlekart');
+  const isWed = isWednesdayDiscount(toDateStr(new Date()));
+  // BattleKart : prix automatique selon jour (pas modifiable par staff)
+  const battleKartPrice = isWed ? (battleKart?.priceWed || 10) : (battleKart?.priceRegular || 19);
+
+  // Total
+  const total = type === 'battlekart' ? battleKartPrice * qty : starcadiumAmount * qty;
+
+  const buildBookingItems = () => {
+    if (type === 'battlekart') {
+      return [{
+        activityId: 'battlekart',
+        activityName: 'BattleKart',
+        roomId: null,
+        start: null,
+        end: null,
+        players: qty,
+        billedPlayers: qty,
+        unit: battleKartPrice,
+        total: total,
+      }];
+    } else {
+      return [{
+        activityId: 'starcadium',
+        activityName: `Starcadium — Carte ${starcadiumAmount}€`,
+        roomId: null,
+        start: null,
+        end: null,
+        players: qty,
+        billedPlayers: qty,
+        unit: starcadiumAmount,
+        total: total,
+      }];
+    }
+  };
+
+  const submit = async (method) => {
+    if (paying) return;
+    if (qty < 1) return alert('Quantité invalide');
+    if (total <= 0) return alert('Total invalide');
+
+    setPaying(true);
+    try {
+      const ref = 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+      const booking = {
+        id: ref,
+        date: toDateStr(new Date()),
+        players: qty,
+        items: buildBookingItems(),
+        subtotal: total,
+        discount: 0,
+        total,
+        paid: method !== 'card', // Cash + test → paid immédiatement, viva → après webhook
+        source: 'on_site',
+        kind: 'quick_sale',
+        customer: {
+          name: customerName || 'Client comptoir',
+          email: customerEmail || null,
+          firstName: customerName.split(' ')[0] || 'Client',
+          lastName: customerName.split(' ').slice(1).join(' ') || 'Comptoir',
+        },
+        createdAt: new Date().toISOString(),
+        staffId: staff?.id,
+        staffName: staff?.name,
+        paymentMethod: method === 'card' ? 'on_site_viva_wallet' : method === 'test' ? 'on_site_test' : 'on_site_cash',
+      };
+
+      await createBooking(booking);
+      await logAudit({
+        action: 'create_quick_sale',
+        entityType: 'booking',
+        entityId: ref,
+        notes: `Vente rapide ${type} par ${staff?.name || 'staff'} (${method})`,
+        after: { type, total, qty, method },
+      });
+
+      // VivaWallet → crée ordre + redirect terminal staff (ou popup)
+      if (method === 'card') {
+        const r = await fetch('/api/payment/viva/create-order', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            bookingRef: ref,
+            amount: total,
+            customer: { email: booking.customer.email || '', name: booking.customer.name, country: 'BE' },
+            merchantTrns: ref,
+            customerTrns: `Multiwex — Vente rapide ${type}`,
+          }),
+        });
+        const j = await r.json();
+        if (!j.ok || !j.checkoutUrl) {
+          throw new Error(j.error || 'Erreur création ordre VivaWallet');
+        }
+        // Ouvre dans nouvel onglet pour pas perdre le contexte staff
+        window.open(j.checkoutUrl, '_blank');
+        alert(`Lien de paiement VivaWallet ouvert dans un nouvel onglet.\nRéf : ${ref}\n\nUne fois payé, le statut sera mis à jour automatiquement.`);
+        onConfirmed(booking);
+        return;
+      }
+
+      // Cash + test : mail confirmation immédiate si email fourni
+      if (booking.customer?.email) {
+        fetch('/api/send-confirmation', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(booking),
+        }).catch(() => {});
+      }
+
+      onConfirmed(booking);
+    } catch (e) {
+      alert('Erreur : ' + e.message);
+    }
+    setPaying(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded border border-mw-pink/40 bg-mw-surface p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="display text-2xl">⚡ Vente rapide</h2>
+          <button onClick={onClose} className="text-xl text-white/50 hover:text-white">✕</button>
+        </div>
+
+        {/* Type */}
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => { setType('battlekart'); setUnitPrice(battleKartPrice); }}
+            className={`rounded border p-4 transition ${type === 'battlekart' ? 'border-mw-pink bg-mw-pink/10' : 'border-white/15 hover:border-mw-pink/50'}`}
+          >
+            <div className="display text-sm">🏎 BattleKart</div>
+            <div className="mt-1 text-xs text-white/50">Tour: {battleKartPrice}€{isWed && ' (mer)'}</div>
+          </button>
+          <button
+            onClick={() => setType('starcadium')}
+            className={`rounded border p-4 transition ${type === 'starcadium' ? 'border-mw-pink bg-mw-pink/10' : 'border-white/15 hover:border-mw-pink/50'}`}
+          >
+            <div className="display text-sm">🕹 Starcadium</div>
+            <div className="mt-1 text-xs text-white/50">Carte arcade</div>
+          </button>
+        </div>
+
+        {/* BattleKart fields — prix fixé par règles métier (auto mer) */}
+        {type === 'battlekart' && (
+          <div className="mb-4">
+            <div className="mb-2 rounded border border-white/10 bg-white/[0.02] p-3 text-xs">
+              <div className="text-white/50">Tarif appliqué</div>
+              <div className="display text-mw-pink">{battleKartPrice} € / joueur</div>
+              {isWed && <div className="mt-1 text-[10px] text-mw-yellow">⚡ Tarif mercredi auto -50%</div>}
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-white/50">Nombre de joueurs</div>
+              <input type="number" min="1" max="50" value={qty} onChange={(e) => setQty(Number(e.target.value))} className="input" />
+            </div>
+          </div>
+        )}
+
+        {/* Starcadium fields */}
+        {type === 'starcadium' && (
+          <>
+            <div className="mb-3">
+              <div className="mb-2 text-xs text-white/50">Montant carte</div>
+              <div className="grid grid-cols-4 gap-2">
+                {STARCADIUM_AMOUNTS.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setStarcadiumAmount(a)}
+                    className={`rounded border py-3 text-center font-bold transition ${starcadiumAmount === a ? 'border-mw-pink bg-mw-pink text-white' : 'border-white/15 text-white/80 hover:border-mw-pink'}`}
+                  >
+                    {a}€
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <div className="mb-1 text-xs text-white/50">Quantité de cartes</div>
+              <input type="number" min="1" max="20" value={qty} onChange={(e) => setQty(Number(e.target.value))} className="input" />
+            </div>
+          </>
+        )}
+
+        {/* Customer (optional) */}
+        <div className="mb-4 rounded border border-white/10 bg-white/[0.02] p-3">
+          <div className="mb-2 text-xs text-white/50">Client (optionnel — pour reçu mail)</div>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nom (optionnel)" className="input" />
+            <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email (optionnel)" type="email" className="input" />
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="mb-4 rounded border border-mw-pink/40 bg-mw-pink/5 p-4 text-center">
+          <div className="text-xs text-white/50">TOTAL À ENCAISSER</div>
+          <div className="display text-3xl text-mw-pink">{total.toFixed(2)} €</div>
+        </div>
+
+        {/* Payment buttons */}
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            onClick={() => submit('card')}
+            disabled={paying || total <= 0}
+            className="btn-primary !py-3 text-sm disabled:opacity-30"
+          >
+            {paying ? 'Traitement…' : '💳 VivaWallet (carte)'}
+          </button>
+          <button
+            onClick={() => submit('cash')}
+            disabled={paying || total <= 0}
+            className="btn-outline !py-3 text-sm disabled:opacity-30"
+          >
+            💵 Cash
+          </button>
+          <button
+            onClick={() => submit('test')}
+            disabled={paying || total <= 0}
+            className="rounded border border-mw-yellow/40 bg-mw-yellow/5 py-3 text-xs text-mw-yellow hover:bg-mw-yellow/10 disabled:opacity-30"
+          >
+            🧪 Bypass test (gratuit, pour démo)
+          </button>
+        </div>
       </div>
     </div>
   );

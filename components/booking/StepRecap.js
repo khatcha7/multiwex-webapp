@@ -101,15 +101,102 @@ export default function StepRecap({ onConfirm }) {
   };
 
   const processPayment = async (method) => {
-    if (sending) return; // Anti double-click
+    if (sending) return;
     setSending(true);
     setPaymentMethod(method);
+
+    // Mode bypass test (gratuit, démo)
+    if (method === 'test_bypass' || method === 'free') {
+      setPaymentStep('processing');
+      await new Promise((r) => setTimeout(r, 600));
+      setPaymentStep('success');
+      await new Promise((r) => setTimeout(r, 500));
+      confirmBooking(method === 'test_bypass' ? 'test_bypass' : 'free');
+      return;
+    }
+
+    // Mode VivaWallet (carte / bancontact) → real payment flow
+    if (method === 'card' || method === 'bancontact' || method === 'viva_wallet') {
+      setPaymentStep('processing');
+      try {
+        // 1. Crée la booking en DB d'abord (paid=false), pour avoir une ref
+        const ref = 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+        const booking = buildBookingPayload('viva_wallet', false, ref);
+        await createBooking(booking);
+        await logAudit({
+          action: 'create_booking_pending',
+          entityType: 'booking',
+          entityId: ref,
+          after: { total: booking.total, method },
+        });
+        sessionStorage.setItem('mw_last_booking', JSON.stringify(booking));
+
+        // 2. Crée l'ordre Viva côté serveur
+        const r = await fetch('/api/payment/viva/create-order', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            bookingRef: ref,
+            amount: total,
+            customer: { email, name: `${firstName} ${lastName}`, phone, country: 'BE' },
+            merchantTrns: ref,
+            customerTrns: `Multiwex — Réservation ${ref}`,
+          }),
+        });
+        const j = await r.json();
+        if (!j.ok || !j.checkoutUrl) {
+          throw new Error(j.error || 'Erreur création ordre VivaWallet');
+        }
+        // 3. Redirect → checkout VivaWallet (sending reste true)
+        window.location.href = j.checkoutUrl;
+      } catch (e) {
+        alert('Échec paiement : ' + (e.message || e));
+        setSending(false);
+        setPaymentStep(null);
+      }
+      return;
+    }
+
+    // Méthodes inconnues → fallback simulation
     setPaymentStep('processing');
-    await new Promise((r) => setTimeout(r, method === 'card' ? 2500 : 1500));
+    await new Promise((r) => setTimeout(r, 1500));
     setPaymentStep('success');
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 500));
     confirmBooking(method);
   };
+
+  // Helper : objet booking à créer en DB (réutilisé par viva flow + confirmBooking)
+  const buildBookingPayload = (method, paid, refOverride = null) => ({
+    id: refOverride || ('MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()),
+    date: cart.date,
+    players: maxPlayers,
+    items: items.map((i) => ({
+      activityId: i.activity.id,
+      activityName: i.activity.name,
+      roomId: i.roomId || null,
+      start: i.slot.start,
+      end: i.slot.end,
+      players: i.players,
+      billedPlayers: i.billedPlayers,
+      unit: i.unit,
+      total: i.total,
+    })),
+    subtotal,
+    discount,
+    total,
+    paid,
+    paymentMethod: method,
+    promoCode: promoApplied ? 'DEMO100' : null,
+    source: 'online',
+    packageId: cart.packageId || null,
+    customer: {
+      firstName, lastName, name: `${firstName} ${lastName}`,
+      email, phone,
+      companyName: withCompany ? companyName : null,
+      vatNumber: withCompany ? vatNumber : null,
+    },
+    createdAt: new Date().toISOString(),
+  });
 
   const confirmBooking = async (method) => {
     const booking = {
@@ -420,6 +507,13 @@ function PaymentModal({ step, method, total, onChoose, onCancel, user }) {
               </button>
               <button onClick={() => setGcMode('choose')} className="btn-outline !py-4 text-base flex items-center justify-center gap-2">
                 <IconGift /> Carte cadeau
+              </button>
+              <button
+                onClick={() => onChoose('test_bypass')}
+                className="rounded border border-mw-yellow/40 bg-mw-yellow/5 px-4 py-3 text-xs text-mw-yellow hover:bg-mw-yellow/10"
+                title="Mode démo : valide la résa sans paiement réel (à retirer en prod)"
+              >
+                🧪 Bypass test démo
               </button>
             </div>
             <button onClick={onCancel} className="mt-4 text-xs text-white/50 hover:text-mw-red">Annuler</button>
