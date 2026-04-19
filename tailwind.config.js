@@ -16,6 +16,8 @@ module.exports = {
         'mw-surface-alt': '#1a1a1a',
         'mw-dark': '#111111',
         'mw-darker': '#080808',
+        'mw-green': '#00ff66',
+        'mw-orange': '#ff8c00',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],

@@ -65,10 +65,10 @@ function blocksForSlot(blocks, laneId, slotStart, slotEnd) {
 }
 
 /** Compute CSS class for a slot based on occupancy + blocks. */
-function slotClass(players, maxPlayers, isBlocked) {
+function slotClass(players, maxPlayers, isBlocked, privative = false) {
   if (isBlocked) return 'cal-slot-blocked';
   if (players >= maxPlayers) return 'cal-slot-full';
-  if (players > 0) return 'cal-slot-partial';
+  if (players > 0) return privative ? 'cal-slot-privative-partial' : 'cal-slot-partial';
   return 'cal-slot-free';
 }
 
@@ -270,7 +270,7 @@ export default function TransposedDayView({
       if (highlightIds.has?.(booking.id)) isHighlighted = true;
     }
 
-    const statusCls = slotClass(players, lane.maxPlayers || 1, isBlocked);
+    const statusCls = slotClass(players, lane.maxPlayers || 1, isBlocked, lane.privative);
     const isSelected = multiSelSet.has(`${lane.laneId}::${slot.start}`);
 
     const classes = [
@@ -343,7 +343,7 @@ export default function TransposedDayView({
                         className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
                       >
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
-                        {width >= 50 && <span className="truncate text-white/80">{plain}</span>}
+                        {width >= 50 && <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: n.content }} />}
                       </div>
                     );
                   })}
@@ -849,7 +849,7 @@ export default function TransposedDayView({
                       if (highlightIds.has?.(booking.id)) isHighlighted = true;
                     }
 
-                    const statusCls = slotClass(players, subLane.maxPlayers || 1, isBlocked);
+                    const statusCls = slotClass(players, subLane.maxPlayers || 1, isBlocked, subLane.privative);
                     const isSelected = multiSelSet.has(`${subLane.laneId}::${slot.start}`);
 
                     const classes = [
@@ -942,7 +942,7 @@ export default function TransposedDayView({
                       if (highlightIds.has?.(booking.id)) isHighlighted = true;
                     }
 
-                    const statusCls = slotClass(players, subLane.maxPlayers || 1, isBlocked);
+                    const statusCls = slotClass(players, subLane.maxPlayers || 1, isBlocked, subLane.privative);
                     const isSelected = multiSelSet.has(`${subLane.laneId}::${slot.start}`);
 
                     const classes = [

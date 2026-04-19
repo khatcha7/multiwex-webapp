@@ -106,8 +106,8 @@ export default function StaffBookingsPage() {
               <th className="px-2 py-3 text-center w-8"></th>
               <th className="px-3 py-3 text-left">ID</th>
               <th className="px-3 py-3 text-left">Client</th>
-              <th className="px-3 py-3 text-left">Date</th>
               <th className="px-3 py-3 text-left">Commandé le</th>
+              <th className="px-3 py-3 text-left">Date</th>
               <th className="px-3 py-3 text-left">Activités</th>
               <th className="px-3 py-3 text-center">Joueurs</th>
               <th className="px-3 py-3 text-right">Total</th>
@@ -153,8 +153,8 @@ export default function StaffBookingsPage() {
                   <div className="display">{b.customer?.name || '—'}</div>
                   <div className="text-[10px] text-white/40">{b.customer?.email}</div>
                 </td>
-                <td className="px-3 py-2 text-xs text-white/70">{new Date(b.date).toLocaleDateString('fr-FR')}</td>
                 <td className="px-3 py-2 text-xs text-white/70">{formatCreatedAt(b.createdAt)}</td>
+                <td className="px-3 py-2 text-xs text-white/70">{new Date(b.date).toLocaleDateString('fr-FR')}</td>
                 <td className="px-3 py-2 text-[10px] text-white/60">
                   {b.items?.map((i, idx) => <div key={idx}>· {i.activityName || i.activity_id} @ {i.start || i.slot_start}</div>)}
                 </td>
