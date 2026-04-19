@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { generateGiftCardPDF } from '@/lib/pdf/generateInvoice';
 import { buildGiftCardEmail } from '@/lib/email/giftcardTemplate';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +15,9 @@ async function loadConfig(supabase) {
 }
 
 export async function POST(req) {
+  const rl = checkRateLimit(req, { limit: 5, windowSec: 60 });
+  if (!rl.ok) return NextResponse.json({ ok: false, error: 'Rate limit exceeded' }, { status: 429 });
+
   try {
     const body = await req.json();
     const code = (body.code || '').trim().toUpperCase();

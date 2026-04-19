@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateBookingICS } from '@/lib/ics';
 import { verifyRef } from '@/lib/signedToken';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 
 export async function GET(req) {
+  const rl = checkRateLimit(req, { limit: 30, windowSec: 60 });
+  if (!rl.ok) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+
   const { searchParams } = new URL(req.url);
   const ref = searchParams.get('ref');
   const token = searchParams.get('token');

@@ -7,6 +7,7 @@ import TransposedDayView from '@/components/staff/TransposedDayView';
 import EditBookingItemModal from '@/components/staff/EditBookingItemModal';
 import NoteEditorModal from '@/components/staff/NoteEditorModal';
 import SlotNotesPopover from '@/components/staff/SlotNotesPopover';
+import { sanitizeHTML } from '@/lib/sanitize';
 import {
   generateSlotsForActivity,
   getHoursForDate,
@@ -1118,7 +1119,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                               >
                                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
                                 {height >= 40 && (
-                                  <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: n.content }} />
+                                  <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: sanitizeHTML(n.content) }} />
                                 )}
                               </div>
                             );

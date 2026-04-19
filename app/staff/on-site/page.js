@@ -232,6 +232,7 @@ export default function OnSiteBookingPage() {
     });
 
   const submitPayment = async (method) => {
+    if (payment?.status === 'processing' || payment?.status === 'success') return; // Anti double-click
     setPayment({ method, status: 'processing' });
     await new Promise((r) => setTimeout(r, method === 'card' ? 2500 : 1000));
     setPayment({ method, status: 'success' });
@@ -260,13 +261,19 @@ export default function OnSiteBookingPage() {
       notes: `Réservation sur place par ${staff?.name || 'staff'}`,
       after: { total: booking.total, method: booking.paymentMethod },
     });
-    // Envoie le mail de confirmation au client (si email présent)
+    // Envoie le mail de confirmation au client (si email présent) — await + log
     if (booking.customer?.email) {
-      fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(booking),
-      }).catch((e) => console.warn('send-confirmation on-site failed', e));
+      try {
+        const r = await fetch('/api/send-confirmation', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(booking),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) {
+          console.warn('[mail on-site] failed — staff peut renvoyer depuis /staff/bookings', j.error);
+        }
+      } catch (e) { console.warn('send-confirmation on-site failed', e); }
     }
     setConfirmed(booking);
   };

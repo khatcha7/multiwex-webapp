@@ -3,6 +3,7 @@
 import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { generateSlotsForActivity, toMinutes, fromMinutes, toDateStr, isToday } from '@/lib/hours';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -343,7 +344,7 @@ export default function TransposedDayView({
                         className="flex w-full items-center gap-1 overflow-hidden text-[10px] leading-tight"
                       >
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
-                        {width >= 50 && <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: n.content }} />}
+                        {width >= 50 && <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: sanitizeHTML(n.content) }} />}
                       </div>
                     );
                   })}

@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { generateInvoicePDF, getNextInvoiceNumber } from '@/lib/pdf/generateInvoice';
 import { generateBookingICS } from '@/lib/ics';
 import { buildConfirmationEmail } from '@/lib/email/confirmationTemplate';
+import { getActivity } from '@/lib/activities';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Force le runtime Node.js (nécessaire pour @react-pdf/renderer côté serveur)
 export const runtime = 'nodejs';
@@ -19,15 +21,77 @@ async function loadConfig(supabase) {
   return map;
 }
 
+// Reconstruit un objet booking à partir d'une ref Supabase (pour resend manuel)
+async function loadBookingFromDB(supabase, ref) {
+  const { data: b } = await supabase
+    .from('bookings')
+    .select('*, booking_items(*), customers(*)')
+    .eq('reference', ref)
+    .maybeSingle();
+  if (!b) return null;
+  const customer = Array.isArray(b.customers) ? b.customers[0] : b.customers;
+  return {
+    id: b.reference,
+    reference: b.reference,
+    date: b.booking_date,
+    players: b.players,
+    subtotal: b.subtotal,
+    discount: b.discount,
+    total: b.total,
+    paid: b.paid,
+    paymentMethod: b.payment_method,
+    promoCode: b.promo_code,
+    source: b.source,
+    customer: customer ? {
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      companyName: customer.company_name,
+      vatNumber: customer.vat_number,
+      address: customer.address,
+    } : null,
+    items: (b.booking_items || []).map((i) => {
+      const a = getActivity(i.activity_id);
+      return {
+        id: i.id,
+        activityId: i.activity_id,
+        activityName: a?.name || i.activity_id,
+        slotDate: i.slot_date,
+        start: (i.slot_start || '').slice(0, 5),
+        end: (i.slot_end || '').slice(0, 5),
+        players: i.players,
+        unit: i.unit_price,
+        total: i.total_price,
+      };
+    }),
+  };
+}
+
 export async function POST(req) {
+  // Rate limit : 5 requêtes par IP par minute (anti-spam mail)
+  const rl = checkRateLimit(req, { limit: 5, windowSec: 60 });
+  if (!rl.ok) return NextResponse.json({ ok: false, error: 'Rate limit exceeded', resetIn: rl.resetIn }, { status: 429 });
+
   try {
-    const booking = await req.json();
+    const body = await req.json();
     const apiKey = process.env.RESEND_API_KEY;
 
     // Init Supabase server-side
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+    // Mode "resend manuel" : si seul {ref} est passé, on lookup le booking en DB
+    let booking;
+    if (body.ref && !body.items && supabase) {
+      booking = await loadBookingFromDB(supabase, body.ref);
+      if (!booking) return NextResponse.json({ ok: false, error: 'Booking not found' }, { status: 404 });
+    } else {
+      booking = body;
+    }
+    if (!booking?.customer?.email) {
+      return NextResponse.json({ ok: false, error: 'Booking has no customer email' }, { status: 400 });
+    }
 
     const config = await loadConfig(supabase);
 
@@ -139,9 +203,25 @@ export async function POST(req) {
       },
     });
 
+    const ref = booking.reference || booking.id;
+
     if (sendResult.error) {
       console.error('[send-confirmation] Resend error', sendResult.error);
+      // Tag failed in DB pour permettre retry manuel
+      if (supabase && ref) {
+        await supabase.from('bookings').update({
+          confirmation_sent_status: 'failed',
+        }).eq('reference', ref);
+      }
       return NextResponse.json({ ok: false, error: sendResult.error }, { status: 500 });
+    }
+
+    // Tag success
+    if (supabase && ref) {
+      await supabase.from('bookings').update({
+        confirmation_sent_at: new Date().toISOString(),
+        confirmation_sent_status: 'sent',
+      }).eq('reference', ref);
     }
 
     return NextResponse.json({ ok: true, id: sendResult.data?.id, invoiceNumber });

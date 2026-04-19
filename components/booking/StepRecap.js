@@ -88,10 +88,12 @@ export default function StepRecap({ onConfirm }) {
   };
 
   const startPayment = () => {
+    if (sending) return; // Anti double-click
     if (!email || !firstName || !lastName) return alert('Nom, prénom et email requis');
     if (!cgvAccepted) return alert('Veuillez accepter les CGV');
     if (!disclaimersAccepted) return alert('Veuillez confirmer avoir pris connaissance des restrictions');
     if (total === 0) {
+      setSending(true);
       confirmBooking('free');
     } else {
       setPaymentStep('choose');
@@ -99,6 +101,8 @@ export default function StepRecap({ onConfirm }) {
   };
 
   const processPayment = async (method) => {
+    if (sending) return; // Anti double-click
+    setSending(true);
     setPaymentMethod(method);
     setPaymentStep('processing');
     await new Promise((r) => setTimeout(r, method === 'card' ? 2500 : 1500));
@@ -148,11 +152,18 @@ export default function StepRecap({ onConfirm }) {
         entityId: booking.id,
         after: { total: booking.total, sessions: booking.items.length, source: 'online' },
       });
-      await fetch('/api/send-confirmation', {
+      const mailRes = await fetch('/api/send-confirmation', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(booking),
       });
+      const mailData = await mailRes.json().catch(() => ({}));
+      if (!mailRes.ok || !mailData.ok) {
+        // Mail failed but booking is created — log et notification non-bloquante
+        console.warn('[mail confirmation] failed', mailData.error);
+        // L'utilisateur verra quand même la résa confirmée. Le mail peut être renvoyé
+        // depuis le back-office staff (bouton "Renvoyer mail" dans /staff/bookings).
+      }
     } catch (e) { console.error(e); }
     setSending(false);
     sessionStorage.setItem('mw_last_booking', JSON.stringify(booking));
