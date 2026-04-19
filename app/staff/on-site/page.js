@@ -512,8 +512,10 @@ export default function OnSiteBookingPage() {
                           ? baseCap
                           : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
                         const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
+                        // Conflit interne : autre session de la même résa déjà sur ce slot+room
+                        const conflictWithOtherSession = arr.some((other, oIdx) => oIdx !== idx && other.slot?.start === slot.start && (other.roomId || null) === (sess.roomId || null));
                         // En back-end : staff peut joindre un groupe privatif tant qu'il y a de la place
-                        const full = effectiveMax === 0 || playersInSlot >= effectiveMax;
+                        const full = effectiveMax === 0 || playersInSlot >= effectiveMax || conflictWithOtherSession;
                         const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
                         // Jaune dès qu'il y a 1 joueur OU bloc partiel — y compris privatif (back-end)
                         const shared = (playersInSlot > 0 || partialBlock) && !full;
@@ -528,7 +530,7 @@ export default function OnSiteBookingPage() {
                             onClick={() => !full && setSessionSlot(id, idx, slot)}
                             disabled={full}
                             className={`relative rounded border px-2 py-1 text-xs ${cls}`}
-                            title={shared ? `Libre: ${effectiveMax - playersInSlot}/${baseCap}` : full ? 'Complet' : 'Libre'}
+                            title={conflictWithOtherSession ? 'Déjà sélectionné par un autre créneau de cette résa' : shared ? `Libre: ${effectiveMax - playersInSlot}/${baseCap}` : full ? 'Complet' : 'Libre'}
                           >
                             {slot.start}
                             {shared && <div className="text-[8px]">{playersInSlot + seatsBlockedTotal}/{baseCap}{partialBlock ? ` 🔒${seatsBlockedTotal}` : ''}</div>}
