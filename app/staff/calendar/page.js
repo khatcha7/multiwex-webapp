@@ -934,6 +934,8 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
           const laneBookings = bookings.flatMap((b) =>
             (b.items || []).filter((i) => i.activityId === lane.id).filter((i) => {
               if (!lane.isRoom) return true;
+              // Si l'item a un room_id défini → match exact ; sinon (ancienne donnée) → fallback hashRoom pour rétro-compat
+              if (i.roomId) return i.roomId === lane.roomId;
               return hashRoom(b.id || b.reference) === lane.roomId;
             }).map((i) => ({ ...i, booking: b }))
           );

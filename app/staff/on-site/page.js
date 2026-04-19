@@ -66,14 +66,21 @@ export default function OnSiteBookingPage() {
   }, [prefilled]);
 
   useEffect(() => {
-    // Charge occupation pour toutes les activités sélectionnées
+    // Charge occupation par activité + par room (pour rooms multi)
+    // Stocké { [activityId]: { [roomId|'_']: occMap } }
     const load = async () => {
       const o = {};
       for (const id of Object.keys(items)) {
         const act = activities.find((a) => a.id === id);
-        if (act) {
-          const oc = await getSlotOccupancy(id, date);
-          o[id] = oc;
+        if (!act) continue;
+        o[id] = {};
+        if (act.rooms?.length) {
+          for (const rm of act.rooms) {
+            // eslint-disable-next-line no-await-in-loop
+            o[id][rm.id] = await getSlotOccupancy(id, date, rm.id);
+          }
+        } else {
+          o[id]._ = await getSlotOccupancy(id, date);
         }
       }
       setOccupancy(o);
@@ -116,18 +123,21 @@ export default function OnSiteBookingPage() {
   const setSessionPlayers = (id, idx, players) => {
     const a = activities.find((x) => x.id === id);
     const minP = a.minPlayers || 1;
-    let maxP = a.maxPlayers;
-    // Si un slot est déjà sélectionné, max = places restantes (− blocs partiels)
+    // maxP = capacité de la room choisie si applicable, sinon max activité
     const cur = items[id]?.[idx];
+    const room = (a.rooms || []).find((r) => r.id === cur?.roomId);
+    let maxP = room?.maxPlayers || a.maxPlayers;
     if (cur?.slot) {
-      const occ = (occupancy[id] || {})[cur.slot.start];
+      const occMap = (occupancy[id] || {})[cur.roomId || '_'] || {};
+      const occ = occMap[cur.slot.start];
       const playersInSlot = occ?.players || 0;
-      const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === cur.slot.start);
+      const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === cur.slot.start && (cur.roomId ? b.roomId === cur.roomId : true));
       const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
-      const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
-      const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+      const baseCap = room?.maxPlayers || a.maxPlayers;
+      const seatsBlockedTotal = hasFullBlock ? baseCap : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+      const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
       if (a.privative && playersInSlot > 0) maxP = 0;
-      else maxP = Math.min(effectiveMax, effectiveMax - playersInSlot);
+      else maxP = Math.max(0, effectiveMax - playersInSlot);
     }
     const clamped = Math.min(Math.max(minP, players), Math.max(minP, maxP));
     setItems((prev) => {
@@ -154,21 +164,24 @@ export default function OnSiteBookingPage() {
 
   const setSessionSlot = (id, idx, slot) => {
     const a = activities.find((x) => x.id === id);
-    const occ = (occupancy[id] || {})[slot.start];
+    const cur = items[id]?.[idx];
+    const room = (a.rooms || []).find((r) => r.id === cur?.roomId);
+    const baseCap = room?.maxPlayers || a.maxPlayers;
+    const occMap = (occupancy[id] || {})[cur?.roomId || '_'] || {};
+    const occ = occMap[slot.start];
     const playersInSlot = occ?.players || 0;
-    const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === slot.start);
+    const blocksHere = (blocks || []).filter((b) => b.activityId === id && b.start === slot.start && (cur?.roomId ? b.roomId === cur.roomId : true));
     const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
-    const seatsBlockedTotal = hasFullBlock ? a.maxPlayers : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
-    const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
-    // Clamp joueurs à la capacité restante (effective − déjà réservé)
+    const seatsBlockedTotal = hasFullBlock ? baseCap : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+    const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
-      const cur = arr[idx] || { players: a.minPlayers || 1 };
-      let maxAllowed = effectiveMax - playersInSlot;
-      if (a.privative && playersInSlot > 0) return prev; // bloqué
-      if (effectiveMax === 0) return prev; // tout bloqué
-      const newPlayers = Math.max(a.minPlayers || 1, Math.min(cur.players, Math.max(a.minPlayers || 1, maxAllowed)));
-      arr[idx] = { ...cur, slot, players: newPlayers };
+      const c = arr[idx] || { players: a.minPlayers || 1 };
+      const maxAllowed = effectiveMax - playersInSlot;
+      if (a.privative && playersInSlot > 0) return prev;
+      if (effectiveMax === 0) return prev;
+      const newPlayers = Math.max(a.minPlayers || 1, Math.min(c.players, Math.max(a.minPlayers || 1, maxAllowed)));
+      arr[idx] = { ...c, slot, players: newPlayers };
       return { ...prev, [id]: arr };
     });
   };
@@ -407,19 +420,22 @@ export default function OnSiteBookingPage() {
                   </button>
                 </div>
                 {arr.map((sess, idx) => {
-                  // Calcul effectiveMax pour cette session (selon slot choisi + blocs)
-                  let sessEffectiveMax = a.maxPlayers;
+                  // Capacité de la room choisie ou activité sans rooms
+                  const sessRoom = (a.rooms || []).find((r) => r.id === sess.roomId);
+                  const sessBaseCap = sessRoom?.maxPlayers || a.maxPlayers;
+                  let sessEffectiveMax = sessBaseCap;
                   let sessSeatsBlocked = 0;
                   if (sess.slot) {
-                    const sb = (blocks || []).filter((b) => b.activityId === id && b.start === sess.slot.start);
+                    const sb = (blocks || []).filter((b) => b.activityId === id && b.start === sess.slot.start && (sess.roomId ? b.roomId === sess.roomId : true));
                     const fullB = sb.some((b) => b.seatsBlocked == null);
-                    sessSeatsBlocked = fullB ? a.maxPlayers : sb.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
-                    const occInfo = occ[sess.slot.start];
+                    sessSeatsBlocked = fullB ? sessBaseCap : sb.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
+                    const sessOccMap = (occ || {})[sess.roomId || '_'] || {};
+                    const occInfo = sessOccMap[sess.slot.start];
                     const playersInSlot = occInfo?.players || 0;
-                    sessEffectiveMax = Math.max(0, a.maxPlayers - sessSeatsBlocked - playersInSlot);
+                    sessEffectiveMax = Math.max(0, sessBaseCap - sessSeatsBlocked - playersInSlot);
                   }
                   const atMax = sess.players >= sessEffectiveMax;
-                  const atMin = sess.players <= (a.minPlayers || 1);
+                  const atMin = sess.players <= (sessRoom?.minPlayers || a.minPlayers || 1);
                   return (
                   <div key={idx} className="mb-2 rounded border border-white/10 p-2">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -470,16 +486,21 @@ export default function OnSiteBookingPage() {
                     <div className="flex flex-wrap gap-1">
                       {allSlots.slice(0, 40).map((slot) => {
                         const chosen = sess.slot?.start === slot.start;
-                        const occInfo = occ[slot.start];
+                        // occ par room si applicable
+                        const occMap = (occ || {})[sess.roomId || '_'] || {};
+                        const occInfo = occMap[slot.start];
                         const playersInSlot = occInfo?.players || 0;
                         const privative = a.privative;
-                        // Blocs sur ce slot
-                        const blocksHere = (blocks || []).filter((b) => b.activityId === a.id && b.start === slot.start);
+                        // Capacité max selon room sélectionnée
+                        const room = (a.rooms || []).find((r) => r.id === sess.roomId);
+                        const baseCap = room?.maxPlayers || a.maxPlayers;
+                        // Blocs sur ce slot — filtrés par room si applicable
+                        const blocksHere = (blocks || []).filter((b) => b.activityId === a.id && b.start === slot.start && (sess.roomId ? b.roomId === sess.roomId : true));
                         const hasFullBlock = blocksHere.some((b) => b.seatsBlocked == null);
                         const seatsBlockedTotal = hasFullBlock
-                          ? a.maxPlayers
+                          ? baseCap
                           : blocksHere.reduce((s, b) => s + (b.seatsBlocked || 0), 0);
-                        const effectiveMax = Math.max(0, a.maxPlayers - seatsBlockedTotal);
+                        const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
                         const full = effectiveMax === 0 || (privative ? playersInSlot > 0 : playersInSlot >= effectiveMax);
                         const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
                         const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
@@ -494,10 +515,10 @@ export default function OnSiteBookingPage() {
                             onClick={() => !full && setSessionSlot(id, idx, slot)}
                             disabled={full}
                             className={`relative rounded border px-2 py-1 text-xs ${cls}`}
-                            title={shared ? `Libre: ${playersInSlot}/${a.maxPlayers}` : full ? 'Complet' : 'Libre'}
+                            title={shared ? `Libre: ${effectiveMax - playersInSlot}/${baseCap}` : full ? 'Complet' : 'Libre'}
                           >
                             {slot.start}
-                            {shared && <div className="text-[8px]">{playersInSlot + seatsBlockedTotal}/{a.maxPlayers}{partialBlock ? ` 🔒${seatsBlockedTotal}` : ''}</div>}
+                            {shared && <div className="text-[8px]">{playersInSlot + seatsBlockedTotal}/{baseCap}{partialBlock ? ` 🔒${seatsBlockedTotal}` : ''}</div>}
                           </button>
                         );
                       })}

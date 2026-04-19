@@ -51,7 +51,22 @@ export default function StepSlots() {
   useEffect(() => {
     if (!currentActivity || !cart.date) return;
     let cancelled = false;
-    getSlotOccupancy(currentActivity.id, cart.date).then((o) => !cancelled && setOccupancy(o));
+    // Fetch occupancy par room si l'activité a des rooms, sinon global.
+    // Stocke sous { [roomId|'_']: { '14:00': {...}, ... } }
+    const fetchOcc = async () => {
+      const out = {};
+      if (currentActivity.rooms?.length) {
+        for (const rm of currentActivity.rooms) {
+          // eslint-disable-next-line no-await-in-loop
+          const o = await getSlotOccupancy(currentActivity.id, cart.date, rm.id);
+          out[rm.id] = o;
+        }
+      } else {
+        out._ = await getSlotOccupancy(currentActivity.id, cart.date);
+      }
+      if (!cancelled) setOccupancy(out);
+    };
+    fetchOcc();
     getSlotBlocks(cart.date).then((b) => !cancelled && setBlocks(b || []));
     return () => { cancelled = true; };
   }, [currentActivity, cart.date, refreshTick]);
@@ -292,11 +307,18 @@ export default function StepSlots() {
                   )}
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {allSlots.map((slot) => {
-              const occ = occupancy[slot.start];
-              // Tous les blocs sur ce slot pour cette activité
-              const blocksHere = blocks.filter(
-                (b) => (b.activity_id || b.activityId) === currentActivity.id && (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start)
-              );
+              // Occupancy spécifique à cette room (ou globale si pas de rooms)
+              const occMap = occupancy[roomId || '_'] || {};
+              const occ = occMap[slot.start];
+              // Blocs sur ce slot — filtrer par room si applicable
+              const blocksHere = blocks.filter((b) => {
+                const sameAct = (b.activity_id || b.activityId) === currentActivity.id;
+                if (!sameAct) return false;
+                const sameStart = (b.start_time?.slice(0, 5) === slot.start || b.start === slot.start);
+                if (!sameStart) return false;
+                if (roomId) return (b.roomId || b.room_id) === roomId;
+                return true;
+              });
               // Si au moins un bloc total → slot bloqué
               const hasFullBlock = blocksHere.some((b) => (b.seatsBlocked ?? b.seats_blocked) == null);
               // Sinon, somme des places bloquées (capacité réduite)
