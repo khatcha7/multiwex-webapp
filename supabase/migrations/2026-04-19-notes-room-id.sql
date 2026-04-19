@@ -3,4 +3,4 @@
 
 alter table notes add column if not exists room_id text;
 
-create index if not exists idx_notes_room on notes(activity_id, room_id, slot_date, slot_start);
+create index if not exists idx_notes_room on notes(activity_id, room_id, note_date, slot_start);
