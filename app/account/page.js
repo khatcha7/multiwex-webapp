@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useBooking } from '@/lib/store';
-import { listBookings, getConfig } from '@/lib/data';
+import { listBookings, getConfig, listGiftcards } from '@/lib/data';
 import { getActivity } from '@/lib/activities';
 import { getPackage } from '@/lib/packages';
 import AddPlayersModal from '@/components/booking/AddPlayersModal';
@@ -20,9 +20,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (hydrated && user) {
       listBookings({ customerEmail: user.email }).then(setBookings);
-      // Charger les cartes cadeaux de l'utilisateur
-      const allCards = JSON.parse(localStorage.getItem('mw_giftcards') || '[]');
-      setGiftCards(allCards.filter((gc) => gc.to_email === user.email));
+      listGiftcards({ email: user.email }).then(setGiftCards);
     }
   }, [hydrated, user]);
 
@@ -107,7 +105,7 @@ export default function AccountPage() {
                     <div className="display text-xl">{bal.toFixed(2)}€</div>
                   </div>
                   <div className="mt-1 text-[10px] text-white/50">
-                    {gc.from_name && <>De {gc.from_name} · </>}
+                    {(gc.fromName || gc.from_name) && <>De {gc.fromName || gc.from_name} · </>}
                     {empty ? 'Épuisée' : 'Disponible'}
                   </div>
                 </div>

@@ -1,16 +1,23 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup, listNoteCategories, createNoteCategory, updateNoteCategory, deleteNoteCategory, restoreDefaultNoteCategories, ensureDefaultNoteCategories } from '@/lib/data';
+import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup, listNoteCategories, createNoteCategory, updateNoteCategory, deleteNoteCategory, restoreDefaultNoteCategories, ensureDefaultNoteCategories, initConfig, migrateLocalStorageToSupabase } from '@/lib/data';
 import { activities } from '@/lib/activities';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 const TABS = [
   { id: 'general', label: 'Général' },
+  { id: 'company', label: 'Entreprise' },
+  { id: 'email', label: 'Email' },
+  { id: 'templates', label: 'Templates email' },
+  { id: 'invoice', label: 'Facture' },
+  { id: 'practical', label: 'Infos pratiques' },
+  { id: 'crosssell', label: 'Cross-sell' },
   { id: 'rules', label: 'Règles métier' },
   { id: 'display', label: 'Affichage' },
   { id: 'activities', label: 'Activités' },
   { id: 'packs', label: 'Packs' },
   { id: 'popups', label: 'Pop-ups' },
-  { id: 'pdf', label: 'PDF / Invitation' },
+  { id: 'pdf', label: 'PDF (legacy)' },
   { id: 'pricing', label: 'Tarifs' },
   { id: 'notes', label: 'Notes' },
 ];
@@ -21,27 +28,33 @@ export default function StaffSettingsPage() {
   const [editingPopup, setEditingPopup] = useState(null);
   const [tab, setTab] = useState('general');
 
-  useEffect(() => {
+  const reloadAll = async () => {
+    await initConfig();
     setCfg(getAllConfig());
-    setPopups(getPopups());
+    const ps = await getPopups();
+    setPopups(ps);
+  };
+
+  useEffect(() => {
+    reloadAll();
   }, []);
 
-  const save = (key, value) => {
-    setConfig(key, value);
+  const save = async (key, value) => {
+    await setConfig(key, value);
     setCfg(getAllConfig());
     logAudit({ action: 'update_config', entityType: 'config', entityId: key, after: { value } });
   };
 
-  const savePopup = (popup) => {
-    const all = upsertPopup(popup);
+  const savePopup = async (popup) => {
+    const all = await upsertPopup(popup);
     setPopups(all);
     setEditingPopup(null);
     logAudit({ action: 'upsert_popup', entityType: 'popup', entityId: popup.id, after: popup });
   };
 
-  const removePopup = (id) => {
+  const removePopup = async (id) => {
     if (!confirm('Supprimer cette pop-up ?')) return;
-    const all = deletePopup(id);
+    const all = await deletePopup(id);
     setPopups(all);
     logAudit({ action: 'delete_popup', entityType: 'popup', entityId: id });
   };
@@ -53,7 +66,7 @@ export default function StaffSettingsPage() {
     savePopup(updated);
   };
 
-  const movePopup = (id, delta) => {
+  const movePopup = async (id, delta) => {
     const sorted = [...popups].sort((a, b) => (a.order || 0) - (b.order || 0));
     const idx = sorted.findIndex((p) => p.id === id);
     if (idx < 0) return;
@@ -61,8 +74,24 @@ export default function StaffSettingsPage() {
     if (newIdx < 0 || newIdx >= sorted.length) return;
     [sorted[idx], sorted[newIdx]] = [sorted[newIdx], sorted[idx]];
     const renumbered = sorted.map((p, i) => ({ ...p, order: i }));
-    savePopups(renumbered);
+    await savePopups(renumbered);
     setPopups(renumbered);
+  };
+
+  const runMigration = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Supabase non configuré. Vérifiez NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+    if (!confirm('Migrer toutes les données localStorage vers Supabase ? À ne faire qu\'une seule fois.')) return;
+    const res = await migrateLocalStorageToSupabase();
+    if (res.ok) {
+      const r = res.report;
+      alert(`Migration OK :\n- ${r.config} clés config\n- ${r.popups} pop-ups\n- ${r.staff} staff\n- ${r.slot_blocks} blocs\n- ${r.notes} notes\n${r.errors.length ? '\\nErreurs :\\n' + r.errors.join('\\n') : ''}`);
+      await reloadAll();
+    } else {
+      alert('Échec : ' + res.reason);
+    }
   };
 
   const addNewPopup = () => {
@@ -101,6 +130,157 @@ export default function StaffSettingsPage() {
           <Field label="Texte Flash Sale (marquee)" value={cfg['site.flash_sale_text']} onSave={(v) => save('site.flash_sale_text', v)} />
           <Field label="Téléphone contact" value={cfg['contact.phone']} onSave={(v) => save('contact.phone', v)} />
           <Field label="Email contact" value={cfg['contact.email']} onSave={(v) => save('contact.email', v)} />
+        </div>
+
+        <div className="mt-6 rounded border border-white/10 bg-white/[0.02] p-4">
+          <h3 className="display mb-2 text-sm">Stockage des données</h3>
+          <div className="mb-3 flex items-center gap-2 text-xs">
+            <span className={`inline-block h-2 w-2 rounded-full ${isSupabaseConfigured ? 'bg-mw-green' : 'bg-mw-red'}`} />
+            <span className="text-white/70">
+              {isSupabaseConfigured
+                ? 'Supabase connecté — les données sont persistées en base.'
+                : 'Supabase NON configuré — fallback localStorage (vos modifications restent sur ce device uniquement).'}
+            </span>
+          </div>
+          {isSupabaseConfigured && (
+            <button onClick={runMigration} className="btn-outline !py-2 !px-4 text-xs">
+              ⇪ Migrer données localStorage → Supabase (one-shot)
+            </button>
+          )}
+        </div>
+      </div>)}
+
+      {tab === 'company' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Informations entreprise</h2>
+        <p className="mb-4 text-xs text-white/50">Utilisées dans les factures, mails de confirmation et footer.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Raison sociale" value={cfg['company.legal_name']} onSave={(v) => save('company.legal_name', v)} />
+          <Field label="Numéro BCE" value={cfg['company.bce']} onSave={(v) => save('company.bce', v)} />
+          <Field label="Numéro TVA" value={cfg['company.tva']} onSave={(v) => save('company.tva', v)} />
+          <Field label="IBAN" value={cfg['company.iban']} onSave={(v) => save('company.iban', v)} />
+          <Field label="BIC (optionnel)" value={cfg['company.bic']} onSave={(v) => save('company.bic', v)} />
+          <Field label="Site web" value={cfg['company.website']} onSave={(v) => save('company.website', v)} />
+          <Field label="Adresse — rue + n°" value={cfg['company.address_street']} onSave={(v) => save('company.address_street', v)} />
+          <Field label="Code postal" value={cfg['company.address_zip']} onSave={(v) => save('company.address_zip', v)} />
+          <Field label="Ville" value={cfg['company.address_city']} onSave={(v) => save('company.address_city', v)} />
+          <Field label="Pays" value={cfg['company.address_country']} onSave={(v) => save('company.address_country', v)} />
+          <Field label="Téléphone" value={cfg['contact.phone']} onSave={(v) => save('contact.phone', v)} />
+          <Field label="Email contact" value={cfg['contact.email']} onSave={(v) => save('contact.email', v)} />
+          <Field label="URL Google Maps (itinéraire)" value={cfg['company.maps_url']} onSave={(v) => save('company.maps_url', v)} />
+          <Field label="URL Google Reviews (post-visite)" value={cfg['company.google_reviews_url']} onSave={(v) => save('company.google_reviews_url', v)} />
+        </div>
+        <h3 className="display mt-6 mb-2 text-sm text-white/70">Réseaux sociaux</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Facebook" value={cfg['social.facebook']} onSave={(v) => save('social.facebook', v)} />
+          <Field label="Instagram" value={cfg['social.instagram']} onSave={(v) => save('social.instagram', v)} />
+          <Field label="TikTok" value={cfg['social.tiktok']} onSave={(v) => save('social.tiktok', v)} />
+          <Field label="LinkedIn" value={cfg['social.linkedin']} onSave={(v) => save('social.linkedin', v)} />
+          <Field label="YouTube" value={cfg['social.youtube']} onSave={(v) => save('social.youtube', v)} />
+        </div>
+      </div>)}
+
+      {tab === 'email' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Configuration Email (Resend)</h2>
+        <div className="mb-4 rounded border border-mw-yellow/30 bg-mw-yellow/5 p-3 text-xs text-white/80">
+          ⚠ <strong>Délivrabilité</strong> : pour éviter le spam, le domaine de l'adresse <code>From</code> doit être vérifié dans Resend (DNS : SPF + DKIM + DMARC). Sans cela, utiliser <code>onboarding@resend.dev</code> en attendant.
+          La clé API est lue depuis la variable d'env <code>RESEND_API_KEY</code> côté serveur (Vercel).
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Adresse expéditeur (From)" value={cfg['email.from']} onSave={(v) => save('email.from', v)} />
+          <Field label="Nom expéditeur" value={cfg['email.from_name']} onSave={(v) => save('email.from_name', v)} />
+          <Field label="Reply-To" value={cfg['email.reply_to']} onSave={(v) => save('email.reply_to', v)} />
+          <Field label="BCC interne (optionnel)" value={cfg['email.bcc_internal']} onSave={(v) => save('email.bcc_internal', v)} />
+        </div>
+        <h3 className="display mt-6 mb-2 text-sm text-white/70">Mail post-visite</h3>
+        <label className="mb-3 flex items-center gap-2 text-sm text-white/80">
+          <input type="checkbox" checked={cfg['email.postvisit_enabled'] === true || cfg['email.postvisit_enabled'] === 'true'} onChange={(e) => save('email.postvisit_enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+          Activer l'envoi automatique du mail post-visite
+        </label>
+        <NumField label="Délai après la résa (heures)" value={cfg['email.postvisit_delay_hours']} onSave={(v) => save('email.postvisit_delay_hours', v)} />
+      </div>)}
+
+      {tab === 'templates' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Templates email — sujets &amp; intros</h2>
+        <p className="mb-4 text-xs text-white/50">Variables disponibles : <code>{'{ref}'}</code> (n° réservation), <code>{'{firstName}'}</code>, <code>{'{date}'}</code>, <code>{'{total}'}</code>.</p>
+
+        <h3 className="display mt-2 mb-2 text-sm text-white/70">Mail de confirmation</h3>
+        <div className="space-y-3">
+          <Field label="Sujet" value={cfg['email.subject_confirmation']} onSave={(v) => save('email.subject_confirmation', v)} />
+          <TextareaField label="Texte d'intro" value={cfg['email.intro_confirmation']} onSave={(v) => save('email.intro_confirmation', v)} rows={3} />
+        </div>
+
+        <h3 className="display mt-6 mb-2 text-sm text-white/70">Mail post-visite</h3>
+        <div className="space-y-3">
+          <Field label="Sujet" value={cfg['email.subject_postvisit']} onSave={(v) => save('email.subject_postvisit', v)} />
+          <TextareaField label="Texte d'intro" value={cfg['email.intro_postvisit']} onSave={(v) => save('email.intro_postvisit', v)} rows={3} />
+          <Field label="CTA Google Reviews (label)" value={cfg['postvisit.review_cta']} onSave={(v) => save('postvisit.review_cta', v)} />
+          <TextareaField label="Outro" value={cfg['postvisit.outro']} onSave={(v) => save('postvisit.outro', v)} rows={2} />
+        </div>
+
+        <h3 className="display mt-6 mb-2 text-sm text-white/70">Mail carte cadeau</h3>
+        <div className="space-y-3">
+          <Field label="Sujet" value={cfg['email.subject_giftcard']} onSave={(v) => save('email.subject_giftcard', v)} />
+          <TextareaField label="Texte d'intro" value={cfg['email.intro_giftcard']} onSave={(v) => save('email.intro_giftcard', v)} rows={3} />
+        </div>
+      </div>)}
+
+      {tab === 'invoice' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Paramètres facture</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <NumField label="Taux de TVA (%)" value={cfg['invoice.tva_rate']} onSave={(v) => save('invoice.tva_rate', v)} />
+          <Field label="Préfixe n° facture" value={cfg['invoice.prefix']} onSave={(v) => save('invoice.prefix', v)} />
+          <NumField label="Prochain n° de facture" value={cfg['invoice.next_number']} onSave={(v) => save('invoice.next_number', v)} />
+          <Field label="URL CGV" value={cfg['invoice.cgv_url']} onSave={(v) => save('invoice.cgv_url', v)} />
+        </div>
+        <div className="mt-3">
+          <TextareaField label="Pied de facture (mention légale)" value={cfg['invoice.footer_legal']} onSave={(v) => save('invoice.footer_legal', v)} rows={2} />
+        </div>
+      </div>)}
+
+      {tab === 'practical' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Infos pratiques par activité</h2>
+        <p className="mb-4 text-xs text-white/50">Affichées dans le mail de confirmation, sous chaque activité réservée.</p>
+        <div className="space-y-3">
+          {activities.filter((a) => a.bookable).map((a) => (
+            <TextareaField
+              key={a.id}
+              label={a.name}
+              value={cfg[`practical.${a.id}`]}
+              onSave={(v) => save(`practical.${a.id}`, v)}
+              rows={2}
+            />
+          ))}
+        </div>
+      </div>)}
+
+      {tab === 'crosssell' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
+        <h2 className="display mb-3 text-xl">Cross-sell &amp; partage</h2>
+        <p className="mb-4 text-xs text-white/50">Blocs affichés dans le mail de confirmation pour générer des ventes additionnelles.</p>
+
+        <div className="mb-4 rounded border border-white/10 bg-white/[0.02] p-4">
+          <label className="mb-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={cfg['crosssell.redplanet_enabled'] === true || cfg['crosssell.redplanet_enabled'] === 'true'} onChange={(e) => save('crosssell.redplanet_enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+            <span className="display">Bloc Red Planet Brasserie</span>
+          </label>
+          <div className="space-y-3">
+            <TextareaField label="Texte d'invitation" value={cfg['crosssell.redplanet_text']} onSave={(v) => save('crosssell.redplanet_text', v)} rows={2} />
+            <Field label="URL de réservation table" value={cfg['crosssell.redplanet_url']} onSave={(v) => save('crosssell.redplanet_url', v)} />
+          </div>
+        </div>
+
+        <div className="mb-4 rounded border border-white/10 bg-white/[0.02] p-4">
+          <label className="mb-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={cfg['crosssell.activities_enabled'] === true || cfg['crosssell.activities_enabled'] === 'true'} onChange={(e) => save('crosssell.activities_enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+            <span className="display">Bloc cross-sell autres activités</span>
+          </label>
+          <TextareaField label="Texte d'invitation" value={cfg['crosssell.activities_text']} onSave={(v) => save('crosssell.activities_text', v)} rows={2} />
+        </div>
+
+        <div className="rounded border border-white/10 bg-white/[0.02] p-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={cfg['crosssell.share_enabled'] === true || cfg['crosssell.share_enabled'] === 'true'} onChange={(e) => save('crosssell.share_enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
+            <span className="display">Bouton "Partager" (WhatsApp / SMS)</span>
+          </label>
         </div>
       </div>)}
 
@@ -499,6 +679,20 @@ function Field({ label, value, onSave }) {
       <div className="flex gap-2">
         <input value={v} onChange={(e) => setV(e.target.value)} className="input flex-1" />
         <button onClick={() => onSave(v)} className="btn-outline !py-2.5 !px-4 text-xs">Sauver</button>
+      </div>
+    </div>
+  );
+}
+
+function TextareaField({ label, value, onSave, rows = 3 }) {
+  const [v, setV] = useState(value || '');
+  useEffect(() => setV(value || ''), [value]);
+  return (
+    <div>
+      <div className="mb-1 text-xs text-white/50">{label}</div>
+      <textarea value={v} onChange={(e) => setV(e.target.value)} rows={rows} className="input resize-none w-full" />
+      <div className="mt-1 flex justify-end">
+        <button onClick={() => onSave(v)} className="btn-outline !py-1.5 !px-3 text-xs">Sauver</button>
       </div>
     </div>
   );
