@@ -30,6 +30,8 @@ export default function OnSiteBookingPage() {
   const [payment, setPayment] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
+  // Add-ons sans créneau (BattleKart + Starcadium) — combinés avec les activités slot
+  const [extras, setExtras] = useState({ battlekart: 0, starcadium: { qty: 0, amount: 10 } });
   const [prefilled, setPrefilled] = useState(false);
   const staff = typeof window !== 'undefined' ? getActiveStaff() : null;
 
@@ -223,9 +225,43 @@ export default function OnSiteBookingPage() {
       .sort((x, y) => x.start.localeCompare(y.start));
   });
 
-  const subtotal = flat.reduce((s, i) => s + i.total, 0);
+  // Extras sans créneau (BattleKart, Starcadium) → ajoutés en items à la résa
+  const battleKart = activities.find((a) => a.id === 'battlekart');
+  const isWedToday = isWednesdayDiscount(date);
+  const battleKartUnit = isWedToday ? (battleKart?.priceWed || 10) : (battleKart?.priceRegular || 19);
+  const extraItems = [];
+  if (extras.battlekart > 0) {
+    extraItems.push({
+      activityId: 'battlekart',
+      activity: battleKart,
+      activityName: 'BattleKart',
+      start: null, end: null,
+      players: extras.battlekart,
+      billedPlayers: extras.battlekart,
+      unit: battleKartUnit,
+      total: battleKartUnit * extras.battlekart,
+      roomId: null,
+    });
+  }
+  if (extras.starcadium.qty > 0) {
+    const stTotal = extras.starcadium.amount * extras.starcadium.qty;
+    extraItems.push({
+      activityId: 'starcadium',
+      activity: activities.find((a) => a.id === 'starcadium'),
+      activityName: `Starcadium — Carte ${extras.starcadium.amount}€`,
+      start: null, end: null,
+      players: extras.starcadium.qty,
+      billedPlayers: extras.starcadium.qty,
+      unit: extras.starcadium.amount,
+      total: stTotal,
+      roomId: null,
+    });
+  }
+  const flatWithExtras = [...flat, ...extraItems];
+  const subtotal = flatWithExtras.reduce((s, i) => s + i.total, 0);
+  const hasExtras = extras.battlekart > 0 || extras.starcadium.qty > 0;
   const allAssigned =
-    Object.keys(items).length > 0 &&
+    (Object.keys(items).length > 0 || hasExtras) &&
     Object.entries(items).every(([id, arr]) => {
       const a = activities.find((x) => x.id === id);
       const needsRoom = a?.rooms && a.rooms.length > 0;
@@ -241,8 +277,8 @@ export default function OnSiteBookingPage() {
     const booking = {
       id: 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase(),
       date,
-      players: Math.max(...flat.map((i) => i.players), 0),
-      items: flat,
+      players: Math.max(...flatWithExtras.map((i) => i.players), 0),
+      items: flatWithExtras,
       subtotal,
       discount: 0,
       total: subtotal,
@@ -580,6 +616,72 @@ export default function OnSiteBookingPage() {
           })}
         </div>
       )}
+
+      {/* Vente directe — BattleKart + Starcadium (sans créneau) */}
+      <div className="mb-4 rounded border border-white/10 bg-mw-surface p-4">
+        <div className="mb-2 display text-sm">3. Vente directe (sans créneau)</div>
+        <p className="mb-3 text-[11px] text-white/50">Optionnel — combiné au panier ci-dessus, un seul paiement.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* BattleKart */}
+          <div className="rounded border border-white/10 bg-white/[0.02] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="display text-sm">🏎 BattleKart</div>
+                <div className="text-[10px] text-white/50">{battleKartUnit}€/joueur {isWedToday && <span className="text-mw-yellow">⚡ Mer -50%</span>}</div>
+              </div>
+              <div className="text-right text-mw-pink display">{(battleKartUnit * extras.battlekart).toFixed(2)}€</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setExtras({ ...extras, battlekart: Math.max(0, extras.battlekart - 1) })} className="flex h-8 w-8 items-center justify-center rounded border border-white/20">−</button>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                value={extras.battlekart}
+                onChange={(e) => setExtras({ ...extras, battlekart: Math.max(0, Math.min(50, Number(e.target.value) || 0)) })}
+                className="input !py-1 w-16 text-center"
+              />
+              <button onClick={() => setExtras({ ...extras, battlekart: Math.min(50, extras.battlekart + 1) })} className="flex h-8 w-8 items-center justify-center rounded border border-white/20">+</button>
+              <span className="text-xs text-white/50">joueur(s)</span>
+            </div>
+          </div>
+
+          {/* Starcadium */}
+          <div className="rounded border border-white/10 bg-white/[0.02] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="display text-sm">🕹 Starcadium</div>
+                <div className="text-[10px] text-white/50">Carte arcade</div>
+              </div>
+              <div className="text-right text-mw-pink display">{(extras.starcadium.amount * extras.starcadium.qty).toFixed(2)}€</div>
+            </div>
+            <div className="mb-2 flex gap-1">
+              {[5, 10, 20, 50].map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, amount: a } })}
+                  className={`flex-1 rounded border py-1 text-xs transition ${extras.starcadium.amount === a ? 'border-mw-pink bg-mw-pink text-white' : 'border-white/15 text-white/70 hover:border-mw-pink'}`}
+                >
+                  {a}€
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.max(0, extras.starcadium.qty - 1) } })} className="flex h-8 w-8 items-center justify-center rounded border border-white/20">−</button>
+              <input
+                type="number"
+                min="0"
+                max="20"
+                value={extras.starcadium.qty}
+                onChange={(e) => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.max(0, Math.min(20, Number(e.target.value) || 0)) } })}
+                className="input !py-1 w-16 text-center"
+              />
+              <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.min(20, extras.starcadium.qty + 1) } })} className="flex h-8 w-8 items-center justify-center rounded border border-white/20">+</button>
+              <span className="text-xs text-white/50">carte(s)</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Payment */}
       {allAssigned && subtotal > 0 && (
