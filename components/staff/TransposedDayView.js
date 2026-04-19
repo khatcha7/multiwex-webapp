@@ -313,6 +313,7 @@ export default function TransposedDayView({
               const slotNotes = notes.filter((n) => {
                 if (n.scope === 'day') return false;
                 if (n.activity_id !== lane.id) return false;
+                if (n.room_id && lane.isRoom && n.room_id !== lane.roomId) return false;
                 if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
                 if (n.scope === 'range') {
                   const ns = toMinutes((n.slot_start || '').slice(0, 5));

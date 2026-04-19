@@ -114,6 +114,8 @@ export default function StaffNotesPage() {
               {filtered.map((n) => {
                 const cat = categories.find((c) => c.id === n.category_id);
                 const act = activities.find((a) => a.id === n.activity_id);
+                const room = act?.rooms?.find((r) => r.id === n.room_id);
+                const actLabel = act ? (room ? `${act.name} · ${room.name}` : act.name) : null;
                 const scopeLabel = n.scope === 'day' ? 'Journée' : n.scope === 'range'
                   ? `${(n.slot_start||'').slice(0,5)}-${(n.slot_end||'').slice(0,5)}`
                   : (n.slot_start || '').slice(0, 5);
@@ -129,7 +131,7 @@ export default function StaffNotesPage() {
                       ) : <span className="text-white/30 text-xs">—</span>}
                     </td>
                     <td className="p-2 text-xs">
-                      {act && <span className="text-white/70">{act.name}</span>}
+                      {actLabel && <span className="text-white/70">{actLabel}</span>}
                       <span className="block text-white/50">{scopeLabel}</span>
                     </td>
                     <td className="p-2">

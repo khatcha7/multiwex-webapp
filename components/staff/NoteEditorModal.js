@@ -9,6 +9,7 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
   const [scope, setScope] = useState(editor.scope || 'slot');
   const [categoryId, setCategoryId] = useState(editor.category_id || editor.categoryId || '');
   const [activityId, setActivityId] = useState(editor.activity_id || editor.activityId || '');
+  const [roomId, setRoomId] = useState(editor.room_id || editor.roomId || '');
   const [slotStart, setSlotStart] = useState(editor.slot_start || editor.slotStart || '');
   const [slotEnd, setSlotEnd] = useState(editor.slot_end || editor.slotEnd || '');
   const [categories, setCategories] = useState([]);
@@ -35,6 +36,7 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
         date: editor.date,
         categoryId: categoryId || null,
         activityId: scope === 'day' ? null : activityId,
+        roomId: scope === 'day' ? null : (roomId || null),
         slotStart: scope === 'day' ? null : slotStart,
         slotEnd: scope === 'range' ? slotEnd : (scope === 'slot' ? slotEnd : null),
         ...(isAdmin && { locked }),
@@ -106,13 +108,26 @@ export default function NoteEditorModal({ editor, activities, onClose, onSaved }
             <>
               <div>
                 <label className="mb-1 block text-xs text-white/60">Activité</label>
-                <select value={activityId} onChange={(e) => setActivityId(e.target.value)} className="input">
+                <select value={activityId} onChange={(e) => { setActivityId(e.target.value); setRoomId(''); }} className="input">
                   <option value="">— Sélectionner —</option>
                   {bookableActivities.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
               </div>
+              {(() => {
+                const selectedAct = bookableActivities.find((a) => a.id === activityId);
+                if (!selectedAct?.rooms?.length) return null;
+                return (
+                  <div>
+                    <label className="mb-1 block text-xs text-white/60">Piste / Salle (optionnel — laisser vide = note globale activité)</label>
+                    <select value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input">
+                      <option value="">— Toutes les pistes —</option>
+                      {selectedAct.rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                );
+              })()}
               <div className={scope === 'range' ? 'grid grid-cols-2 gap-2' : ''}>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">{scope === 'range' ? 'Début' : 'Créneau'}</label>
