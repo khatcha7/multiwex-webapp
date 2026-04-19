@@ -356,9 +356,11 @@ export default function StaffCalendarPage() {
       setSelAnchor({ laneId, slot });
     }
     const items = bookings.flatMap((b) =>
-      (b.items || []).filter((i) => i.activityId === actDef.id && i.start === slot.start).map((i) => ({ ...i, booking: b }))
+      (b.items || [])
+        .filter((i) => i.activityId === actDef.id && i.start === slot.start && (actDef.isRoom ? i.roomId === actDef.roomId : true))
+        .map((i) => ({ ...i, booking: b }))
     );
-    const block = blocks.find((bl) => (bl.activity_id || bl.activityId) === actDef.id && (bl.start_time?.slice(0, 5) || bl.start) === slot.start);
+    const block = blocks.find((bl) => (bl.activity_id || bl.activityId) === actDef.id && (bl.start_time?.slice(0, 5) || bl.start) === slot.start && (actDef.isRoom ? ((bl.roomId || bl.room_id) === actDef.roomId) : !(bl.roomId || bl.room_id)));
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
@@ -375,7 +377,9 @@ export default function StaffCalendarPage() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     hoverTimer.current = setTimeout(() => {
       const items = bookings.flatMap((b) =>
-        (b.items || []).filter((i) => i.activityId === actDef.id && i.start === slot.start).map((i) => ({ ...i, booking: b }))
+        (b.items || [])
+          .filter((i) => i.activityId === actDef.id && i.start === slot.start && (actDef.isRoom ? i.roomId === actDef.roomId : true))
+          .map((i) => ({ ...i, booking: b }))
       );
       setHoverSlot({ laneId, slot, items, actDef });
     }, 800);
