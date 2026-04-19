@@ -691,7 +691,7 @@ export default function StaffCalendarPage() {
           onOpenBlock={setSelected}
           notes={filteredNotes} noteCategories={noteCategories}
           onEditNote={(note) => setNoteEditor({ mode: 'edit', ...note })}
-          onAddNoteToSlot={(actDef, slot) => setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: actDef.id, slotStart: slot.start, slotEnd: slot.end })}
+          onAddNoteToSlot={(actDef, slot) => setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: actDef.id, roomId: actDef.isRoom ? actDef.roomId : null, slotStart: slot.start, slotEnd: slot.end })}
           onOpenNotesList={(slotNotes, actDef, slot, e) => setSlotNotesPopover({ notes: slotNotes, position: { x: e.clientX, y: e.clientY }, context: { actDef, slot } })}
         />
       )}
@@ -798,6 +798,7 @@ export default function StaffCalendarPage() {
                   scope: 'slot',
                   date,
                   activityId: ctxMenu.actDef.id,
+                  roomId: ctxMenu.actDef.isRoom ? ctxMenu.actDef.roomId : null,
                   slotStart: ctxMenu.slot.start,
                   slotEnd: ctxMenu.slot.end,
                 });
@@ -831,7 +832,7 @@ export default function StaffCalendarPage() {
           onAddNew={() => {
             const ctx = slotNotesPopover.context;
             setSlotNotesPopover(null);
-            setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: ctx.actDef.id, slotStart: ctx.slot.start, slotEnd: ctx.slot.end });
+            setNoteEditor({ mode: 'create', scope: 'slot', date, activityId: ctx.actDef.id, roomId: ctx.actDef.isRoom ? ctx.actDef.roomId : null, slotStart: ctx.slot.start, slotEnd: ctx.slot.end });
           }}
         />
       )}
@@ -1006,8 +1007,10 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
 
                   // Notes attachées à ce slot (slot exact, range qui le couvre, ou day)
                   const slotNotes = notes.filter((n) => {
-                    if (n.scope === 'day') return false; // affichées ailleurs (Phase 3)
+                    if (n.scope === 'day') return false;
                     if (n.activity_id !== lane.id) return false;
+                    // Filtre par room : note ciblée sur une room → match seulement cette lane ; note sans room → s'affiche sur toutes les rooms de l'activité
+                    if (n.room_id && lane.isRoom && n.room_id !== lane.roomId) return false;
                     if (n.scope === 'slot') return (n.slot_start || '').slice(0, 5) === slot.start;
                     if (n.scope === 'range') {
                       const ns = toMinutes((n.slot_start || '').slice(0, 5));
