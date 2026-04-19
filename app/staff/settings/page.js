@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup, listNoteCategories, createNoteCategory, updateNoteCategory, deleteNoteCategory, restoreDefaultNoteCategories, ensureDefaultNoteCategories } from '@/lib/data';
+import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, deletePopup, listNoteCategories, createNoteCategory, updateNoteCategory, deleteNoteCategory, restoreDefaultNoteCategories, ensureDefaultNoteCategories, initConfig, migrateLocalStorageToSupabase } from '@/lib/data';
 import { activities } from '@/lib/activities';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 const TABS = [
   { id: 'general', label: 'Général' },
@@ -27,27 +28,33 @@ export default function StaffSettingsPage() {
   const [editingPopup, setEditingPopup] = useState(null);
   const [tab, setTab] = useState('general');
 
-  useEffect(() => {
+  const reloadAll = async () => {
+    await initConfig();
     setCfg(getAllConfig());
-    setPopups(getPopups());
+    const ps = await getPopups();
+    setPopups(ps);
+  };
+
+  useEffect(() => {
+    reloadAll();
   }, []);
 
-  const save = (key, value) => {
-    setConfig(key, value);
+  const save = async (key, value) => {
+    await setConfig(key, value);
     setCfg(getAllConfig());
     logAudit({ action: 'update_config', entityType: 'config', entityId: key, after: { value } });
   };
 
-  const savePopup = (popup) => {
-    const all = upsertPopup(popup);
+  const savePopup = async (popup) => {
+    const all = await upsertPopup(popup);
     setPopups(all);
     setEditingPopup(null);
     logAudit({ action: 'upsert_popup', entityType: 'popup', entityId: popup.id, after: popup });
   };
 
-  const removePopup = (id) => {
+  const removePopup = async (id) => {
     if (!confirm('Supprimer cette pop-up ?')) return;
-    const all = deletePopup(id);
+    const all = await deletePopup(id);
     setPopups(all);
     logAudit({ action: 'delete_popup', entityType: 'popup', entityId: id });
   };
@@ -59,7 +66,7 @@ export default function StaffSettingsPage() {
     savePopup(updated);
   };
 
-  const movePopup = (id, delta) => {
+  const movePopup = async (id, delta) => {
     const sorted = [...popups].sort((a, b) => (a.order || 0) - (b.order || 0));
     const idx = sorted.findIndex((p) => p.id === id);
     if (idx < 0) return;
@@ -67,8 +74,24 @@ export default function StaffSettingsPage() {
     if (newIdx < 0 || newIdx >= sorted.length) return;
     [sorted[idx], sorted[newIdx]] = [sorted[newIdx], sorted[idx]];
     const renumbered = sorted.map((p, i) => ({ ...p, order: i }));
-    savePopups(renumbered);
+    await savePopups(renumbered);
     setPopups(renumbered);
+  };
+
+  const runMigration = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Supabase non configuré. Vérifiez NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+    if (!confirm('Migrer toutes les données localStorage vers Supabase ? À ne faire qu\'une seule fois.')) return;
+    const res = await migrateLocalStorageToSupabase();
+    if (res.ok) {
+      const r = res.report;
+      alert(`Migration OK :\n- ${r.config} clés config\n- ${r.popups} pop-ups\n- ${r.staff} staff\n- ${r.slot_blocks} blocs\n- ${r.notes} notes\n${r.errors.length ? '\\nErreurs :\\n' + r.errors.join('\\n') : ''}`);
+      await reloadAll();
+    } else {
+      alert('Échec : ' + res.reason);
+    }
   };
 
   const addNewPopup = () => {
@@ -107,6 +130,23 @@ export default function StaffSettingsPage() {
           <Field label="Texte Flash Sale (marquee)" value={cfg['site.flash_sale_text']} onSave={(v) => save('site.flash_sale_text', v)} />
           <Field label="Téléphone contact" value={cfg['contact.phone']} onSave={(v) => save('contact.phone', v)} />
           <Field label="Email contact" value={cfg['contact.email']} onSave={(v) => save('contact.email', v)} />
+        </div>
+
+        <div className="mt-6 rounded border border-white/10 bg-white/[0.02] p-4">
+          <h3 className="display mb-2 text-sm">Stockage des données</h3>
+          <div className="mb-3 flex items-center gap-2 text-xs">
+            <span className={`inline-block h-2 w-2 rounded-full ${isSupabaseConfigured ? 'bg-mw-green' : 'bg-mw-red'}`} />
+            <span className="text-white/70">
+              {isSupabaseConfigured
+                ? 'Supabase connecté — les données sont persistées en base.'
+                : 'Supabase NON configuré — fallback localStorage (vos modifications restent sur ce device uniquement).'}
+            </span>
+          </div>
+          {isSupabaseConfigured && (
+            <button onClick={runMigration} className="btn-outline !py-2 !px-4 text-xs">
+              ⇪ Migrer données localStorage → Supabase (one-shot)
+            </button>
+          )}
         </div>
       </div>)}
 
