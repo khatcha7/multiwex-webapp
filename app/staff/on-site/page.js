@@ -290,7 +290,14 @@ export default function OnSiteBookingPage() {
       staffName: staff?.name,
       paymentMethod: method === 'card' ? 'on_site_card' : 'on_site_cash',
     };
-    await createBooking(booking);
+    try {
+      await createBooking(booking);
+    } catch (e) {
+      console.error('[on-site] createBooking failed', e);
+      setPayment(null);
+      alert(`Erreur enregistrement réservation : ${e?.message || e}\n\nVérifiez la migration Supabase 2026-04-19-walkin-items.sql.`);
+      return;
+    }
     await logAudit({
       action: 'create_booking',
       entityType: 'booking',
