@@ -52,10 +52,9 @@ export default function OnSiteBookingPage() {
           const a = activities.find((x) => x.id === s.activityId);
           if (!a) return;
           if (!newItems[s.activityId]) newItems[s.activityId] = [];
-          // Si l'activité a des rooms et qu'on a un roomId → applique min de la room
-          const room = s.roomId ? (a.rooms || []).find((r) => r.id === s.roomId) : null;
+          // Back-end : init à 1 joueur (pas le min activité, le staff peut juste ajouter 1 personne)
           newItems[s.activityId].push({
-            players: room?.minPlayers || a.minPlayers || 1,
+            players: 1,
             roomId: s.roomId || null,
             slot: { start: s.start, end: s.end },
           });
@@ -97,7 +96,7 @@ export default function OnSiteBookingPage() {
     setItems((prev) => {
       const next = { ...prev };
       if (next[id]) delete next[id];
-      else next[id] = [{ players: a.minPlayers || 2, slot: null }];
+      else next[id] = [{ players: 1, slot: null }];
       return next;
     });
   };
@@ -106,7 +105,7 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     setItems((prev) => ({
       ...prev,
-      [id]: [...(prev[id] || []), { players: a.minPlayers || 2, slot: null }],
+      [id]: [...(prev[id] || []), { players: 1, slot: null }],
     }));
   };
 
@@ -125,7 +124,8 @@ export default function OnSiteBookingPage() {
 
   const setSessionPlayers = (id, idx, players) => {
     const a = activities.find((x) => x.id === id);
-    const minP = a.minPlayers || 1;
+    // En back-end (sur place) : pas de min activité, juste 1 (staff peut ajouter 1 personne à un groupe)
+    const minP = 1;
     // maxP = capacité de la room choisie si applicable, sinon max activité
     const cur = items[id]?.[idx];
     const room = (a.rooms || []).find((r) => r.id === cur?.roomId);
@@ -179,11 +179,11 @@ export default function OnSiteBookingPage() {
     const effectiveMax = Math.max(0, baseCap - seatsBlockedTotal);
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
-      const c = arr[idx] || { players: a.minPlayers || 1 };
+      const c = arr[idx] || { players: 1 };
       const maxAllowed = effectiveMax - playersInSlot;
-      // Privatif : on autorise à condition qu'il reste de la place
       if (maxAllowed <= 0) return prev;
-      const newPlayers = Math.max(a.minPlayers || 1, Math.min(c.players, Math.max(a.minPlayers || 1, maxAllowed)));
+      // Min 1 en back-end (on garde le min activité que pour la facturation, pas la sélection)
+      const newPlayers = Math.max(1, Math.min(c.players, Math.max(1, maxAllowed)));
       arr[idx] = { ...c, slot, players: newPlayers };
       return { ...prev, [id]: arr };
     });
@@ -194,18 +194,26 @@ export default function OnSiteBookingPage() {
     const unit = getActivityPrice(a, date);
     return arr
       .filter((s) => s.slot)
-      .map((s) => ({
-        activityId: id,
-        activity: a,
-        activityName: a.name,
-        start: s.slot.start,
-        end: s.slot.end,
-        players: s.players,
-        billedPlayers: Math.max(s.players, a.minPlayers || 1),
-        unit,
-        total: unit * Math.max(s.players, a.minPlayers || 1),
-        roomId: s.roomId || null,
-      }))
+      .map((s) => {
+        // Si le slot a déjà des joueurs (ajout à un groupe existant) → on facture le réel,
+        // sinon (nouveau groupe) → facture au minimum activité.
+        const occMap = (occupancy[id] || {})[s.roomId || '_'] || {};
+        const playersAlready = (occMap[s.slot.start]?.players) || 0;
+        const minBilling = playersAlready > 0 ? 1 : (a.minPlayers || 1);
+        const billed = Math.max(s.players, minBilling);
+        return {
+          activityId: id,
+          activity: a,
+          activityName: a.name,
+          start: s.slot.start,
+          end: s.slot.end,
+          players: s.players,
+          billedPlayers: billed,
+          unit,
+          total: unit * billed,
+          roomId: s.roomId || null,
+        };
+      })
       .sort((x, y) => x.start.localeCompare(y.start));
   });
 
@@ -438,7 +446,7 @@ export default function OnSiteBookingPage() {
                     sessEffectiveMax = Math.max(0, sessBaseCap - sessSeatsBlocked - playersInSlot);
                   }
                   const atMax = sess.players >= sessEffectiveMax;
-                  const atMin = sess.players <= (sessRoom?.minPlayers || a.minPlayers || 1);
+                  const atMin = sess.players <= 1;
                   return (
                   <div key={idx} className="mb-2 rounded border border-white/10 p-2">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -507,7 +515,8 @@ export default function OnSiteBookingPage() {
                         // En back-end : staff peut joindre un groupe privatif tant qu'il y a de la place
                         const full = effectiveMax === 0 || playersInSlot >= effectiveMax;
                         const partialBlock = !hasFullBlock && seatsBlockedTotal > 0;
-                        const shared = !privative && (playersInSlot > 0 || partialBlock) && !full;
+                        // Jaune dès qu'il y a 1 joueur OU bloc partiel — y compris privatif (back-end)
+                        const shared = (playersInSlot > 0 || partialBlock) && !full;
                         let cls = 'border-white/15 text-white/70 hover:border-white/40';
                         if (chosen) cls = 'border-mw-pink bg-mw-pink text-white';
                         else if (full) cls = 'cursor-not-allowed border-mw-red/30 bg-mw-red/10 text-white/30 line-through';
