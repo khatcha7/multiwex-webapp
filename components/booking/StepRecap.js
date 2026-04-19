@@ -40,6 +40,7 @@ export default function StepRecap({ onConfirm }) {
         activity: a,
         sessionIndex: idx,
         slot,
+        roomId: sess.roomId || null,
         players: sess.players,
         billedPlayers,
         unit,
@@ -114,6 +115,7 @@ export default function StepRecap({ onConfirm }) {
       items: items.map((i) => ({
         activityId: i.activity.id,
         activityName: i.activity.name,
+        roomId: i.roomId || null,
         start: i.slot.start,
         end: i.slot.end,
         players: i.players,
