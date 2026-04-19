@@ -154,13 +154,18 @@ export default function OnSiteBookingPage() {
     const a = activities.find((x) => x.id === id);
     setItems((prev) => {
       const arr = (prev[id] || []).slice();
-      const cur = arr[idx] || { players: a.minPlayers || 1 };
+      const cur = arr[idx] || { players: 1 };
       let players = cur.players;
       if (a.rooms) {
         const room = a.rooms.find((r) => r.id === roomId);
-        if (room) players = Math.min(Math.max(room.minPlayers || 1, players), room.maxPlayers);
+        if (room) players = Math.min(Math.max(1, players), room.maxPlayers);
       }
-      arr[idx] = { ...cur, roomId, players };
+      // Si le changement de room crée un conflit avec une autre session sur le même slot+room → reset le slot
+      let newSlot = cur.slot;
+      if (newSlot && arr.some((other, oIdx) => oIdx !== idx && other.slot?.start === newSlot.start && (other.roomId || null) === roomId)) {
+        newSlot = null;
+      }
+      arr[idx] = { ...cur, roomId, players, slot: newSlot };
       return { ...prev, [id]: arr };
     });
   };
