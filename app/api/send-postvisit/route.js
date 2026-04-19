@@ -28,10 +28,12 @@ export async function GET(req) {
     return NextResponse.json({ ok: true, skipped: 'disabled' });
   }
 
+  // Override date via query (utile pour tests manuels) : ?date=YYYY-MM-DD
+  const url = new URL(req.url);
+  const dateOverride = url.searchParams.get('date');
   const delayHours = Number(config['email.postvisit_delay_hours']) || 24;
-  // Date cible = aujourd'hui - delayHours
   const target = new Date(Date.now() - delayHours * 3600 * 1000);
-  const targetDate = target.toISOString().slice(0, 10);
+  const targetDate = dateOverride || target.toISOString().slice(0, 10);
 
   const { data: bookings } = await supabase
     .from('bookings')
