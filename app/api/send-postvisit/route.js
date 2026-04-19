@@ -24,7 +24,9 @@ export async function GET(req) {
   const config = {};
   (cfg || []).forEach((row) => { config[row.key] = row.value; });
 
-  if (!config['email.postvisit_enabled']) {
+  // Default true si pas explicitement set à false dans la config
+  const enabled = config['email.postvisit_enabled'] !== false && config['email.postvisit_enabled'] !== 'false';
+  if (!enabled) {
     return NextResponse.json({ ok: true, skipped: 'disabled' });
   }
 
