@@ -109,7 +109,7 @@ export default function StepRecap({ onConfirm }) {
 
   const confirmBooking = async (method) => {
     const booking = {
-      id: 'MW-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+      id: 'MW-' + crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase(),
       date: cart.date,
       players: maxPlayers,
       items: items.map((i) => ({

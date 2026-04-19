@@ -15,13 +15,43 @@ async function loadConfig(supabase) {
 
 export async function POST(req) {
   try {
-    const giftcard = await req.json();
+    const body = await req.json();
+    const code = (body.code || '').trim().toUpperCase();
+    if (!code) return NextResponse.json({ ok: false, error: 'Missing code' }, { status: 400 });
+
     const apiKey = process.env.RESEND_API_KEY;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
+
+    // Lookup serveur — on n'utilise JAMAIS le payload pour les valeurs sensibles
+    // (montant, paid, code). Seul le code identifiant est accepté du client.
+    const { data: dbCard, error: lookupErr } = await supabase
+      .from('giftcards')
+      .select('*')
+      .eq('code', code)
+      .maybeSingle();
+    if (lookupErr || !dbCard) {
+      return NextResponse.json({ ok: false, error: 'Giftcard not found' }, { status: 404 });
+    }
+    if (!dbCard.paid) {
+      return NextResponse.json({ ok: false, error: 'Giftcard not paid yet' }, { status: 400 });
+    }
+    const giftcard = {
+      code: dbCard.code,
+      amount: parseFloat(dbCard.amount),
+      balance: parseFloat(dbCard.balance),
+      fromName: dbCard.from_name,
+      toName: dbCard.to_name,
+      toEmail: dbCard.to_email,
+      message: dbCard.message,
+    };
+    if (!giftcard.toEmail) {
+      return NextResponse.json({ ok: false, error: 'No recipient email on giftcard' }, { status: 400 });
+    }
+
     const config = await loadConfig(supabase);
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || req.headers.get('origin') || `https://${req.headers.get('host')}`;
 

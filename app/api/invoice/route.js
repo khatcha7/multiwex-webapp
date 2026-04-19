@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateInvoicePDF } from '@/lib/pdf/generateInvoice';
 import { getActivity } from '@/lib/activities';
+import { verifyRef } from '@/lib/signedToken';
 
 export const runtime = 'nodejs';
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const ref = searchParams.get('ref');
+  const token = searchParams.get('token');
   if (!ref) return NextResponse.json({ error: 'Missing ref' }, { status: 400 });
+  if (!verifyRef(ref, token)) return NextResponse.json({ error: 'Invalid or missing token' }, { status: 401 });
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,

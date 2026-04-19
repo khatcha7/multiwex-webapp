@@ -8,9 +8,12 @@ export const runtime = 'nodejs';
 // Cron Vercel : appelé chaque jour. Trouve les bookings dont la date == today - delay_hours
 // et envoie un mail post-visite. Tag les bookings traités via post_visit_sent_at.
 export async function GET(req) {
-  // Auth basique : vérifier le secret cron Vercel
+  // Auth obligatoire : CRON_SECRET requis (sinon endpoint exposé publiquement = spam)
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Server misconfigured: CRON_SECRET missing' }, { status: 500 });
+  }
   const auth = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
