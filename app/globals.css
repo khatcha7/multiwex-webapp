@@ -158,6 +158,17 @@ body {
   opacity: 0.5;
 }
 
+.cal-slot-privative-partial {
+  background: #ff8c00;
+  border-color: #000;
+  color: #000;
+}
+.cal-slot-privative-partial .cal-time,
+.cal-slot-privative-partial .cal-players {
+  color: #000;
+  font-size: 12px;
+}
+
 .cal-slot-partial-blocked {
   border-color: #CC003C !important;
   border-width: 2px !important;

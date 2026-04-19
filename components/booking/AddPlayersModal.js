@@ -32,11 +32,13 @@ export default function AddPlayersModal({ booking, onClose, onUpdated }) {
         const item = booking.items[i];
         const act = getActivity(item.activityId);
         if (!act) continue;
-        const occ = await getSlotOccupancy(item.activityId, booking.date);
+        const room = item.roomId && Array.isArray(act.rooms) ? act.rooms.find((r) => r.id === item.roomId) : null;
+        const cap = room ? room.maxPlayers : act.maxPlayers;
+        const occ = await getSlotOccupancy(item.activityId, booking.date, item.roomId || undefined);
         const slotOcc = occ[item.start] || { players: 0 };
-        const remainingCapacity = Math.max(0, act.maxPlayers - slotOcc.players);
+        const remainingCapacity = Math.max(0, cap - slotOcc.players);
         res[i] = {
-          activityName: act.name,
+          activityName: room ? `${act.name} · ${room.name}` : act.name,
           logo: act.logo,
           start: item.start,
           current: item.players || 0,

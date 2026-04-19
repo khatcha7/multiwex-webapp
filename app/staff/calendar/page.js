@@ -334,15 +334,33 @@ export default function StaffCalendarPage() {
   const handleRightClick = useCallback((e, laneId, actDef, slot) => {
     e.preventDefault();
     e.stopPropagation();
-    // If nothing is selected, select this one first
-    if (multiSel.length === 0) {
+    // Sélection comme un clic gauche, en respectant Shift / Ctrl/Cmd
+    if (e.shiftKey && selAnchor && selAnchor.laneId === laneId) {
+      const all = generateSlotsForActivity(actDef, date, { fullDay: true });
+      const i1 = all.findIndex((s) => s.start === selAnchor.slot.start);
+      const i2 = all.findIndex((s) => s.start === slot.start);
+      if (i1 >= 0 && i2 >= 0) {
+        const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1];
+        setMultiSel(all.slice(lo, hi + 1).map((s) => ({ laneId, actDef, slot: s })));
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      setMultiSel((prev) => {
+        const key = `${laneId}-${slot.start}`;
+        const has = prev.find((s) => `${s.laneId}-${s.slot.start}` === key);
+        if (has) return prev.filter((s) => `${s.laneId}-${s.slot.start}` !== key);
+        return [...prev, { laneId, actDef, slot }];
+      });
+      setSelAnchor({ laneId, slot });
+    } else if (multiSel.length === 0 || !multiSel.some((s) => s.laneId === laneId && s.slot.start === slot.start)) {
       setMultiSel([{ laneId, actDef, slot }]);
       setSelAnchor({ laneId, slot });
     }
     const items = bookings.flatMap((b) =>
-      (b.items || []).filter((i) => i.activityId === actDef.id && i.start === slot.start).map((i) => ({ ...i, booking: b }))
+      (b.items || [])
+        .filter((i) => i.activityId === actDef.id && i.start === slot.start && (actDef.isRoom ? i.roomId === actDef.roomId : true))
+        .map((i) => ({ ...i, booking: b }))
     );
-    const block = blocks.find((bl) => (bl.activity_id || bl.activityId) === actDef.id && (bl.start_time?.slice(0, 5) || bl.start) === slot.start);
+    const block = blocks.find((bl) => (bl.activity_id || bl.activityId) === actDef.id && (bl.start_time?.slice(0, 5) || bl.start) === slot.start && (actDef.isRoom ? ((bl.roomId || bl.room_id) === actDef.roomId) : !(bl.roomId || bl.room_id)));
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
@@ -352,14 +370,16 @@ export default function StaffCalendarPage() {
       items,
       block,
     });
-  }, [multiSel, bookings, blocks]);
+  }, [multiSel, bookings, blocks, date, selAnchor]);
 
   // Hover tooltip
   const onSlotEnter = (laneId, actDef, slot) => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
     hoverTimer.current = setTimeout(() => {
       const items = bookings.flatMap((b) =>
-        (b.items || []).filter((i) => i.activityId === actDef.id && i.start === slot.start).map((i) => ({ ...i, booking: b }))
+        (b.items || [])
+          .filter((i) => i.activityId === actDef.id && i.start === slot.start && (actDef.isRoom ? i.roomId === actDef.roomId : true))
+          .map((i) => ({ ...i, booking: b }))
       );
       setHoverSlot({ laneId, slot, items, actDef });
     }, 800);
@@ -881,6 +901,21 @@ export default function StaffCalendarPage() {
 }
 
 function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours, multiSel, highlightIds, onClick, onRightClick, onHoverEnter, onHoverLeave, onBlockHour, k7Open, onToggleK7, slashOpen, onToggleSlash, onOpenBlock, notes = [], noteCategories = [], onEditNote, onAddNoteToSlot, onOpenNotesList }) {
+  // Now-line (Bruxelles) — refresh chaque minute
+  const [nowMinutes, setNowMinutes] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const fmt = new Intl.DateTimeFormat('fr-BE', { timeZone: 'Europe/Brussels', hour: '2-digit', minute: '2-digit', hour12: false });
+      const parts = fmt.formatToParts(new Date());
+      const h = parseInt(parts.find((p) => p.type === 'hour').value, 10);
+      const m = parseInt(parts.find((p) => p.type === 'minute').value, 10);
+      setNowMinutes(h * 60 + m);
+    };
+    update();
+    const id = setInterval(update, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const isShowingToday = toDateStr(new Date()) === date;
   // Full 24h display
   const hourCount = 24;
   const openM = hours ? toMinutes(hours.open) : -1;
@@ -926,7 +961,13 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
         </div>
       </div>
 
-    <div ref={gridScrollRef} className="overflow-x-auto rounded-b border border-white/10 bg-mw-bg">
+    <div ref={gridScrollRef} className="relative overflow-x-auto rounded-b border border-white/10 bg-mw-bg">
+      {isShowingToday && (
+        <div
+          className="pointer-events-none absolute left-0 right-0 z-20 h-0.5 bg-mw-green shadow-[0_0_6px_rgba(0,255,102,0.7)]"
+          style={{ top: `${(nowMinutes / 60) * pxH}px` }}
+        />
+      )}
       <div className="flex min-w-full">
         {/* Time column */}
         <div className="sticky left-0 z-10 w-14 shrink-0 border-r border-white/10 bg-mw-bg">
@@ -991,13 +1032,16 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                   const isSel = multiSel.some((s) => s.laneId === lane.laneId && s.slot.start === slot.start);
                   const isHighlight = slotItems.some((it) => highlightIds.has(it.booking?.id || it.booking?.reference));
                   const effectiveMax = Math.max(0, lane.maxPlayers - seatsBlockedSum);
-                  const full = effectiveMax === 0 || (lane.privative ? players > 0 : players >= effectiveMax);
+                  // Back-end calendar : privatif → vraiment "complet" seulement si capacité atteinte (différent du client online)
+                  const full = effectiveMax === 0 || players >= effectiveMax;
                   const partial = players > 0 && !full;
+                  const privativePartial = lane.privative && partial;
                   const partialBlock = !isFullBlock && seatsBlockedSum > 0;
 
                   let cls = 'cal-slot-free';
                   if (isFullBlock) cls = 'cal-slot-blocked';
                   else if (full) cls = 'cal-slot-full';
+                  else if (privativePartial) cls = 'cal-slot-privative-partial';
                   else if (partial || partialBlock) cls = 'cal-slot-partial';
                   if (partialBlock) cls += ' cal-slot-partial-blocked';
                   if (isSel) cls += ' cal-slot-selected';
@@ -1074,7 +1118,7 @@ function DayViewV2({ date, lanes, bookings, blocks, pxH, pxActivity = 160, hours
                               >
                                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
                                 {height >= 40 && (
-                                  <span className="truncate text-white/80">{plain}</span>
+                                  <span className="prose-tiptap min-w-0 flex-1 truncate text-white/80" dangerouslySetInnerHTML={{ __html: n.content }} />
                                 )}
                               </div>
                             );
