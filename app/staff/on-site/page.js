@@ -617,43 +617,47 @@ export default function OnSiteBookingPage() {
         </div>
       )}
 
-      {/* Vente directe — BattleKart + Starcadium (sans créneau) */}
-      <div className="mb-4 rounded border border-mw-yellow/40 bg-mw-surface px-3 py-2">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="display text-xs text-mw-yellow">⚡ Vente directe (sans créneau)</div>
+      {/* Vente directe — BattleKart + Starcadium */}
+      <div className="mb-4 rounded border border-mw-yellow/40 bg-mw-surface p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+          <div className="display text-xs text-mw-yellow">⚡ Vente directe</div>
           <div className="text-[10px] text-white/40">Combiné au panier — un seul paiement</div>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {/* BattleKart */}
-          <div className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5">
-            <div className="min-w-0 flex-1">
-              <div className="display text-xs">🏎 BattleKart</div>
-              <div className="text-[9px] text-white/50">{battleKartUnit}€/j {isWedToday && <span className="text-mw-yellow">⚡-50%</span>}</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5">
+            <div className="display min-w-0 shrink-0 text-xs">🏎 BattleKart</div>
+            <div className="text-[9px] text-white/50">{battleKartUnit}€/j {isWedToday && <span className="text-mw-yellow">⚡-50%</span>}</div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button onClick={() => setExtras({ ...extras, battlekart: Math.max(0, extras.battlekart - 1) })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">−</button>
+              <span className="display w-5 text-center text-mw-pink">{extras.battlekart}</span>
+              <button onClick={() => setExtras({ ...extras, battlekart: Math.min(50, extras.battlekart + 1) })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">+</button>
+              <span className="text-[10px] text-white/50">j.</span>
+              <div className="display w-14 text-right text-xs text-mw-pink">{(battleKartUnit * extras.battlekart).toFixed(2)}€</div>
             </div>
-            <button onClick={() => setExtras({ ...extras, battlekart: Math.max(0, extras.battlekart - 1) })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">−</button>
-            <span className="display w-5 text-center text-mw-pink">{extras.battlekart}</span>
-            <button onClick={() => setExtras({ ...extras, battlekart: Math.min(50, extras.battlekart + 1) })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">+</button>
-            <span className="text-[10px] text-white/50">joueurs</span>
-            <div className="display ml-1 w-14 text-right text-xs text-mw-pink">{(battleKartUnit * extras.battlekart).toFixed(2)}€</div>
           </div>
 
           {/* Starcadium */}
-          <div className="flex items-center gap-1.5 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5">
             <div className="display shrink-0 text-xs">🕹</div>
-            {[5, 10, 20, 50].map((a) => (
-              <button
-                key={a}
-                onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, amount: a } })}
-                className={`rounded border px-1.5 py-0.5 text-[10px] transition ${extras.starcadium.amount === a ? 'border-mw-pink bg-mw-pink text-white' : 'border-white/15 text-white/70 hover:border-mw-pink'}`}
-              >
-                {a}€
-              </button>
-            ))}
-            <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.max(0, extras.starcadium.qty - 1) } })} className="ml-1 flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">−</button>
-            <span className="display w-5 text-center text-mw-pink">{extras.starcadium.qty}</span>
-            <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.min(20, extras.starcadium.qty + 1) } })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">+</button>
-            <span className="text-[10px] text-white/50">cartes</span>
-            <div className="display ml-auto w-14 text-right text-xs text-mw-pink">{(extras.starcadium.amount * extras.starcadium.qty).toFixed(2)}€</div>
+            <div className="flex shrink-0 gap-1">
+              {[5, 10, 20, 50].map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, amount: a } })}
+                  className={`flex h-6 items-center justify-center rounded border px-2 text-[10px] transition ${extras.starcadium.amount === a ? 'border-mw-pink bg-mw-pink text-white' : 'border-white/15 text-white/70 hover:border-mw-pink'}`}
+                >
+                  {a}€
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.max(0, extras.starcadium.qty - 1) } })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">−</button>
+              <span className="display w-5 text-center text-mw-pink">{extras.starcadium.qty}</span>
+              <button onClick={() => setExtras({ ...extras, starcadium: { ...extras.starcadium, qty: Math.min(20, extras.starcadium.qty + 1) } })} className="flex h-6 w-6 items-center justify-center rounded border border-white/20 text-xs">+</button>
+              <span className="text-[10px] text-white/50">c.</span>
+              <div className="display w-14 text-right text-xs text-mw-pink">{(extras.starcadium.amount * extras.starcadium.qty).toFixed(2)}€</div>
+            </div>
           </div>
         </div>
       </div>
