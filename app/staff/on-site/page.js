@@ -52,8 +52,11 @@ export default function OnSiteBookingPage() {
           const a = activities.find((x) => x.id === s.activityId);
           if (!a) return;
           if (!newItems[s.activityId]) newItems[s.activityId] = [];
+          // Si l'activité a des rooms et qu'on a un roomId → applique min de la room
+          const room = s.roomId ? (a.rooms || []).find((r) => r.id === s.roomId) : null;
           newItems[s.activityId].push({
-            players: a.minPlayers || 1,
+            players: room?.minPlayers || a.minPlayers || 1,
+            roomId: s.roomId || null,
             slot: { start: s.start, end: s.end },
           });
         });

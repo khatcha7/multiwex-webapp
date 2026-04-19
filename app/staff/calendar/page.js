@@ -765,8 +765,8 @@ export default function StaffCalendarPage() {
               onClick={() => {
                 // Pré-remplir avec les créneaux sélectionnés (multiSel ou créneau unique)
                 const slotsToBook = multiSel.length > 0
-                  ? multiSel.map((s) => ({ activityId: s.actDef.id, start: s.slot.start, end: s.slot.end }))
-                  : [{ activityId: ctxMenu.actDef.id, start: ctxMenu.slot.start, end: ctxMenu.slot.end }];
+                  ? multiSel.map((s) => ({ activityId: s.actDef.id, roomId: s.actDef.isRoom ? s.actDef.roomId : null, start: s.slot.start, end: s.slot.end }))
+                  : [{ activityId: ctxMenu.actDef.id, roomId: ctxMenu.actDef.isRoom ? ctxMenu.actDef.roomId : null, start: ctxMenu.slot.start, end: ctxMenu.slot.end }];
                 sessionStorage.setItem('mw_onsite_prefill', JSON.stringify({ date, slots: slotsToBook }));
                 setCtxMenu(null);
                 window.location.href = '/staff/on-site';
