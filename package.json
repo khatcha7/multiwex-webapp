@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.103.0",
     "@tiptap/extension-color": "^3.22.4",
     "@tiptap/extension-text-style": "^3.22.4",
@@ -17,7 +18,8 @@
     "@tiptap/starter-kit": "^3.22.4",
     "next": "^16.2.3",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "resend": "^6.12.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
