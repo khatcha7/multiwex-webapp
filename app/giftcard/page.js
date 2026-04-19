@@ -38,6 +38,12 @@ export default function GiftCardPage() {
         message,
         paid: final === 0,
       });
+      // Envoie le mail giftcard avec voucher PDF
+      fetch('/api/send-giftcard', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...created, fromName: from, toName: to, toEmail: email, message, amount: value }),
+      }).catch((e) => console.warn('send-giftcard failed', e));
       setDone({ ...created, email, from, to });
     } catch (e) {
       alert('Erreur création carte cadeau : ' + e.message);
