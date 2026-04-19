@@ -260,6 +260,14 @@ export default function OnSiteBookingPage() {
       notes: `Réservation sur place par ${staff?.name || 'staff'}`,
       after: { total: booking.total, method: booking.paymentMethod },
     });
+    // Envoie le mail de confirmation au client (si email présent)
+    if (booking.customer?.email) {
+      fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(booking),
+      }).catch((e) => console.warn('send-confirmation on-site failed', e));
+    }
     setConfirmed(booking);
   };
 

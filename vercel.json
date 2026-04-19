@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/send-postvisit",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}
