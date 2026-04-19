@@ -4,14 +4,21 @@ import { getAllConfig, setConfig, logAudit, getPopups, savePopups, upsertPopup, 
 import { activities } from '@/lib/activities';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
+// Tabs principaux. Si `children` présent → sous-onglets affichés en 2e ligne.
 const TABS = [
   { id: 'general', label: 'Général' },
   { id: 'company', label: 'Entreprise' },
-  { id: 'email', label: 'Email' },
-  { id: 'templates', label: 'Templates email' },
+  {
+    id: 'mail',
+    label: '✉ Mail',
+    children: [
+      { id: 'email', label: 'Configuration' },
+      { id: 'templates', label: 'Templates' },
+      { id: 'practical', label: 'Infos pratiques' },
+      { id: 'crosssell', label: 'Cross-sell' },
+    ],
+  },
   { id: 'invoice', label: 'Facture' },
-  { id: 'practical', label: 'Infos pratiques' },
-  { id: 'crosssell', label: 'Cross-sell' },
   { id: 'rules', label: 'Règles métier' },
   { id: 'display', label: 'Affichage' },
   { id: 'activities', label: 'Activités' },
@@ -21,6 +28,12 @@ const TABS = [
   { id: 'pricing', label: 'Tarifs' },
   { id: 'notes', label: 'Notes' },
 ];
+
+// Map sous-tab → parent (pour highlight du parent quand un sous-tab est actif)
+const PARENT_OF = {};
+TABS.forEach((t) => {
+  if (t.children) t.children.forEach((c) => { PARENT_OF[c.id] = t.id; });
+});
 
 export default function StaffSettingsPage() {
   const [cfg, setCfg] = useState({});
@@ -115,13 +128,35 @@ export default function StaffSettingsPage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <h1 className="section-title mb-4">Réglages</h1>
 
-      <div className="mb-6 flex flex-wrap gap-1 rounded border border-white/15 bg-white/5 p-1">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`display rounded px-3 py-1.5 text-xs transition ${tab === t.id ? 'bg-mw-pink text-white' : 'text-white/60 hover:text-white'}`}>
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-2 flex flex-wrap gap-1 rounded border border-white/15 bg-white/5 p-1">
+        {TABS.map((t) => {
+          const isActive = tab === t.id || PARENT_OF[tab] === t.id;
+          const onClick = () => {
+            // Si parent avec children → ouvre le 1er sous-tab
+            if (t.children && t.children.length > 0) setTab(t.children[0].id);
+            else setTab(t.id);
+          };
+          return (
+            <button key={t.id} onClick={onClick} className={`display rounded px-3 py-1.5 text-xs transition ${isActive ? 'bg-mw-pink text-white' : 'text-white/60 hover:text-white'}`}>
+              {t.label}
+            </button>
+          );
+        })}
       </div>
+      {/* Sous-onglets affichés si tab actif a un parent */}
+      {PARENT_OF[tab] && (() => {
+        const parent = TABS.find((t) => t.id === PARENT_OF[tab]);
+        return (
+          <div className="mb-6 ml-4 flex flex-wrap gap-1 rounded border border-mw-pink/30 bg-mw-pink/5 p-1">
+            {parent.children.map((c) => (
+              <button key={c.id} onClick={() => setTab(c.id)} className={`display rounded px-3 py-1.5 text-[11px] transition ${tab === c.id ? 'bg-mw-pink text-white' : 'text-white/60 hover:text-white'}`}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+      {!PARENT_OF[tab] && <div className="mb-6" />}
 
       {tab === 'general' && (<div className="mb-6 rounded border border-white/10 bg-mw-surface p-5">
         <h2 className="display mb-3 text-xl">Contenu éditable</h2>
