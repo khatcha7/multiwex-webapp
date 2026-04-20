@@ -39,6 +39,10 @@ export default function ChatWidget() {
   // Bulle déplaçable (mobile + desktop) + masquage temporaire
   const [bubblePos, setBubblePos] = useState(null); // { x, y } en pixels OU null = position par défaut
   const [hidden, setHidden] = useState(false);
+
+  // Mode résa IA — séparé du FAQ classique pour ne rien casser
+  const [bookingMode, setBookingMode] = useState(false);
+  const [bookingHistory, setBookingHistory] = useState([]); // historique format Claude tool-use
   const dragRef = useRef({ startX: 0, startY: 0, origX: 0, origY: 0, dragging: false });
   const justDragged = useRef(false);
 
@@ -147,28 +151,54 @@ export default function ChatWidget() {
     setMessages((prev) => [...prev, { role: 'user', content: msg }]);
 
     try {
-      const r = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: msg, sessionId, conversationId }),
-      });
-      const j = await r.json();
-      if (j.ok) {
-        setMessages((prev) => [...prev, {
-          role: 'bot',
-          content: j.answer,
-          source: j.source,
-          suggestions: j.suggestions || [],
-        }]);
-        if (j.conversationId && !conversationId) setConversationId(j.conversationId);
-        if (j.contactEmail) setContactEmail(j.contactEmail);
+      if (bookingMode) {
+        // Mode résa IA : appelle l'agent Claude tool-use
+        const r = await fetch('/api/chat/booking', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ message: msg, history: bookingHistory }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          setMessages((prev) => [...prev, { role: 'bot', content: j.assistantMessage, source: 'booking-agent' }]);
+          setBookingHistory(j.history || []);
+        } else {
+          setMessages((prev) => [...prev, { role: 'bot', content: j.error || 'Erreur IA réservation.', source: 'error' }]);
+        }
       } else {
-        setMessages((prev) => [...prev, { role: 'bot', content: j.error || 'Erreur. Réessaie plus tard.', source: 'error' }]);
+        // Mode FAQ classique
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ message: msg, sessionId, conversationId }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          setMessages((prev) => [...prev, {
+            role: 'bot',
+            content: j.answer,
+            source: j.source,
+            suggestions: j.suggestions || [],
+          }]);
+          if (j.conversationId && !conversationId) setConversationId(j.conversationId);
+          if (j.contactEmail) setContactEmail(j.contactEmail);
+        } else {
+          setMessages((prev) => [...prev, { role: 'bot', content: j.error || 'Erreur. Réessaie plus tard.', source: 'error' }]);
+        }
       }
     } catch (e) {
       setMessages((prev) => [...prev, { role: 'bot', content: 'Erreur réseau. Vérifie ta connexion.', source: 'error' }]);
     }
     setSending(false);
+  };
+
+  const toggleBookingMode = () => {
+    const newMode = !bookingMode;
+    setBookingMode(newMode);
+    // Reset historique conversation pour démarrer propre
+    setMessages([]);
+    setBookingHistory([]);
+    setShowEmailForm(false);
   };
 
   const sendContactMail = async () => {
@@ -253,30 +283,74 @@ export default function ChatWidget() {
           className="fixed z-50 flex h-[min(640px,85vh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-white/15 bg-mw-surface shadow-2xl"
           style={{ ...panelStyle, boxShadow: `0 20px 60px -10px ${bubbleColor}55` }}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3" style={{ background: `linear-gradient(90deg, ${bubbleColor} 0%, #7b00e0 100%)` }}>
-            <div>
-              <div className="display text-sm uppercase tracking-wider text-white">{botName}</div>
-              <div className="text-[10px] text-white/80">Assistant Multiwex · 24/7</div>
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3" style={{ background: bookingMode ? 'linear-gradient(90deg, #00d9ff 0%, #0066cc 100%)' : `linear-gradient(90deg, ${bubbleColor} 0%, #7b00e0 100%)` }}>
+            <div className="min-w-0 flex-1">
+              <div className="display text-sm uppercase tracking-wider text-white">
+                {bookingMode ? '✨ Réserve avec Ellie' : botName}
+              </div>
+              <div className="text-[10px] text-white/80">
+                {bookingMode ? 'Mode réservation IA · dispo en direct' : 'Assistant Multiwex · 24/7'}
+              </div>
             </div>
+            <button
+              onClick={toggleBookingMode}
+              className="mr-2 rounded border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase text-white transition hover:bg-white/20"
+              title={bookingMode ? 'Revenir au mode questions' : 'Passer en mode réservation IA'}
+            >
+              {bookingMode ? '← FAQ' : '🎟 Réserver'}
+            </button>
             <button onClick={() => setOpen(false)} aria-label="Fermer" className="text-xl text-white/80 hover:text-white">✕</button>
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 text-sm">
             {messages.length === 0 && !showEmailForm && (
               <>
-                <div className="mb-3 rounded bg-white/5 p-3 text-white/80">{welcomeMsg}</div>
-                <div className="space-y-2">
-                  <div className="text-[10px] uppercase tracking-wider text-white/50">Questions fréquentes</div>
-                  {starterSuggestions.map((s) => (
+                {bookingMode ? (
+                  <>
+                    <div className="mb-3 rounded border border-mw-cyan/40 bg-mw-cyan/10 p-3 text-white/90">
+                      ✨ Salut ! Je suis Ellie, je peux te réserver directement tes activités. Dis-moi ce qui t'intéresse — date, nombre de personnes, et on s'en charge ensemble.
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-[10px] uppercase tracking-wider text-white/50">Exemples</div>
+                      {[
+                        'Karting samedi soir pour 6 personnes',
+                        'Anniversaire fils 8 ans, 10 enfants le 3 mai',
+                        'EVG 12 personnes dans 2 semaines',
+                        'Quelles activités vous avez ?',
+                      ].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => sendMessage(s)}
+                          className="block w-full rounded border border-mw-cyan/30 bg-mw-cyan/5 px-3 py-2 text-left text-xs text-white/90 transition hover:border-mw-cyan hover:bg-mw-cyan/10"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-3 rounded bg-white/5 p-3 text-white/80">{welcomeMsg}</div>
+                    <div className="space-y-2">
+                      <div className="text-[10px] uppercase tracking-wider text-white/50">Questions fréquentes</div>
+                      {starterSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => sendMessage(s)}
+                          className="block w-full rounded border border-mw-pink/30 bg-mw-pink/5 px-3 py-2 text-left text-xs text-white/90 transition hover:border-mw-pink hover:bg-mw-pink/10"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                     <button
-                      key={s}
-                      onClick={() => sendMessage(s)}
-                      className="block w-full rounded border border-mw-pink/30 bg-mw-pink/5 px-3 py-2 text-left text-xs text-white/90 transition hover:border-mw-pink hover:bg-mw-pink/10"
+                      onClick={toggleBookingMode}
+                      className="mt-3 block w-full rounded border border-mw-cyan/40 bg-mw-cyan/10 px-3 py-2 text-center text-xs font-bold text-mw-cyan transition hover:bg-mw-cyan/20"
                     >
-                      {s}
+                      ✨ Ou réserve direct avec Ellie IA →
                     </button>
-                  ))}
-                </div>
+                  </>
+                )}
               </>
             )}
 
