@@ -45,8 +45,27 @@ export default function ChatWidget() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('mw_chat_bubble_pos');
-      if (saved) setBubblePos(JSON.parse(saved));
+      if (saved) {
+        const p = JSON.parse(saved);
+        // Clamp dans le viewport actuel — sinon position desktop hérite sur mobile et bulle off-screen
+        const W = window.innerWidth, H = window.innerHeight;
+        if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+          const x = Math.max(8, Math.min(W - 64, p.x));
+          const y = Math.max(8, Math.min(H - 64, p.y));
+          setBubblePos({ x, y });
+        }
+      }
     } catch {}
+    // Re-clamp on resize (rotation mobile, redim desktop)
+    const onResize = () => {
+      setBubblePos((p) => {
+        if (!p) return p;
+        const W = window.innerWidth, H = window.innerHeight;
+        return { x: Math.max(8, Math.min(W - 64, p.x)), y: Math.max(8, Math.min(H - 64, p.y)) };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Sauvegarde la position quand elle change (après un drag)
@@ -191,7 +210,19 @@ export default function ChatWidget() {
     ? { bottom: '1.25rem', left: '1.25rem' }
     : { bottom: '1.25rem', right: '1.25rem' };
 
-  if (hidden) return null;
+  // Si masqué : afficher un mini-tab discret en bas à droite pour le réafficher
+  if (hidden) {
+    return (
+      <button
+        onClick={() => setHidden(false)}
+        aria-label="Réafficher le chat"
+        title="Réafficher le chat"
+        className="fixed bottom-4 right-2 z-50 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs text-white/60 shadow ring-1 ring-white/15 backdrop-blur transition hover:bg-white/20 hover:text-white"
+      >
+        💬
+      </button>
+    );
+  }
 
   return (
     <>
@@ -210,7 +241,7 @@ export default function ChatWidget() {
             onClick={() => setHidden(true)}
             aria-label="Masquer le chat"
             className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] text-white/70 shadow ring-1 ring-white/20 hover:text-white"
-            title="Masquer (réapparaît au prochain rechargement)"
+            title="Masquer (réafficher via le mini-bouton coin bas-droit)"
           >
             ×
           </button>
