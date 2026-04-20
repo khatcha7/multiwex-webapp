@@ -125,6 +125,7 @@ export default function ChatWidget() {
   const starterSuggestions = String(starterRaw).split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 4);
   const bubbleColor = getConfig('chatbot.bubble_color') || '#e8005a';
   const positionLeft = getConfig('chatbot.position') === 'bottom-left';
+  const ellieEnabled = getBool('chatbot.ellie_enabled', false);
 
   useEffect(() => {
     let sid = sessionStorage.getItem('mw_chat_sid');
@@ -292,13 +293,15 @@ export default function ChatWidget() {
                 {bookingMode ? 'Mode réservation IA · dispo en direct' : 'Assistant Multiwex · 24/7'}
               </div>
             </div>
-            <button
-              onClick={toggleBookingMode}
-              className="mr-2 rounded border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase text-white transition hover:bg-white/20"
-              title={bookingMode ? 'Revenir au mode questions' : 'Passer en mode réservation IA'}
-            >
-              {bookingMode ? '← FAQ' : '🎟 Réserver'}
-            </button>
+            {ellieEnabled && (
+              <button
+                onClick={toggleBookingMode}
+                className="mr-2 rounded border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-bold uppercase text-white transition hover:bg-white/20"
+                title={bookingMode ? 'Revenir au mode questions' : 'Passer en mode réservation IA'}
+              >
+                {bookingMode ? '← FAQ' : '🎟 Réserver'}
+              </button>
+            )}
             <button onClick={() => setOpen(false)} aria-label="Fermer" className="text-xl text-white/80 hover:text-white">✕</button>
           </div>
 
@@ -343,12 +346,14 @@ export default function ChatWidget() {
                         </button>
                       ))}
                     </div>
-                    <button
-                      onClick={toggleBookingMode}
-                      className="mt-3 block w-full rounded border border-mw-cyan/40 bg-mw-cyan/10 px-3 py-2 text-center text-xs font-bold text-mw-cyan transition hover:bg-mw-cyan/20"
-                    >
-                      ✨ Ou réserve direct avec Ellie IA →
-                    </button>
+                    {ellieEnabled && (
+                      <button
+                        onClick={toggleBookingMode}
+                        className="mt-3 block w-full rounded border border-mw-cyan/40 bg-mw-cyan/10 px-3 py-2 text-center text-xs font-bold text-mw-cyan transition hover:bg-mw-cyan/20"
+                      >
+                        ✨ Ou réserve direct avec Ellie IA →
+                      </button>
+                    )}
                   </>
                 )}
               </>

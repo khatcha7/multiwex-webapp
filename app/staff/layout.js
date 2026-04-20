@@ -34,9 +34,26 @@ export default function StaffLayout({ children }) {
 
   if (pathname === '/staff/login') return children;
 
+  const [pendingChatbot, setPendingChatbot] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const r = await fetch('/api/chatbot-escalations?count_pending=1', { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setPendingChatbot(j.count || 0);
+      } catch {}
+    }
+    load();
+    const id = setInterval(load, 30000); // refresh toutes les 30s
+    return () => { cancelled = true; clearInterval(id); };
+  }, [pathname]);
+
   const tabs = [
     { href: '/staff/calendar', label: 'Calendrier', perm: 'calendar' },
     { href: '/staff/bookings', label: 'Réservations', perm: 'bookings_view' },
+    { href: '/staff/chatbot-requests', label: 'Demandes IA', perm: 'bookings_view', badge: pendingChatbot },
     { href: '/staff/on-site', label: 'Sur place', perm: 'on_site_booking' },
     { href: '/staff/reports', label: 'Reports', perm: 'financial_reports' },
     { href: '/staff/settings', label: 'Réglages', perm: 'settings' },
@@ -83,11 +100,16 @@ export default function StaffLayout({ children }) {
                 <Link
                   key={t.href}
                   href={t.href}
-                  className={`display shrink-0 rounded-md px-3 py-1.5 text-xs transition ${
+                  className={`display relative shrink-0 rounded-md px-3 py-1.5 text-xs transition ${
                     active ? 'bg-mw-pink text-white' : 'text-white/70 hover:bg-white/10'
                   }`}
                 >
                   {t.label}
+                  {t.badge > 0 && (
+                    <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-mw-red px-1 text-[10px] font-bold text-white">
+                      {t.badge > 99 ? '99+' : t.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -108,11 +130,16 @@ export default function StaffLayout({ children }) {
                   <Link
                     key={t.href}
                     href={t.href}
-                    className={`display rounded-md px-3 py-2 text-sm transition ${
+                    className={`display flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
                       active ? 'bg-mw-pink text-white' : 'text-white/80 hover:bg-white/10'
                     }`}
                   >
-                    {t.label}
+                    <span>{t.label}</span>
+                    {t.badge > 0 && (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-mw-red px-1.5 text-[11px] font-bold text-white">
+                        {t.badge > 99 ? '99+' : t.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
