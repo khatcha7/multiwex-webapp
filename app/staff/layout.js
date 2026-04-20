@@ -18,6 +18,24 @@ export default function StaffLayout({ children }) {
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
+  const [pendingChatbot, setPendingChatbot] = useState(0);
+  useEffect(() => {
+    // Ne fetch que si staff connecté et pas sur login
+    if (!hydrated || !staff || pathname === '/staff/login') return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const r = await fetch('/api/chatbot-escalations?count_pending=1', { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setPendingChatbot(j.count || 0);
+      } catch {}
+    }
+    load();
+    const id = setInterval(load, 30000); // refresh toutes les 30s
+    return () => { cancelled = true; clearInterval(id); };
+  }, [pathname, hydrated, staff]);
+
   const logout = () => {
     if (staff) logAudit({ action: 'logout', entityType: 'staff_session', entityId: staff.id });
     setActiveStaff(null);
@@ -33,22 +51,6 @@ export default function StaffLayout({ children }) {
   }
 
   if (pathname === '/staff/login') return children;
-
-  const [pendingChatbot, setPendingChatbot] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const r = await fetch('/api/chatbot-escalations?count_pending=1', { cache: 'no-store' });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (!cancelled) setPendingChatbot(j.count || 0);
-      } catch {}
-    }
-    load();
-    const id = setInterval(load, 30000); // refresh toutes les 30s
-    return () => { cancelled = true; clearInterval(id); };
-  }, [pathname]);
 
   const tabs = [
     { href: '/staff/calendar', label: 'Calendrier', perm: 'calendar' },
