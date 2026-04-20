@@ -36,6 +36,64 @@ export default function ChatWidget() {
 
   const scrollRef = useRef(null);
 
+  // Bulle déplaçable (mobile + desktop) + masquage temporaire
+  const [bubblePos, setBubblePos] = useState(null); // { x, y } en pixels OU null = position par défaut
+  const [hidden, setHidden] = useState(false);
+  const dragRef = useRef({ startX: 0, startY: 0, origX: 0, origY: 0, dragging: false });
+  const justDragged = useRef(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mw_chat_bubble_pos');
+      if (saved) setBubblePos(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Sauvegarde la position quand elle change (après un drag)
+  useEffect(() => {
+    if (bubblePos) {
+      try { localStorage.setItem('mw_chat_bubble_pos', JSON.stringify(bubblePos)); } catch {}
+    }
+  }, [bubblePos]);
+
+  function onPointerDown(e) {
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: rect.left,
+      origY: rect.top,
+      dragging: false,
+      target,
+    };
+    target.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      const d = dragRef.current;
+      const dx = ev.clientX - d.startX;
+      const dy = ev.clientY - d.startY;
+      if (!d.dragging && Math.abs(dx) + Math.abs(dy) < 8) return;
+      d.dragging = true;
+      const W = window.innerWidth, H = window.innerHeight;
+      const newX = Math.max(8, Math.min(W - 64, d.origX + dx));
+      const newY = Math.max(8, Math.min(H - 64, d.origY + dy));
+      setBubblePos({ x: newX, y: newY });
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      if (dragRef.current.dragging) {
+        justDragged.current = true;
+        setTimeout(() => { justDragged.current = false; }, 150);
+      }
+      dragRef.current.dragging = false;
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  }
+
   // Config dynamique (lue côté client depuis cache config)
   const enabled = getBool('chatbot.enabled', true);
   const botName = getConfig('chatbot.bot_name') || '🤖 Multibot';
@@ -126,25 +184,43 @@ export default function ChatWidget() {
 
   const lastBot = [...messages].reverse().find((m) => m.role === 'bot');
   const liveSuggestions = lastBot?.suggestions || [];
-  const positionStyle = positionLeft ? { bottom: '1.25rem', left: '1.25rem' } : { bottom: '1.25rem', right: '1.25rem' };
+  const bubbleStyle = bubblePos
+    ? { left: bubblePos.x, top: bubblePos.y }
+    : (positionLeft ? { bottom: '6rem', left: '1.25rem' } : { bottom: '6rem', right: '1.25rem' });
+  const panelStyle = positionLeft
+    ? { bottom: '1.25rem', left: '1.25rem' }
+    : { bottom: '1.25rem', right: '1.25rem' };
+
+  if (hidden) return null;
 
   return (
     <>
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Ouvrir le chat"
-          className="fixed z-50 flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg transition hover:scale-110"
-          style={{ ...positionStyle, background: `linear-gradient(135deg, ${bubbleColor} 0%, #7b00e0 100%)`, color: '#fff' }}
-        >
-          💬
-        </button>
+        <div className="fixed z-50" style={bubbleStyle}>
+          <button
+            onPointerDown={onPointerDown}
+            onClick={(e) => { if (!justDragged.current) setOpen(true); }}
+            aria-label="Ouvrir le chat"
+            className="flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg transition hover:scale-110 select-none touch-none"
+            style={{ background: `linear-gradient(135deg, ${bubbleColor} 0%, #7b00e0 100%)`, color: '#fff', cursor: 'grab' }}
+          >
+            💬
+          </button>
+          <button
+            onClick={() => setHidden(true)}
+            aria-label="Masquer le chat"
+            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] text-white/70 shadow ring-1 ring-white/20 hover:text-white"
+            title="Masquer (réapparaît au prochain rechargement)"
+          >
+            ×
+          </button>
+        </div>
       )}
 
       {open && (
         <div
           className="fixed z-50 flex h-[min(640px,85vh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-white/15 bg-mw-surface shadow-2xl"
-          style={{ ...positionStyle, boxShadow: `0 20px 60px -10px ${bubbleColor}55` }}
+          style={{ ...panelStyle, boxShadow: `0 20px 60px -10px ${bubbleColor}55` }}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3" style={{ background: `linear-gradient(90deg, ${bubbleColor} 0%, #7b00e0 100%)` }}>
             <div>
