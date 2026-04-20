@@ -6,7 +6,8 @@ function getCurrentStatus() {
   // Jour & heure en fuseau Bruxelles (le centre est en Belgique)
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Brussels', weekday: 'short' });
   const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const today = openingHours[dayMap[fmt.format(new Date())]];
+  const todayIdx = dayMap[fmt.format(new Date())];
+  const today = openingHours[todayIdx];
   const minutes = nowMinutesBrussels();
   const toMin = (hhmm) => {
     const [h, m] = hhmm.split(':').map(Number);
@@ -24,7 +25,7 @@ function getCurrentStatus() {
   }
   // trouver prochain jour ouvert
   for (let i = 1; i <= 7; i++) {
-    const nextDay = (now.getDay() + i) % 7;
+    const nextDay = (todayIdx + i) % 7;
     if (openingHours[nextDay]) {
       return `ACTUELLEMENT FERMÉ · OUVERTURE ${dayLabelsFrFull[nextDay].toUpperCase()} DE ${openingHours[nextDay].open} À ${openingHours[nextDay].close}`;
     }
