@@ -333,22 +333,22 @@ export default function StaffSettingsPage() {
           <input type="checkbox" checked={cfg['chatbot.enabled'] === true || cfg['chatbot.enabled'] === 'true'} onChange={(e) => save('chatbot.enabled', e.target.checked)} className="h-4 w-4 accent-mw-pink" />
           <span className="display">Activer le chatbot sur le site public</span>
         </label>
-        <label className="mb-4 flex items-start gap-2 rounded border border-mw-cyan/30 bg-mw-cyan/5 p-3 text-sm">
-          <input
-            type="checkbox"
-            checked={cfg['chatbot.ellie_enabled'] === true || cfg['chatbot.ellie_enabled'] === 'true'}
-            onChange={(e) => save('chatbot.ellie_enabled', e.target.checked)}
-            className="mt-1 h-4 w-4 accent-mw-cyan"
-          />
-          <span>
+        <div className="mb-4 rounded border border-mw-cyan/30 bg-mw-cyan/5 p-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={cfg['chatbot.ellie_enabled'] === true || cfg['chatbot.ellie_enabled'] === 'true'}
+              onChange={(e) => save('chatbot.ellie_enabled', e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-mw-cyan"
+            />
             <span className="display text-mw-cyan">✨ Activer Ellie IA (réservation conversationnelle)</span>
-            <div className="mt-1 text-xs text-white/60">
-              Si activé, les clients voient un bouton "🎟 Réserver" dans le chat pour faire leur réservation en conversation avec Claude (coût ~0,20€ par réservation menée jusqu'au paiement).
-              <br />
-              <span className="text-mw-yellow">Si désactivé : chatbot FAQ uniquement, 0€ de coût API.</span>
-            </div>
-          </span>
-        </label>
+          </label>
+          <p className="mt-2 pl-6 text-xs text-white/60">
+            Si activé, les clients voient un bouton « 🎟 Réserver » dans le chat pour faire leur réservation en conversation avec Claude (coût ~0,20 € par réservation menée jusqu'au paiement).
+            <br />
+            <span className="text-mw-yellow">Si désactivé : chatbot FAQ uniquement, 0 € de coût API.</span>
+          </p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nom du bot" value={cfg['chatbot.bot_name']} onSave={(v) => save('chatbot.bot_name', v)} />
           <div>
