@@ -269,10 +269,11 @@ export default function ChatWidget() {
             💬
           </button>
           <button
-            onClick={() => setHidden(true)}
+            onClick={(e) => { e.stopPropagation(); setHidden(true); }}
             aria-label="Masquer le chat"
-            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] text-white/70 shadow ring-1 ring-white/20 hover:text-white"
+            className="absolute flex h-5 w-5 items-center justify-center rounded-full bg-black text-xs leading-none text-white shadow ring-1 ring-white/30 hover:bg-red-600"
             title="Masquer (réafficher via le mini-bouton coin bas-droit)"
+            style={{ top: '-14px', right: '-14px', zIndex: 60 }}
           >
             ×
           </button>

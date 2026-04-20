@@ -62,7 +62,9 @@ export default function StaffSettingsPage() {
 
   const save = async (key, value) => {
     await setConfig(key, value);
-    setCfg(getAllConfig());
+    // Spread obligatoire : getAllConfig() retourne la MÊME référence que _configCache.
+    // Sans spread, React ne détecte pas le changement d'état → le toggle revient visuellement.
+    setCfg({ ...getAllConfig() });
     logAudit({ action: 'update_config', entityType: 'config', entityId: key, after: { value } });
   };
 
