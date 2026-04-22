@@ -88,16 +88,12 @@ export default function StepRecap({ onConfirm }) {
   };
 
   const startPayment = () => {
-    if (sending) return; // Anti double-click
+    if (sending) return;
     if (!email || !firstName || !lastName) return alert('Nom, prénom et email requis');
     if (!cgvAccepted) return alert('Veuillez accepter les CGV');
     if (!disclaimersAccepted) return alert('Veuillez confirmer avoir pris connaissance des restrictions');
-    if (total === 0) {
-      setSending(true);
-      confirmBooking('free');
-    } else {
-      setPaymentStep('choose');
-    }
+    setSending(true);
+    confirmBooking(total === 0 ? 'free' : 'direct');
   };
 
   const processPayment = async (method) => {
@@ -430,7 +426,7 @@ export default function StepRecap({ onConfirm }) {
         disabled={!firstName || !lastName || !email || !cgvAccepted || !disclaimersAccepted || sending}
         className="btn-primary mt-6 w-full md:w-auto"
       >
-        {sending ? 'Envoi…' : total === 0 ? 'Confirmer la réservation →' : `Payer ${total.toFixed(2)}€ →`}
+        {sending ? 'Confirmation en cours…' : total === 0 ? 'Confirmer la réservation →' : `Confirmer — ${total.toFixed(2)}€ →`}
       </button>
 
       {paymentStep && (

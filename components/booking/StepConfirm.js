@@ -11,15 +11,17 @@ export default function StepConfirm({ onRestart }) {
 
   useEffect(() => {
     const b = sessionStorage.getItem('mw_last_booking');
-    if (b) {
-      setBooking(JSON.parse(b));
-      const popups = getPopups().filter((p) => p.enabled && p.trigger === 'after_confirmation').sort((a, b) => (a.order || 0) - (b.order || 0));
-      setPopupQueue(popups);
-      if (popups.length > 0) {
-        const t = setTimeout(() => setPopupIndex(0), 1500);
-        return () => clearTimeout(t);
+    if (!b) return;
+    setBooking(JSON.parse(b));
+    let timer;
+    getPopups().then((allPopups) => {
+      const filtered = (allPopups || []).filter((p) => p.enabled && p.trigger === 'after_confirmation').sort((a, b) => (a.order || 0) - (b.order || 0));
+      setPopupQueue(filtered);
+      if (filtered.length > 0) {
+        timer = setTimeout(() => setPopupIndex(0), 1500);
       }
-    }
+    }).catch(() => {});
+    return () => clearTimeout(timer);
   }, []);
 
   const current = popupIndex >= 0 ? popupQueue[popupIndex] : null;
@@ -63,7 +65,6 @@ export default function StepConfirm({ onRestart }) {
       <h1 className="section-title mb-2">Réservation confirmée&nbsp;!</h1>
       <p className="mb-6 text-white/60">
         Un email de confirmation a été envoyé à <span className="text-mw-pink">{booking.customer.email}</span>
-        <span className="text-xs text-white/40"> (simulation démo)</span>
       </p>
       <div className="mx-auto max-w-md rounded border border-mw-pink/40 bg-gradient-to-br from-mw-pink/10 to-transparent p-6 text-left">
         <div className="mb-4 flex items-center justify-between">
