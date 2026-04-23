@@ -1,5 +1,6 @@
 import './globals.css';
 import { Archivo_Black, Montserrat } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { BookingProvider } from '@/lib/store';
 import { PublicTop, PublicFooter } from '@/components/PublicChrome';
 import DataInit from '@/components/DataInit';
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
           <main className="flex-1">{children}</main>
           <PublicFooter />
         </BookingProvider>
+        <Analytics />
       </body>
     </html>
   );
